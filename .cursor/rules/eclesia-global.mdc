@@ -1,0 +1,44 @@
+---
+description: Contrato global — spec-driven, testes, segurança, PT-BR, LGPD, tenancy
+alwaysApply: true
+---
+
+# Eclesia — contrato global
+
+Responda em **português brasileiro**.
+
+## Projeto
+
+SaaS de gestão eclesial modular, multi-tenant (banco por tenant) com LGPD.
+Monorepo: `api/` (Laravel) + `front/` (Vue 3). Visão: `docs/product/BRIEF.md`.
+Hierarquia: Tenant (organização) → 1..N Igrejas no banco do tenant (ADR-0002).
+1ª fase: fundação + núcleo + módulo ECC (PLAN-001). Decisões em aberto do BRIEF: perguntar.
+
+## Features novas
+
+1. Spec em `docs/specs/` (draft → approved).
+2. OpenAPI (`api/docs/specs/openapi.yaml`) antes de mudar API.
+3. Testes + implementação (TDD).
+4. ADR se decisão de arquitetura.
+5. PII → `$encryptable` + coluna TEXT; domínio da igreja → migration `tenant/` + `routes/tenant.php`.
+
+## Testes
+
+Toda alteração relevante exige testes no lado afetado:
+- `api/` → PHPUnit/Pest
+- `front/` → Vitest
+- Cruza os dois → testes nos **dois** lados
+
+Coverage mínimo 80% onde aplicável.
+
+## API
+
+- Rotas `/api/v1/`
+- `declare(strict_types=1);` em todo PHP novo
+- UUID/ULID em URLs públicas — não IDs sequenciais
+- Multi-tenant: `stancl/tenancy`; LGPD: `elgibor-solution/laravel-database-encryption`
+
+## Segurança
+
+Não versionar credenciais nem `.env` com valores reais.
+Não gravar PII em texto claro no banco.

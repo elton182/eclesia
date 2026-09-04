@@ -1,0 +1,51 @@
+# Dependências
+node_modules/
+package-lock.json
+
+# Build de desenvolvimento (não necessário para publicação)
+dist/
+.vite/
+
+# Arquivos de desenvolvimento
+*.log
+.DS_Store
+.env
+.env.local
+.env.*.local
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Testes
+coverage/
+.nyc_output/
+
+# Documentação de desenvolvimento
+docs/
+*.md
+!README.md
+
+# Scripts
+scripts/
+
+# Configurações de desenvolvimento
+vite.config.js
+tailwind.config.js
+jsconfig.json
+
+# Arquivos de exemplo
+index.html
+public/
+
+# Git
+.git/
+.gitignore
+
+# Outros
+.cache/
+temp/
+tmp/

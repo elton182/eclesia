@@ -1,0 +1,437 @@
+openapi: 3.0.3
+info:
+  title: Eclesia API
+  version: 0.2.0
+  description: |
+    API multi-tenant do Eclesia (gestão eclesial).
+    Contexto central (landlord): `/admin/*`.
+    Contexto tenant: header `X-Tenant` (slug) + auth web/Sanctum.
+    Dados pessoais criptografados em repouso (LGPD).
+servers:
+  - url: http://localhost:8000/api/v1
+    description: Local
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Sanctum
+    tenantHeader:
+      type: apiKey
+      in: header
+      name: X-Tenant
+  schemas:
+    Tenant:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    EccEquipe:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        nome:
+          type: string
+        cor:
+          type: string
+          nullable: true
+        casais_count:
+          type: integer
+    EccCasal:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        equipe_id:
+          type: string
+          format: uuid
+          nullable: true
+        equipe_nome:
+          type: string
+          nullable: true
+        nome:
+          type: string
+        email:
+          type: string
+          nullable: true
+        telefone:
+          type: string
+          nullable: true
+        data_nascimento:
+          type: string
+          nullable: true
+        nome_conjuge:
+          type: string
+        email_conjuge:
+          type: string
+          nullable: true
+        telefone_conjuge:
+          type: string
+          nullable: true
+        data_nascimento_conjuge:
+          type: string
+          nullable: true
+        endereco:
+          type: string
+          nullable: true
+        bairro:
+          type: string
+          nullable: true
+        cidade:
+          type: string
+          nullable: true
+        uf:
+          type: string
+          nullable: true
+        cep:
+          type: string
+          nullable: true
+        data_casamento:
+          type: string
+          nullable: true
+        filhos:
+          type: string
+          nullable: true
+        observacoes:
+          type: string
+          nullable: true
+paths:
+  /health:
+    get:
+      summary: Health check (central ou tenant conforme host/contexto)
+      responses:
+        '200':
+          description: OK
+  /admin/login:
+    post:
+      summary: Login super-admin (plataforma)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+      responses:
+        '200':
+          description: Token Sanctum + dados do admin
+        '403':
+          description: Credenciais inválidas
+  /admin/me:
+    post:
+      summary: Super-admin autenticado
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Dados do admin
+        '401':
+          description: Não autenticado
+  /admin/logout:
+    post:
+      summary: Logout super-admin
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Logout efetuado
+  /admin/tenants:
+    get:
+      summary: Listar tenants
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Lista de tenants
+    post:
+      summary: Criar tenant (provisiona banco)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, slug]
+              properties:
+                name:
+                  type: string
+                slug:
+                  type: string
+                  pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$'
+      responses:
+        '201':
+          description: Tenant criado
+        '422':
+          description: Validação
+  /admin/tenants/{id}:
+    get:
+      summary: Detalhe do tenant
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Tenant
+        '404':
+          description: Não encontrado
+    put:
+      summary: Atualizar tenant
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                slug:
+                  type: string
+      responses:
+        '200':
+          description: Atualizado
+    delete:
+      summary: Remover tenant e banco
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Removido
+  /web/login:
+    post:
+      summary: Login web (tenant)
+      description: Requer header X-Tenant. E-mail via whereEncrypted.
+      security:
+        - tenantHeader: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+      responses:
+        '200':
+          description: Login OK (cookies access/refresh)
+        '403':
+          description: Credenciais inválidas
+  /web/me:
+    post:
+      summary: Usuário autenticado (tenant)
+      security:
+        - tenantHeader: []
+      responses:
+        '200':
+          description: Dados do usuário
+        '401':
+          description: Não autenticado
+  /web/logout:
+    post:
+      summary: Logout web (tenant)
+      security:
+        - tenantHeader: []
+      responses:
+        '200':
+          description: Logout efetuado
+  /ecc/equipes:
+    get:
+      summary: Listar equipes ECC
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      responses:
+        '200':
+          description: Lista
+    post:
+      summary: Criar equipe
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nome]
+              properties:
+                nome:
+                  type: string
+                cor:
+                  type: string
+      responses:
+        '201':
+          description: Criada
+  /ecc/equipes/{id}:
+    get:
+      summary: Detalhe equipe
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Equipe
+    put:
+      summary: Atualizar equipe
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Atualizada
+    delete:
+      summary: Remover equipe
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Removida
+  /ecc/casais:
+    get:
+      summary: Listar casais
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      responses:
+        '200':
+          description: Lista
+    post:
+      summary: Criar casal
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      responses:
+        '201':
+          description: Criado
+  /ecc/casais/import:
+    post:
+      summary: Importar casais (linhas da planilha)
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rows]
+              properties:
+                rows:
+                  type: array
+                  items:
+                    type: object
+      responses:
+        '200':
+          description: Resultado da importação
+  /ecc/casais/{id}:
+    get:
+      summary: Detalhe casal
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Casal
+    put:
+      summary: Atualizar casal
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Atualizado
+    delete:
+      summary: Remover casal
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Removido

@@ -1,0 +1,41 @@
+# Dependências / IDE
+.idea/
+.vscode/
+.fleet/
+.zed/
+*.swp
+.DS_Store
+
+# Env e secrets
+.env
+.env.*
+!.env.example
+auth.json
+*.pem
+*.key
+
+# Logs e caches
+*.log
+npm-debug.log*
+.phpunit.cache
+.phpunit.result.cache
+
+# API
+api/vendor/
+api/node_modules/
+api/public/build/
+api/public/hot/
+api/public/storage/
+api/storage/*.key
+api/storage/pail/
+api/.phpunit.cache
+
+# Front
+front/node_modules/
+front/dist/
+front/.env
+front/.env.*
+!front/.env.example
+
+# Prototipo lixo Windows
+*:Zone.Identifier

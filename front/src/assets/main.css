@@ -1,0 +1,185 @@
+@import './base.css';
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  :root {
+    /* Marca Eclesia (logo.png) */
+    --color-primary: #00234E;
+    --color-primary-dark: #001A3A;
+    --color-primary-soft: #0A3A6B;
+    --color-accent: #C5A059;
+    --color-accent-dark: #A8863F;
+    --color-accent-soft: #E8D9B5;
+    --color-bg: #F4F6F9;
+    --color-surface: #FFFFFF;
+    --color-surface-2: #EEF2F7;
+    --color-ink: #1A2332;
+    --color-muted: #6B7A8F;
+    --color-line: #D8DEE8;
+    --color-ok: #3E7C63;
+    --color-danger: #A23A3A;
+    --radius: 16px;
+    --shadow: 0 1px 2px rgba(0, 35, 78, 0.04), 0 8px 24px rgba(0, 35, 78, 0.06);
+  }
+
+  html {
+    font-family: 'Figtree', system-ui, sans-serif;
+  }
+
+  body {
+    @apply transition-colors duration-300;
+    background: var(--color-bg);
+    color: var(--color-ink);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .dark body {
+    background: #0B1220;
+    color: #E8EEF6;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Fraunces', Georgia, serif;
+    font-weight: 600;
+  }
+
+  button {
+    transition: opacity 0.2s, background-color 0.2s;
+  }
+
+  button:focus {
+    outline: none;
+  }
+}
+
+@layer components {
+  .card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+  }
+
+  .btn {
+    @apply px-4 py-2.5 font-semibold inline-flex items-center gap-2 transition-all duration-200 focus:outline-none;
+    border-radius: 11px;
+    font-size: 14px;
+  }
+
+  .btn-primary {
+    background: var(--color-primary);
+    color: #F7F4EE;
+  }
+
+  .btn-primary:hover {
+    background: var(--color-primary-dark);
+  }
+
+  .btn-accent {
+    background: var(--color-accent);
+    color: var(--color-primary);
+  }
+
+  .btn-accent:hover {
+    background: var(--color-accent-dark);
+    color: #fff;
+  }
+
+  .btn-ghost {
+    background: var(--color-surface-2);
+    color: var(--color-ink);
+    border: 1px solid var(--color-line);
+  }
+
+  .btn-ghost:hover {
+    background: #e4ebf3;
+  }
+
+  .btn-danger {
+    @apply bg-red-700 hover:bg-red-800 text-white;
+  }
+
+  .input {
+    @apply w-full px-3.5 py-2.5 transition-all duration-200;
+    font-size: 14.5px;
+    border: 1px solid var(--color-line);
+    border-radius: 11px;
+    background: var(--color-surface);
+    color: var(--color-ink);
+  }
+
+  .input:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(0, 35, 78, 0.12);
+  }
+
+  .fld {
+    display: block;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--color-muted);
+    margin-bottom: 6px;
+  }
+
+  .page-eyebrow {
+    font-size: 12px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--color-accent);
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+
+  .badge {
+    @apply px-2 py-1 rounded-full text-xs font-semibold inline-flex items-center gap-1;
+  }
+
+  .badge-info {
+    background: rgba(0, 35, 78, 0.08);
+    color: var(--color-primary);
+  }
+
+  .badge-success {
+    @apply bg-green-100 text-green-800;
+  }
+
+  .badge-warning {
+    background: rgba(197, 160, 89, 0.18);
+    color: var(--color-accent-dark);
+  }
+
+  .badge-danger {
+    @apply bg-red-100 text-red-800;
+  }
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-surface-2);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-primary);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-primary-dark);
+}

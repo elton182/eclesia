@@ -1,0 +1,18 @@
+---
+description: Convenções front Vue 3 — Innov UI, Pinia, Sanctum
+globs: front/**/*
+alwaysApply: false
+---
+
+# Front
+
+Leia `front/CLAUDE.md` e `front/AGENTS.md`.
+
+- Composition API com `<script setup>`
+- Preferir componentes `Innov*` existentes
+- Tipos via OpenAPI — não duplicar modelos
+- `data-testid` em elementos testáveis
+- Alteração relevante no front exige testes Vitest; se cruzar com `api/`, testes PHPUnit/Pest também
+- Axios em `src/services/api.js` com credentials/CSRF
+- Endpoints tenant alinhados à API (`web/login`, `web/me`, `web/logout`)
+- Host do front = domínio do tenant

@@ -1,0 +1,191 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Tests\Feature;
+
+use App\Models\Casal;
+use App\Models\EccEquipe;
+use App\Models\Igreja;
+use App\Models\SuperAdmin;
+use App\Models\Tenant;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\File;
+use Laravel\Sanctum\Sanctum;
+use Tests\TestCase;
+
+class EccEquipeCasalTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private Tenant $tenant;
+
+    private SuperAdmin $admin;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->admin = SuperAdmin::query()->create([
+            'name' => 'Admin',
+            'email' => 'admin@test.local',
+            'password' => 'password',
+        ]);
+
+        Sanctum::actingAs($this->admin);
+
+        $response = $this->postJson('/api/v1/admin/tenants', [
+            'name' => 'Demo',
+            'slug' => 'demo',
+        ]);
+
+        $response->assertCreated();
+        $this->tenant = Tenant::query()->where('slug', 'demo')->firstOrFail();
+    }
+
+    protected function tearDown(): void
+    {
+        if (tenancy()->initialized) {
+            tenancy()->end();
+        }
+
+        $dbPath = database_path('tenant'.$this->tenant->id);
+        if (File::exists($dbPath)) {
+            File::delete($dbPath);
+        }
+
+        parent::tearDown();
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function tenantJson(string $method, string $uri, array $data = [])
+    {
+        return $this->withHeader('X-Tenant', 'demo')->json($method, $uri, $data);
+    }
+
+    public function test_ecc_requires_tenant_header(): void
+    {
+        $this->getJson('/api/v1/ecc/equipes')->assertStatus(400);
+    }
+
+    public function test_can_manage_equipes_and_casais(): void
+    {
+        $equipe = $this->tenantJson('POST', '/api/v1/ecc/equipes', [
+            'nome' => 'Equipe A',
+            'cor' => '#00234E',
+        ])->assertCreated()
+            ->json('data');
+
+        $this->assertSame('EQUIPE A', $equipe['nome']);
+
+        $casal = $this->tenantJson('POST', '/api/v1/ecc/casais', [
+            'equipe_id' => $equipe['id'],
+            'nome' => 'João Silva',
+            'email' => 'joao@example.com',
+            'nome_conjuge' => 'Maria Silva',
+            'email_conjuge' => 'maria@example.com',
+            'cidade' => 'São Paulo',
+            'uf' => 'SP',
+            'data_casamento' => '10/05/2010',
+        ])->assertCreated()
+            ->json('data');
+
+        $this->assertSame('João Silva', $casal['nome']);
+        $this->assertSame('Maria Silva', $casal['nome_conjuge']);
+        $this->assertSame('EQUIPE A', $casal['equipe_nome']);
+
+        $this->tenantJson('GET', '/api/v1/ecc/casais')
+            ->assertOk()
+            ->assertJsonCount(1, 'data');
+    }
+
+    public function test_import_casais_from_spreadsheet_rows(): void
+    {
+        $result = $this->tenantJson('POST', '/api/v1/ecc/casais/import', [
+            'rows' => [
+                [
+                    'equipe' => 'EQUIPE B',
+                    'nome' => 'Carlos',
+                    'e-mail' => 'carlos@example.com',
+                    'nome conjuge' => 'Ana',
+                    'e-mail conjuge' => 'ana@example.com',
+                    'cidade' => 'Campinas',
+                    'uf' => 'SP',
+                ],
+                [
+                    'equipe' => 'EQUIPE B',
+                    'nome' => 'Pedro',
+                    'nome conjuge' => 'Paula',
+                ],
+            ],
+        ])->assertOk()
+            ->json();
+
+        $this->assertSame(2, $result['imported']);
+        $this->assertSame([], $result['errors']);
+
+        $this->tenant->run(function () {
+            $this->assertSame(1, EccEquipe::query()->count());
+            $this->assertSame(2, Casal::query()->count());
+            $this->assertSame(1, Igreja::query()->count());
+        });
+    }
+
+    public function test_import_formato_ecc_xlsx_nome_combinado(): void
+    {
+        $result = $this->tenantJson('POST', '/api/v1/ecc/casais/import', [
+            'rows' => [
+                [
+                    'Nº ' => 1,
+                    'Equipe' => 'Nossa Senhora da Glória',
+                    'Nome' => 'Luiz e Vera Lúcia',
+                    'Piloto' => 'SIM',
+                    'Endereço' => 'Rua das Flores, 10',
+                    'Telefone' => '99976-1273 / 99858-8043',
+                    'Têm filhos? Se sim, qual idade?' => '2 (já adultos)',
+                    'Quanto tempo de casados?' => 40,
+                    'Qual ECC vocês fizeram? ' => '8º',
+                    'Já trabalharam no encontro do ECC?' => 'Sim, Coordenou Cozinha',
+                    'Em qual função você gostaria de trabalhar?' => 'Café',
+                    'Casal dirigente? Qual função' => 'Não',
+                    'Já foi Cordenador Geral?' => 'Não',
+                    'Ficha Com foto:' => 'Sim',
+                    'Tem 2ª Etapa' => '11º',
+                    'Tem 3ª Etapa' => 'Não',
+                    'Indicação para 2025' => 'Acolhida',
+                ],
+                [
+                    'Equipe' => 'Nossa Senhora da Glória',
+                    'Nome' => 'Osébio e Célia',
+                    'Endereço' => 'Av. Central, 100',
+                    'Telefone' => '97286-3250',
+                ],
+            ],
+        ])->assertOk()
+            ->json();
+
+        $this->assertSame(2, $result['imported'], json_encode($result['errors']));
+        $this->assertSame([], $result['errors']);
+
+        $lista = $this->tenantJson('GET', '/api/v1/ecc/casais')->assertOk()->json('data');
+        $this->assertCount(2, $lista);
+
+        $primeiro = collect($lista)->firstWhere('nome', 'Luiz');
+        $this->assertNotNull($primeiro);
+        $this->assertSame('Vera Lúcia', $primeiro['nome_conjuge']);
+        $this->assertSame('NOSSA SENHORA DA GLÓRIA', $primeiro['equipe_nome']);
+        $this->assertSame('99976-1273', $primeiro['telefone']);
+        $this->assertSame('99858-8043', $primeiro['telefone_conjuge']);
+        $this->assertTrue($primeiro['piloto']);
+        $this->assertSame(40, $primeiro['anos_casados']);
+        $this->assertSame('8º', $primeiro['ecc_origem']);
+        $this->assertSame('Sim, Coordenou Cozinha', $primeiro['experiencia_servico']);
+        $this->assertSame('Café', $primeiro['preferencia_funcao']);
+        $this->assertTrue($primeiro['ficha_com_foto']);
+        $this->assertSame('11º', $primeiro['etapa_2']);
+        $this->assertStringContainsString('Indicação para 2025', (string) $primeiro['observacoes']);
+        $this->assertStringNotContainsString('Piloto:', (string) $primeiro['observacoes']);
+    }
+}

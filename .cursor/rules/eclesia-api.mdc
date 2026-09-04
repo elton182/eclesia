@@ -1,0 +1,19 @@
+---
+description: Convenções API Laravel — tenancy, LGPD, Sanctum
+globs: api/**/*
+alwaysApply: false
+---
+
+# API
+
+Leia `api/CLAUDE.md` e `api/AGENTS.md`.
+
+- Controllers finos; lógica em Services
+- Form Requests + API Resources
+- OpenAPI em `api/docs/specs/openapi.yaml` antes de implementar contrato
+- TDD: testes PHPUnit/Pest em `tests/` antes de fechar feature; alteração relevante na API exige testes; se cruzar com `front/`, testes Vitest também
+- Tenant: migrations em `database/migrations/tenant/`; rotas em `routes/tenant.php`
+- Central: `routes/api.php`; tables `tenants`/`domains`
+- LGPD: trait `EncryptedAttribute`, `$encryptable`, `whereEncrypted`, colunas TEXT
+- Login com e-mail criptografado: não usar `Auth::attempt` direto
+- Prefixo `/api/v1/`; `declare(strict_types=1);`

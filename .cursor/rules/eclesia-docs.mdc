@@ -1,0 +1,20 @@
+---
+description: Specs, planos e ADRs
+globs: docs/**/*
+alwaysApply: false
+---
+
+# Documentação
+
+| Tipo | Caminho |
+|------|---------|
+| Brief / visão | `docs/product/BRIEF.md` |
+| Spec | `docs/specs/SPEC-XXX.md` |
+| Plano | `docs/plans/PLAN-XXX.md` |
+| ADR | `docs/architecture/ADR-XXXX.md` |
+
+Não aprovar spec com `TODO` pendente.
+
+ADR-0001: LGPD + banco por tenant. ADR-0002: hierarquia Tenant→Igreja e identificação header/path. Consultar ambos (e o BRIEF) antes de mudar isolamento, hierarquia ou criptografia.
+
+Decisões em aberto no BRIEF: perguntar ao usuário antes de assumir.

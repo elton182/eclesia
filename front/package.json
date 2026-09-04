@@ -1,0 +1,64 @@
+{
+  "name": "eclesia-front",
+  "version": "1.0.0",
+  "description": "Front-end Vue 3 do Eclesia (base Innov)",
+  "type": "module",
+  "main": "./src/index.js",
+  "module": "./src/index.js",
+  "exports": {
+    ".": {
+      "import": "./src/index.js",
+      "require": "./src/index.js"
+    },
+    "./styles": "./src/assets/main.css",
+    "./components": "./src/components/index.js"
+  },
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "vue",
+    "vue3",
+    "components",
+    "ui",
+    "tailwindcss",
+    "innov"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "build:lib": "BUILD_MODE=library vite build",
+    "preview": "vite preview",
+    "create-project": "node scripts/create-project.js",
+    "test:run": "node --test src/**/*.spec.js"
+  },
+  "peerDependencies": {
+    "axios": "^1.8.4",
+    "pinia": "^3.0.1",
+    "vue": "^3.5.13",
+    "vue-router": "^4.5.0"
+  },
+  "dependencies": {
+    "@fortawesome/fontawesome-svg-core": "^6.7.2",
+    "@fortawesome/free-brands-svg-icons": "^6.7.2",
+    "@fortawesome/free-solid-svg-icons": "^6.7.2",
+    "@fortawesome/vue-fontawesome": "^3.0.8",
+    "vue-i18n": "^11.4.7",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.0.13",
+    "@vitejs/plugin-vue": "^5.2.1",
+    "tailwindcss": "^4.0.13",
+    "vite": "^6.2.1",
+    "vite-plugin-vue-devtools": "^7.7.2"
+  }
+}

@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ECC · Gestão do Movimento</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/vue/3.4.21/vue.global.prod.js"></script>
+<style>
+  :root{--bg:#F1E7DA;--surface:#FCFAF6;--surface-2:#F7F0E6;--wine:#7A2231;--wine-deep:#5A1622;--gold:#B0812F;--gold-soft:#EFE2C6;--ink:#2B2420;--muted:#8A7A6B;--line:#E7DACA;--ok:#3E7C63;--warn:#B4632A;--danger:#A23A3A;--radius:16px;--shadow:0 1px 2px rgba(43,36,32,.04),0 8px 24px rgba(90,22,34,.06);--m-acolhida:#C56A76;--m-cozinha:#C08A2E;--m-liturgia:#8A6FB0;--m-animacao:#CF7350;--m-ordem:#6B7C8C;--m-visitacao:#4F9089;--m-secretaria:#5B84B1;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{font-family:'Figtree',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;line-height:1.45}
+  #app{min-height:100vh;display:flex;flex-direction:column}
+  .shell{display:flex;flex:1;min-height:0}
+  .sidebar{width:236px;flex-shrink:0;background:var(--wine);color:#F7E8DC;padding:22px 16px;display:flex;flex-direction:column;gap:5px;position:sticky;top:0;height:100vh}
+  .brand{display:flex;align-items:center;gap:11px;padding:4px 8px 20px}
+  .brand .mark{width:38px;height:38px;flex-shrink:0;border-radius:11px;background:linear-gradient(150deg,#9c3444,#5A1622);display:grid;place-items:center;box-shadow:inset 0 0 0 1px rgba(255,255,255,.12)}
+  .brand .mark svg{width:22px;height:22px}
+  .brand h1{font-family:'Fraunces',serif;font-size:19px;font-weight:600;line-height:1;color:#FBEEE4}
+  .brand span{font-size:11px;color:#E7B9A9;letter-spacing:.14em;text-transform:uppercase;font-weight:600}
+  .nav-item{display:flex;align-items:center;gap:12px;padding:11px 12px;border-radius:11px;color:#EBCBBE;font-weight:500;font-size:14.5px;cursor:pointer;border:none;background:none;width:100%;text-align:left;transition:.15s}
+  .nav-item svg{width:19px;height:19px;flex-shrink:0;opacity:.9}
+  .nav-item:hover{background:rgba(255,255,255,.07);color:#FBEEE4}
+  .nav-item.active{background:#FCFAF6;color:var(--wine);font-weight:600}
+  .nav-item.active svg{opacity:1}
+  .sidebar .foot{margin-top:auto;font-size:11.5px;color:#D69E8E;padding:12px 10px 0;border-top:1px solid rgba(255,255,255,.12);line-height:1.5}
+  .main{flex:1;min-width:0;display:flex;flex-direction:column;overflow-y:auto;height:100vh}
+  .topbar{display:none}
+  .content{padding:26px 30px 40px;max-width:1120px;width:100%;margin:0 auto}
+  .page-head{margin-bottom:22px}
+  .eyebrow{font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);font-weight:700;margin-bottom:6px}
+  .page-head h2{font-family:'Fraunces',serif;font-size:29px;font-weight:600;line-height:1.1}
+  .page-head p{color:var(--muted);font-size:14.5px;margin-top:5px;max-width:64ch}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+  .btn{font-family:inherit;font-size:14px;font-weight:600;border:none;border-radius:11px;padding:10px 16px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;transition:.15s}
+  .btn svg{width:16px;height:16px}
+  .btn-primary{background:var(--wine);color:#FBEEE4}
+  .btn-primary:hover{background:var(--wine-deep)}
+  .btn-primary:disabled{opacity:.5;cursor:not-allowed}
+  .btn-ghost{background:var(--surface-2);color:var(--ink);border:1px solid var(--line)}
+  .btn-ghost:hover{background:#efe5d6}
+  .btn-sm{padding:7px 12px;font-size:13px;border-radius:9px}
+  .input{font-family:inherit;font-size:14.5px;padding:10px 13px;border:1px solid var(--line);border-radius:11px;background:var(--surface);color:var(--ink);width:100%;transition:.15s}
+  .input:focus{outline:none;border-color:var(--wine);box-shadow:0 0 0 3px rgba(122,34,49,.10)}
+  textarea.input{min-height:110px;resize:vertical;line-height:1.5}
+  label.fld{display:block;font-size:12.5px;font-weight:600;color:var(--muted);margin-bottom:6px}
+  .field{margin-bottom:14px}
+  .badge{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;padding:3px 9px;border-radius:100px;line-height:1.5}
+  .chip{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;padding:5px 11px;border-radius:100px;background:var(--surface-2);border:1px solid var(--line);color:var(--ink)}
+  .chip .dot{width:8px;height:8px;border-radius:100px;flex-shrink:0}
+  .couple{display:inline-flex;align-items:center}
+  .couple .disc{width:34px;height:34px;border-radius:100px;display:grid;place-items:center;font-weight:700;font-size:12px;color:#fff;border:2px solid var(--surface)}
+  .couple .disc:nth-child(2){margin-left:-11px}
+  .couple.sm .disc{width:27px;height:27px;font-size:10px}
+  .couple.lg .disc{width:44px;height:44px;font-size:15px}
+  .segmented{display:inline-flex;background:var(--surface-2);border:1px solid var(--line);border-radius:11px;padding:3px;margin-bottom:18px}
+  .segmented button{border:none;background:none;font-family:inherit;font-weight:600;font-size:13.5px;color:var(--muted);padding:8px 18px;border-radius:8px;cursor:pointer}
+  .segmented button.on{background:var(--surface);color:var(--wine);box-shadow:var(--shadow)}
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px}
+  .stat{padding:18px 18px 16px}
+  .stat .k{font-family:'Fraunces',serif;font-size:34px;font-weight:600;line-height:1;color:var(--wine)}
+  .stat .l{font-size:13px;color:var(--muted);margin-top:7px;font-weight:500}
+  .stat .sub{font-size:12px;color:var(--gold);font-weight:600;margin-top:3px}
+  .rows{display:flex;flex-direction:column}
+  .row{display:flex;align-items:center;gap:14px;padding:13px 18px;border-bottom:1px solid var(--line)}
+  .row:last-child{border-bottom:none}
+  .row .grow{flex:1;min-width:0}
+  .row .name{font-weight:600;font-size:14.5px}
+  .row .meta{font-size:12.5px;color:var(--muted);margin-top:1px}
+  .toolbar{display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap}
+  .toolbar .search{flex:1;min-width:180px;max-width:340px;position:relative}
+  .toolbar .search svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:var(--muted)}
+  .toolbar .search input{padding-left:36px}
+  .section-lbl{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:11px 0 7px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(258px,1fr));gap:14px}
+  .couple-card{padding:16px}
+  .couple-card .top{display:flex;align-items:center;gap:12px;margin-bottom:13px}
+  .couple-card .top .nm{font-weight:600;font-size:15px;line-height:1.2}
+  .couple-card .top .rl{font-size:12px;color:var(--muted);margin-top:2px}
+  .tags{display:flex;flex-wrap:wrap;gap:6px}
+  .team-card{overflow:hidden;display:flex;flex-direction:column}
+  .team-card .bar{height:5px}
+  .team-card .body{padding:16px 17px}
+  .team-card h3{font-family:'Fraunces',serif;font-size:19px;font-weight:600;display:flex;align-items:center;gap:9px}
+  .team-card .coord{font-size:13px;color:var(--muted);margin-top:8px;display:flex;align-items:center;gap:8px}
+  .team-card .count{margin-top:13px;display:flex;align-items:baseline;gap:6px}
+  .team-card .count b{font-family:'Fraunces',serif;font-size:24px;color:var(--wine)}
+  .team-card .count span{font-size:12.5px;color:var(--muted)}
+  .pcard{padding:18px;display:flex;flex-direction:column}
+  .pcard .ph{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px}
+  .pcard .ph h3{font-family:'Fraunces',serif;font-size:21px;font-weight:600;display:flex;align-items:center;gap:9px}
+  .lead{display:flex;align-items:center;gap:11px;padding:11px;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;margin-bottom:12px}
+  .lead .grow{flex:1}
+  .lead .nm{font-weight:600;font-size:14px}
+  .membros-list{display:flex;flex-direction:column;gap:8px}
+  .membro{display:flex;align-items:center;gap:10px}
+  .membro .nm{font-size:13.5px;font-weight:500}
+  .reuniao{margin-top:14px;padding-top:13px;border-top:1px solid var(--line);font-size:13px;color:var(--muted);display:flex;align-items:center;gap:8px}
+  .reuniao b{color:var(--ink);font-weight:600}
+  .escala-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+  .edition-pill{display:inline-flex;flex-direction:column;background:var(--wine);color:#FBEEE4;padding:12px 18px;border-radius:14px;box-shadow:var(--shadow)}
+  .edition-pill .t{font-family:'Fraunces',serif;font-size:17px;font-weight:600}
+  .edition-pill .d{font-size:12.5px;color:#E7B9A9;margin-top:2px}
+  .progress-wrap{flex:1;min-width:220px;max-width:420px}
+  .progress-wrap .lab{display:flex;justify-content:space-between;font-size:12.5px;color:var(--muted);margin-bottom:6px;font-weight:500}
+  .track{height:9px;border-radius:100px;background:var(--surface-2);overflow:hidden;border:1px solid var(--line)}
+  .track .fill{height:100%;background:linear-gradient(90deg,var(--gold),var(--wine));border-radius:100px;transition:width .4s}
+  .board{display:grid;grid-template-columns:repeat(auto-fill,minmax(268px,1fr));gap:14px;align-items:start}
+  .col{display:flex;flex-direction:column;overflow:hidden}
+  .col .hd{padding:13px 15px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line)}
+  .col .hd .lft{display:flex;align-items:center;gap:9px;min-width:0}
+  .col .hd h4{font-weight:600;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .col .hd .n{font-size:12px;color:var(--muted);font-weight:600;flex-shrink:0}
+  .col .assigned{padding:9px 11px;display:flex;flex-direction:column;gap:7px;min-height:8px}
+  .assign-chip{display:flex;align-items:center;gap:9px;padding:7px 8px 7px 9px;border-radius:11px;background:var(--surface-2);border:1px solid var(--line)}
+  .assign-chip .grow{flex:1;min-width:0}
+  .assign-chip .nm{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .assign-chip .rm{background:none;border:none;cursor:pointer;color:var(--muted);padding:4px;border-radius:7px;display:grid;place-items:center}
+  .assign-chip .rm:hover{background:#eadfce;color:var(--danger)}
+  .assign-chip svg{width:15px;height:15px}
+  .col .add{margin:4px 11px 12px;border:1.5px dashed var(--line);background:none;color:var(--muted);font-weight:600;font-size:13px;padding:9px;border-radius:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px;transition:.15s}
+  .col .add:hover{border-color:var(--wine);color:var(--wine);background:var(--surface-2)}
+  .col .add svg{width:15px;height:15px}
+  .empty-hint{font-size:12.5px;color:var(--muted);padding:6px 4px;text-align:center;font-style:italic}
+  .cal{padding:16px 16px 18px}
+  .cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+  .cal-head .mo{font-family:'Fraunces',serif;font-size:20px;font-weight:600}
+  .cal-nav{display:flex;gap:6px}
+  .cal-nav button{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:7px 9px;cursor:pointer;color:var(--ink);display:grid;place-items:center}
+  .cal-nav button:hover{background:#efe5d6}
+  .cal-nav button svg{width:16px;height:16px}
+  .cal-dow{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-bottom:5px}
+  .cal-dow span{text-align:center;font-size:11px;font-weight:700;color:var(--muted)}
+  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+  .cal-cell{min-height:66px;border:1px solid transparent;border-radius:10px;padding:5px;cursor:pointer;display:flex;flex-direction:column;gap:3px;transition:.12s;overflow:hidden}
+  .cal-cell.has{background:var(--surface-2)}
+  .cal-cell:hover.has{border-color:var(--line)}
+  .cal-cell.empty{cursor:default}
+  .cal-cell.today .dn{background:var(--wine);color:#fff}
+  .cal-cell.sel{border-color:var(--wine);box-shadow:0 0 0 2px rgba(122,34,49,.14)}
+  .cal-cell .dn{font-size:12.5px;font-weight:600;width:22px;height:22px;display:grid;place-items:center;border-radius:100px;color:var(--ink)}
+  .cal-cell .evs{display:flex;flex-direction:column;gap:2px;min-width:0}
+  .cal-ev{font-size:10px;font-weight:600;color:#fff;padding:1px 5px;border-radius:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.5;cursor:pointer}
+  .cal-more{font-size:9.5px;font-weight:700;color:var(--muted);padding-left:3px}
+  .legend{display:flex;flex-wrap:wrap;gap:12px;margin-top:14px;padding-top:13px;border-top:1px solid var(--line)}
+  .legend span{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);font-weight:500}
+  .legend .cd{width:9px;height:9px;border-radius:100px}
+  .fchips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+  .fchip{border:1px solid var(--line);background:var(--surface-2);color:var(--muted);font-family:inherit;font-weight:600;font-size:12.5px;padding:6px 13px;border-radius:100px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+  .fchip.on{background:var(--wine);color:#FBEEE4;border-color:var(--wine)}
+  .fchip .cd{width:8px;height:8px;border-radius:100px}
+  .mes-lbl{font-family:'Fraunces',serif;font-size:15px;font-weight:600;margin:18px 0 8px;text-transform:capitalize}
+  .ev-row{display:flex;align-items:center;gap:13px;padding:13px 16px;border-bottom:1px solid var(--line);cursor:pointer;transition:.12s}
+  .ev-row:last-child{border-bottom:none}
+  .ev-row:hover{background:var(--surface-2)}
+  .ev-date{flex-shrink:0;width:46px;text-align:center}
+  .ev-date .d{font-family:'Fraunces',serif;font-size:22px;font-weight:600;line-height:1;color:var(--wine)}
+  .ev-date .m{font-size:10.5px;text-transform:uppercase;color:var(--muted);font-weight:700}
+  .ev-bar{width:4px;align-self:stretch;border-radius:100px;flex-shrink:0}
+  .ev-row .grow{flex:1;min-width:0}
+  .ev-row .t{font-weight:600;font-size:14.5px}
+  .ev-row .s{font-size:12.5px;color:var(--muted);margin-top:2px;display:flex;gap:10px;flex-wrap:wrap}
+  .backbar{display:flex;align-items:center;gap:12px;margin-bottom:18px}
+  .backbtn{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:9px;cursor:pointer;display:grid;place-items:center;color:var(--ink)}
+  .backbtn:hover{background:var(--surface-2)}
+  .backbtn svg{width:18px;height:18px}
+  .detail-hero{padding:20px;margin-bottom:16px}
+  .detail-hero .k{font-family:'Fraunces',serif;font-size:24px;font-weight:600;display:flex;align-items:center;gap:10px}
+  .detail-hero .sub{color:var(--muted);font-size:13.5px;margin-top:7px;display:flex;gap:14px;flex-wrap:wrap}
+  .tgl{border:1px solid var(--line);background:var(--surface-2);color:var(--muted);font-family:inherit;font-weight:600;font-size:12.5px;padding:6px 13px;border-radius:100px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:.13s}
+  .tgl.on{background:#E4F0EA;border-color:#bfe0d0;color:var(--ok)}
+  .tgl.on.money{background:var(--gold-soft);border-color:#e2cf9e;color:#8a6414}
+  .tgl svg{width:14px;height:14px}
+  .cardpad{padding:16px 18px}
+  .cardpad h3{font-family:'Fraunces',serif;font-size:17px;font-weight:600;margin-bottom:4px;display:flex;align-items:center;gap:9px}
+  .cardpad .hint{font-size:12.5px;color:var(--muted);margin-bottom:12px}
+  .aval{padding:11px 13px;background:var(--surface-2);border:1px solid var(--line);border-radius:11px;margin-bottom:8px}
+  .aval .a{font-size:11.5px;font-weight:700;color:var(--wine);margin-bottom:3px}
+  .aval .t{font-size:13.5px}
+  .conta-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}
+  .conta-stat{padding:14px;background:var(--surface-2);border:1px solid var(--line);border-radius:12px}
+  .conta-stat .v{font-family:'Fraunces',serif;font-size:22px;font-weight:600}
+  .conta-stat .l{font-size:11.5px;color:var(--muted);margin-top:2px;font-weight:500}
+  .extr-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);font-size:13px}
+  .extr-row:last-child{border-bottom:none}
+  .extr-ic{width:26px;height:26px;border-radius:8px;display:grid;place-items:center;flex-shrink:0}
+  .extr-ic svg{width:15px;height:15px}
+  .extr-row .v{margin-left:auto;font-weight:700;font-variant-numeric:tabular-nums;flex-shrink:0}
+  .extr-row .v.pos{color:var(--ok)}
+  .extr-row .v.neg{color:var(--danger)}
+  .compra-row{display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+  .compra-row:last-child{border-bottom:none}
+  .compra-row .cinfo{flex:1;min-width:130px}
+  .compra-row .cn{font-weight:600;font-size:14px}
+  .compra-row .cq{font-size:12px;color:var(--muted);margin-top:1px}
+  .compra-actions{display:flex;gap:6px;flex-wrap:wrap}
+  .money-big{font-family:'Fraunces',serif;font-size:26px;font-weight:600;color:var(--ok)}
+  .overlay{position:fixed;inset:0;background:rgba(43,36,32,.42);backdrop-filter:blur(2px);display:flex;align-items:flex-end;justify-content:center;z-index:50}
+  @media(min-width:640px){.overlay{align-items:center;padding:20px}}
+  .modal{background:var(--surface);width:100%;max-width:480px;border-radius:20px 20px 0 0;box-shadow:0 -8px 40px rgba(43,36,32,.25);max-height:90vh;display:flex;flex-direction:column;animation:up .22s ease}
+  @media(min-width:640px){.modal{border-radius:20px}}
+  @keyframes up{from{transform:translateY(16px);opacity:.6}to{transform:none;opacity:1}}
+  .modal .mh{padding:18px 20px;border-bottom:1px solid var(--line);display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+  .modal .mh h3{font-family:'Fraunces',serif;font-size:19px;font-weight:600}
+  .modal .mh .sub{font-size:12.5px;color:var(--muted);margin-top:3px}
+  .modal .mb{padding:18px 20px;overflow-y:auto}
+  .modal .mf{padding:14px 20px;border-top:1px solid var(--line);display:flex;gap:10px;justify-content:flex-end}
+  .x{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:7px;cursor:pointer;display:grid;place-items:center;color:var(--muted);flex-shrink:0}
+  .x:hover{color:var(--ink)}
+  .x svg{width:16px;height:16px}
+  .pick{display:flex;align-items:center;gap:12px;padding:11px;border:1px solid var(--line);border-radius:12px;margin-bottom:8px;cursor:pointer;transition:.13s;background:var(--surface)}
+  .pick:hover:not(.disabled){border-color:var(--wine);background:var(--surface-2)}
+  .pick.sel{border-color:var(--wine);box-shadow:0 0 0 2px rgba(122,34,49,.14)}
+  .pick.disabled{opacity:.5;cursor:not-allowed}
+  .pick .grow{flex:1;min-width:0}
+  .pick .nm{font-weight:600;font-size:14px}
+  .aptidao{display:flex;gap:5px;flex-wrap:wrap;margin-top:4px}
+  .grp-lbl{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:12px 0 8px}
+  .grp-lbl:first-child{margin-top:2px}
+  .detail-row{display:flex;align-items:center;gap:10px;font-size:14px;padding:7px 0}
+  .detail-row .ic{width:20px;color:var(--muted);display:flex;justify-content:center}
+  .detail-row .ic svg{width:17px;height:17px}
+  .part-chip{display:flex;align-items:center;gap:9px;padding:6px 8px;border-radius:10px;background:var(--surface-2);border:1px solid var(--line);margin-bottom:7px}
+  .part-chip .grow{flex:1;min-width:0}
+  .part-chip .nm{font-size:13px;font-weight:600}
+  .part-chip .rm{background:none;border:none;cursor:pointer;color:var(--muted);padding:4px;border-radius:7px;display:grid;place-items:center}
+  .part-chip .rm:hover{background:#eadfce;color:var(--danger)}
+  .part-chip svg{width:14px;height:14px}
+  .tabbar{display:none}
+  @media(max-width:860px){
+    .sidebar{display:none}
+    .topbar{display:flex;align-items:center;gap:11px;padding:13px 16px;background:var(--wine);color:#FBEEE4;position:sticky;top:0;z-index:20}
+    .topbar .mark{width:32px;height:32px;border-radius:9px;background:linear-gradient(150deg,#9c3444,#5A1622);display:grid;place-items:center}
+    .topbar .mark svg{width:18px;height:18px}
+    .topbar h1{font-family:'Fraunces',serif;font-size:17px;font-weight:600}
+    .topbar h1 small{display:block;font-family:'Figtree';font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#E7B9A9;font-weight:600}
+    .main{height:auto}
+    .content{padding:18px 15px 92px;max-width:100%}
+    .stats{grid-template-columns:1fr 1fr;gap:11px}
+    .cal-cell{min-height:54px;padding:4px;gap:2px}
+    .cal-cell .dn{width:18px;height:18px;font-size:11px}
+    .cal-ev{font-size:8.5px;padding:1px 3px;border-radius:4px}
+    .cal-more{font-size:8px}
+    .cal-grid{gap:4px}
+    .conta-stats{grid-template-columns:1fr;gap:9px}
+    .tabbar{display:flex;position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--line);z-index:40;padding:6px 2px 8px;box-shadow:0 -2px 16px rgba(43,36,32,.07)}
+    .tabbar button{flex:1;background:none;border:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;padding:5px 1px;color:var(--muted);font-size:10px;font-weight:600;font-family:inherit}
+    .tabbar button svg{width:20px;height:20px}
+    .tabbar button.active{color:var(--wine)}
+    .page-head h2{font-size:24px}
+  }
+  @media(max-width:520px){.stats{grid-template-columns:1fr 1fr}.grid{grid-template-columns:1fr}.board{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="topbar"><div class="mark" v-html="icons.rings"></div><h1>Comunhão<small>Gestão do ECC</small></h1></div>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand"><div class="mark" v-html="icons.rings"></div><div><h1>Comunhão</h1><span>Gestão do ECC</span></div></div>
+      <button v-for="t in tabs" :key="t.id" class="nav-item" :class="{active:view===t.id}" @click="view=t.id"><span v-html="icons[t.icon]"></span>{{ t.label }}</button>
+      <div class="foot">Paróquia São José<br>1ª Etapa · 2026</div>
+    </aside>
+    <main class="main"><div class="content">
+
+      <!-- PAINEL -->
+      <section v-if="view==='painel'">
+        <div class="page-head"><div class="eyebrow">Paz e bem</div><h2>Painel</h2><p>A caminhada de relance: comunidade, equipes de perseverança, próximos eventos e o preparo da jornada anual.</p></div>
+        <div class="stats">
+          <div class="card stat"><div class="k">{{ casais.length }}</div><div class="l">Casais cadastrados</div><div class="sub">{{ pessoas.length }} pessoas</div></div>
+          <div class="card stat"><div class="k">{{ equipesPerseveranca.length }}</div><div class="l">Equipes de perseverança</div><div class="sub">reuniões mensais</div></div>
+          <div class="card stat"><div class="k">{{ ministerios.length }}</div><div class="l">Ministérios de serviço</div><div class="sub">{{ equipesComCoord }} com coordenação</div></div>
+          <div class="card stat"><div class="k">{{ totalEscalados }}</div><div class="l">Casais escalados</div><div class="sub">{{ pctEscala }}% da meta</div></div>
+        </div>
+        <div class="section-lbl">Próximos eventos</div>
+        <div class="card rows" style="margin-bottom:22px">
+          <div class="ev-row" v-for="e in proximosEventos" :key="e.id" @click="irParaEvento(e)">
+            <div class="ev-date"><div class="d">{{ e.dia }}</div><div class="m">{{ mesesAbrev[e.mes0] }}</div></div>
+            <div class="ev-bar" :style="{background:tipoCor(e.tipo)}"></div>
+            <div class="grow"><div class="t">{{ e.titulo }}</div><div class="s"><span>{{ tipoLabel(e.tipo) }}</span><span>{{ e.hora }}</span></div></div>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+          <div class="card" style="padding:20px">
+            <div class="eyebrow">Próximo encontro</div>
+            <h3 style="font-family:'Fraunces',serif;font-size:20px;font-weight:600;margin-top:2px">{{ edicao.nome }}</h3>
+            <div style="color:var(--muted);font-size:13.5px;margin-top:5px">{{ edicao.data }} · {{ edicao.local }}</div>
+            <div class="progress-wrap" style="max-width:none;margin-top:16px"><div class="lab"><span>Ministérios preenchidos</span><span>{{ totalEscalados }}/{{ metaEscala }}</span></div><div class="track"><div class="fill" :style="{width:pctEscala+'%'}"></div></div></div>
+            <button class="btn btn-ghost btn-sm" style="margin-top:14px" @click="view='escala'"><span v-html="icons.grid"></span>Abrir escala</button>
+          </div>
+          <div class="card" style="padding:20px;border-color:#e6c8ce">
+            <div class="eyebrow" style="color:var(--m-acolhida)">Jornada anual</div>
+            <h3 style="font-family:'Fraunces',serif;font-size:20px;font-weight:600;margin-top:2px">{{ eventoAnual.titulo }}</h3>
+            <div style="color:var(--muted);font-size:13.5px;margin-top:5px">{{ eventoAnual.dia }} de {{ meses[eventoAnual.mes0] }} · {{ eventoAnual.local }}</div>
+            <div style="display:flex;gap:16px;margin-top:14px">
+              <div><div class="money-big" style="font-size:20px;color:var(--wine)">{{ resumoCompras.providos }}/{{ resumoCompras.total }}</div><div style="font-size:11.5px;color:var(--muted)">itens providos</div></div>
+              <div><div class="money-big" style="font-size:20px">R$ {{ resumoCompras.saldo }}</div><div style="font-size:11.5px;color:var(--muted)">saldo em caixa</div></div>
+            </div>
+            <button class="btn btn-ghost btn-sm" style="margin-top:14px" @click="abrirEvento(eventoAnual,'painel')"><span v-html="icons.cart"></span>Lista de compras e caixa</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- COMUNIDADE -->
+      <section v-if="view==='comunidade'">
+        <div class="page-head"><div class="eyebrow">Comunidade</div><h2>Comunidade</h2><p>Pessoas cadastradas e os casais que formam. Cada casal indica onde deseja e onde já serviu.</p></div>
+        <div class="segmented"><button :class="{on:subCom==='pessoas'}" @click="subCom='pessoas'">Pessoas</button><button :class="{on:subCom==='casais'}" @click="subCom='casais'">Casais</button></div>
+        <template v-if="subCom==='pessoas'">
+          <div class="toolbar"><div class="search"><span v-html="icons.search"></span><input class="input" v-model="buscaPessoa" placeholder="Buscar por nome…" /></div><button class="btn btn-primary" @click="abrirNovaPessoa"><span v-html="icons.plus"></span>Nova pessoa</button></div>
+          <div class="rows card">
+            <div class="row" v-for="p in pessoasFiltradas" :key="p.id">
+              <div :style="{width:'38px',height:'38px',borderRadius:'100px',display:'grid',placeItems:'center',color:'#fff',fontWeight:700,fontSize:'13px',background:corPessoa(p.id),flexShrink:0}">{{ iniciais(p.nome) }}</div>
+              <div class="grow"><div class="name">{{ p.nome }}</div><div class="meta">{{ p.casalId ? 'Casal · ' + nomeCasal(p.casalId) : 'Sem casal vinculado' }}</div></div>
+              <span class="badge" :style="badgePapel(p.papel)">{{ p.papel }}</span>
+            </div>
+            <div class="row" v-if="pessoasFiltradas.length===0"><div class="grow"><div class="meta">Ninguém encontrado.</div></div></div>
+          </div>
+        </template>
+        <template v-else>
+          <div class="grid">
+            <div class="card couple-card" v-for="c in casais" :key="c.id">
+              <div class="top"><div class="couple lg"><div class="disc" :style="{background:corPessoa(c.pessoaIds[0])}">{{ iniciaisPessoa(c.pessoaIds[0]) }}</div><div class="disc" :style="{background:corPessoa(c.pessoaIds[1])}">{{ iniciaisPessoa(c.pessoaIds[1]) }}</div></div><div><div class="nm">{{ c.nome }}</div><div class="rl">{{ c.papel }}</div></div></div>
+              <div class="section-lbl">Deseja servir em</div>
+              <div class="tags"><span class="chip" v-for="mid in c.preferencias" :key="mid"><span class="dot" :style="{background:min(mid).cor}"></span>{{ min(mid).nome }}</span><span v-if="c.preferencias.length===0" class="meta" style="font-size:12.5px;color:var(--muted)">Sem preferência</span></div>
+              <div class="section-lbl">Já serviu em</div>
+              <div class="tags"><span class="chip" v-for="mid in c.historico" :key="mid" style="background:var(--surface)"><span v-html="icons.star" style="color:var(--gold);display:flex"></span>{{ min(mid).nome }}</span><span v-if="c.historico.length===0" class="meta" style="font-size:12.5px;color:var(--muted)">Primeira vez servindo</span></div>
+            </div>
+          </div>
+        </template>
+      </section>
+
+      <!-- EQUIPES DE SERVIÇO -->
+      <section v-if="view==='equipes'">
+        <div class="page-head"><div class="eyebrow">Serviço</div><h2>Equipes de serviço</h2><p>Os ministérios do encontro, com coordenação e casais escalados.</p></div>
+        <div class="grid">
+          <div class="card team-card" v-for="m in ministerios" :key="m.id">
+            <div class="bar" :style="{background:m.cor}"></div>
+            <div class="body">
+              <h3><span class="dot" :style="{background:m.cor,width:'12px',height:'12px',borderRadius:'100px'}"></span>{{ m.nome }}</h3>
+              <div class="coord"><template v-if="m.coordenadorCasalId">Coord.: <b style="color:var(--ink);font-weight:600">{{ nomeCasal(m.coordenadorCasalId) }}</b></template><template v-else><span style="color:var(--warn);font-weight:600">Coordenação em aberto</span></template></div>
+              <div class="count"><b>{{ (escala[m.id]||[]).length }}</b><span>casal(is) escalado(s)</span></div>
+              <div class="tags" style="margin-top:12px"><span class="chip" v-for="cid in (escala[m.id]||[])" :key="cid" style="background:var(--surface)">{{ nomeCasal(cid) }}</span><span v-if="(escala[m.id]||[]).length===0" class="meta" style="font-size:12.5px;color:var(--muted)">Ninguém escalado</span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ESCALA -->
+      <section v-if="view==='escala'">
+        <div class="page-head"><div class="eyebrow">Serviço · Encontro</div><h2>Montagem da escala</h2><p>Distribua os casais entre os ministérios. O sistema mostra quem <b>deseja servir</b>, quem tem <b>experiência</b> e alerta sobre <b>restrições</b>.</p></div>
+        <div class="escala-head"><div class="edition-pill"><span class="t">{{ edicao.nome }}</span><span class="d">{{ edicao.data }} · {{ edicao.local }}</span></div><div class="progress-wrap"><div class="lab"><span>Andamento</span><span>{{ totalEscalados }}/{{ metaEscala }} · {{ pctEscala }}%</span></div><div class="track"><div class="fill" :style="{width:pctEscala+'%'}"></div></div></div></div>
+        <div class="board">
+          <div class="card col" v-for="m in ministerios" :key="m.id">
+            <div class="hd"><div class="lft"><span class="dot" :style="{background:m.cor,width:'11px',height:'11px',borderRadius:'100px',flexShrink:0}"></span><h4>{{ m.nome }}</h4></div><span class="n">{{ (escala[m.id]||[]).length }}</span></div>
+            <div class="assigned">
+              <div class="assign-chip" v-for="cid in (escala[m.id]||[])" :key="cid">
+                <div class="couple sm"><div class="disc" :style="{background:corPessoa(casalById(cid).pessoaIds[0])}">{{ iniciaisPessoa(casalById(cid).pessoaIds[0]) }}</div><div class="disc" :style="{background:corPessoa(casalById(cid).pessoaIds[1])}">{{ iniciaisPessoa(casalById(cid).pessoaIds[1]) }}</div></div>
+                <div class="grow"><div class="nm">{{ nomeCasal(cid) }}</div></div>
+                <button class="rm" @click="removerDaEscala(m.id,cid)" v-html="icons.x"></button>
+              </div>
+              <div class="empty-hint" v-if="(escala[m.id]||[]).length===0">Nenhum casal escalado</div>
+            </div>
+            <button class="add" @click="openPicker(m.id)"><span v-html="icons.plus"></span>Escalar casal</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- PERSEVERANÇA -->
+      <section v-if="view==='perseveranca'">
+        <div class="page-head"><div class="eyebrow">Pós-encontro</div><h2>Perseverança</h2><p>As equipes que seguem a caminhada. Cada uma tem nome, casal líder e reunião mensal — abra a reunião para lançar presença, contribuição, ata e avaliações.</p></div>
+        <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(300px,1fr))">
+          <div class="card pcard" v-for="e in equipesPerseveranca" :key="e.id">
+            <div class="ph"><h3><span v-html="icons.sprout" style="color:var(--m-visitacao);display:flex"></span>Equipe {{ e.nome }}</h3><span class="badge" style="background:var(--surface-2);color:var(--muted)">{{ e.casalIds.length + 1 }} casais</span></div>
+            <div class="lead"><div class="couple sm"><div class="disc" :style="{background:corPessoa(casalById(e.liderCasalId).pessoaIds[0])}">{{ iniciaisPessoa(casalById(e.liderCasalId).pessoaIds[0]) }}</div><div class="disc" :style="{background:corPessoa(casalById(e.liderCasalId).pessoaIds[1])}">{{ iniciaisPessoa(casalById(e.liderCasalId).pessoaIds[1]) }}</div></div><div class="grow"><div class="nm">{{ nomeCasal(e.liderCasalId) }}</div></div><span class="badge" style="background:var(--gold-soft);color:#8a6414">Casal líder</span></div>
+            <div class="section-lbl">Casais da equipe</div>
+            <div class="membros-list"><div class="membro" v-for="cid in e.casalIds" :key="cid"><div class="couple sm"><div class="disc" :style="{background:corPessoa(casalById(cid).pessoaIds[0])}">{{ iniciaisPessoa(casalById(cid).pessoaIds[0]) }}</div><div class="disc" :style="{background:corPessoa(casalById(cid).pessoaIds[1])}">{{ iniciaisPessoa(casalById(cid).pessoaIds[1]) }}</div></div><div class="nm">{{ nomeCasal(cid) }}</div></div></div>
+            <div class="reuniao"><span v-html="icons.calendar" style="display:flex"></span>Reúne <b>{{ e.recorrencia }}</b> · {{ e.hora }} · {{ e.local }}</div>
+            <button v-if="proximaReuniao(e.id)" class="btn btn-primary btn-sm" style="margin-top:14px;justify-content:center" @click="abrirEvento(proximaReuniao(e.id),'perseveranca')"><span v-html="icons.doc"></span>Abrir próxima reunião</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- EVENTOS (Lista | Calendário) -->
+      <section v-if="view==='eventos'">
+        <div class="page-head"><div class="eyebrow">Agenda</div><h2>Eventos</h2><p>Todos os eventos do movimento num só lugar — encontros, jornada anual, reuniões de servos e de perseverança.</p></div>
+        <div class="segmented"><button :class="{on:subEv==='lista'}" @click="subEv='lista'">Lista</button><button :class="{on:subEv==='calendario'}" @click="subEv='calendario'">Calendário</button></div>
+
+        <template v-if="subEv==='lista'">
+          <div class="toolbar" style="justify-content:space-between">
+            <div class="fchips">
+              <button class="fchip" :class="{on:filtroTipo==='todos'}" @click="filtroTipo='todos'">Todos</button>
+              <button v-for="t in tiposEvento" :key="t.id" class="fchip" :class="{on:filtroTipo===t.id}" @click="filtroTipo=t.id"><span class="cd" :style="{background:tipoCor(t.id)}"></span>{{ t.label }}</button>
+            </div>
+            <button class="btn btn-primary" @click="abrirNovoEvento"><span v-html="icons.plus"></span>Novo evento</button>
+          </div>
+          <template v-for="g in eventosLista" :key="g.chave">
+            <div class="mes-lbl">{{ g.label }}</div>
+            <div class="card rows">
+              <div class="ev-row" v-for="e in g.itens" :key="e.id" @click="abrirEvento(e,'eventos')">
+                <div class="ev-date"><div class="d">{{ e.dia }}</div><div class="m">{{ mesesAbrev[e.mes0] }}</div></div>
+                <div class="ev-bar" :style="{background:tipoCor(e.tipo)}"></div>
+                <div class="grow"><div class="t">{{ e.titulo }}</div><div class="s"><span>{{ tipoLabel(e.tipo) }}</span><span>{{ e.hora }}</span><span>{{ e.local }}</span></div></div>
+              </div>
+            </div>
+          </template>
+          <div class="empty-hint" v-if="eventosLista.length===0" style="padding:24px">Nenhum evento com esse filtro.</div>
+        </template>
+
+        <template v-else>
+          <div class="card cal">
+            <div class="cal-head"><div class="mo">{{ meses[calMonth] }} {{ calYear }}</div><div class="cal-nav"><button @click="mudarMes(-1)" v-html="icons.chevL"></button><button @click="hoje()" style="font-size:12.5px;font-weight:600;padding:7px 12px">Hoje</button><button @click="mudarMes(1)" v-html="icons.chevR"></button></div></div>
+            <div class="cal-dow"><span v-for="d in ['D','S','T','Q','Q','S','S']">{{ d }}</span></div>
+            <div class="cal-grid"><div v-for="(cell,i) in gridDias" :key="i" class="cal-cell" :class="{empty:!cell,has:cell&&eventosDoDia(cell).length,today:cell&&ehHoje(cell),sel:cell&&selDia===cell}" @click="cell && selecionarDia(cell)"><template v-if="cell"><div class="dn">{{ cell }}</div><div class="evs"><div class="cal-ev" v-for="ev in eventosDoDia(cell).slice(0,2)" :key="ev.id" :style="{background:tipoCor(ev.tipo)}" @click.stop="abrirEvento(ev,'eventos')">{{ eventoAbrev(ev) }}</div><div class="cal-more" v-if="eventosDoDia(cell).length>2">+{{ eventosDoDia(cell).length-2 }} mais</div></div></template></div></div>
+            <div class="legend"><span><span class="cd" style="background:var(--wine)"></span>Encontro</span><span><span class="cd" style="background:var(--m-acolhida)"></span>Jornada anual</span><span><span class="cd" style="background:var(--gold)"></span>Reunião de servos</span><span><span class="cd" style="background:var(--m-visitacao)"></span>Perseverança</span><span><span class="cd" style="background:var(--m-liturgia)"></span>Formação</span></div>
+          </div>
+          <div class="section-lbl" style="margin-top:22px">{{ selDia ? selDia + ' de ' + meses[calMonth] : 'Eventos de ' + meses[calMonth] }}<button v-if="selDia" @click="selDia=null" class="btn btn-ghost btn-sm" style="margin-left:10px">Ver o mês todo</button></div>
+          <div class="card rows">
+            <div class="ev-row" v-for="e in listaEventosMes" :key="e.id" @click="abrirEvento(e,'eventos')">
+              <div class="ev-date"><div class="d">{{ e.dia }}</div><div class="m">{{ mesesAbrev[e.mes0] }}</div></div>
+              <div class="ev-bar" :style="{background:tipoCor(e.tipo)}"></div>
+              <div class="grow"><div class="t">{{ e.titulo }}</div><div class="s"><span>{{ tipoLabel(e.tipo) }}</span><span>{{ e.hora }}</span><span>{{ e.local }}</span></div></div>
+            </div>
+            <div class="ev-row" v-if="listaEventosMes.length===0" style="cursor:default"><div class="grow"><div class="meta" style="font-size:13px;color:var(--muted)">Nenhum evento neste período.</div></div></div>
+          </div>
+        </template>
+      </section>
+
+      <!-- DETALHE: REUNIÃO DE PERSEVERANÇA -->
+      <section v-if="view==='reuniao' && reuniaoAberta">
+        <div class="backbar"><button class="backbtn" @click="voltar()" v-html="icons.chevL"></button><div class="eyebrow" style="margin:0">Reunião · Casal líder</div></div>
+        <div class="card detail-hero"><div class="k"><span v-html="icons.sprout" style="color:var(--m-visitacao);display:flex"></span>{{ reuniaoAberta.titulo }}</div><div class="sub"><span>{{ reuniaoAberta.dia }} de {{ meses[reuniaoAberta.mes0] }} de {{ reuniaoAberta.ano }} · {{ reuniaoAberta.hora }}</span><span>{{ reuniaoAberta.local }}</span><span>Líder: {{ nomeCasal(equipeById(reuniaoAberta.equipeId).liderCasalId) }}</span></div></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+          <div class="card cardpad">
+            <h3><span v-html="icons.people" style="display:flex;color:var(--muted)"></span>Presença</h3>
+            <div class="hint">{{ presencaCount(reuniaoAberta) }} de {{ casaisDaEquipe(reuniaoAberta.equipeId).length }} presentes</div>
+            <div class="rows"><div class="row" style="padding:9px 0" v-for="cid in casaisDaEquipe(reuniaoAberta.equipeId)" :key="cid">
+              <div class="couple sm"><div class="disc" :style="{background:corPessoa(casalById(cid).pessoaIds[0])}">{{ iniciaisPessoa(casalById(cid).pessoaIds[0]) }}</div><div class="disc" :style="{background:corPessoa(casalById(cid).pessoaIds[1])}">{{ iniciaisPessoa(casalById(cid).pessoaIds[1]) }}</div></div>
+              <div class="grow"><div class="name" style="font-size:13.5px">{{ nomeCasal(cid) }}</div></div>
+              <button class="tgl" :class="{on:reuniaoAberta.presenca[cid]}" @click="togglePresenca(reuniaoAberta,cid)"><span v-if="reuniaoAberta.presenca[cid]" v-html="icons.check"></span>{{ reuniaoAberta.presenca[cid] ? 'Presente' : 'Ausente' }}</button>
+            </div></div>
+          </div>
+          <div class="card cardpad">
+            <h3><span v-html="icons.money" style="display:flex;color:var(--muted)"></span>Contribuição mensal</h3>
+            <div class="hint">{{ contribCount(reuniaoAberta) }} de {{ casaisDaEquipe(reuniaoAberta.equipeId).length }} contribuíram</div>
+            <div class="rows"><div class="row" style="padding:9px 0" v-for="cid in casaisDaEquipe(reuniaoAberta.equipeId)" :key="cid">
+              <div class="grow"><div class="name" style="font-size:13.5px">{{ nomeCasal(cid) }}</div></div>
+              <button class="tgl money" :class="{on:reuniaoAberta.contribuicao[cid]}" @click="toggleContrib(reuniaoAberta,cid)"><span v-if="reuniaoAberta.contribuicao[cid]" v-html="icons.check"></span>{{ reuniaoAberta.contribuicao[cid] ? 'Contribuiu' : 'Pendente' }}</button>
+            </div></div>
+          </div>
+        </div>
+        <div class="card cardpad" style="margin-top:14px"><h3><span v-html="icons.doc" style="display:flex;color:var(--muted)"></span>Ata da reunião</h3><div class="hint">Registro do encontro — fica salvo nesta sessão.</div><textarea class="input" v-model="reuniaoAberta.ata" placeholder="Tema partilhado, encaminhamentos, intenções de oração…"></textarea></div>
+        <div class="card cardpad" style="margin-top:14px"><h3><span v-html="icons.star" style="display:flex;color:var(--gold)"></span>Avaliações</h3><div class="hint">Observações do casal líder sobre a caminhada da equipe.</div>
+          <div v-for="(a,i) in reuniaoAberta.avaliacoes" :key="i" class="aval"><div class="a">{{ a.autor }}</div><div class="t">{{ a.texto }}</div></div>
+          <div style="display:flex;gap:8px;margin-top:8px"><input class="input" v-model="novaAval" placeholder="Escrever uma avaliação…" @keyup.enter="addAvaliacao(reuniaoAberta)" /><button class="btn btn-primary" :disabled="!novaAval" @click="addAvaliacao(reuniaoAberta)">Adicionar</button></div>
+        </div>
+      </section>
+
+      <!-- DETALHE: EVENTO ANUAL (caixa + lista de compras) -->
+      <section v-if="view==='eventoAnual' && anualAberto">
+        <div class="backbar"><button class="backbtn" @click="voltar()" v-html="icons.chevL"></button><div class="eyebrow" style="margin:0;color:var(--m-acolhida)">Jornada anual do ECC</div></div>
+        <div class="card detail-hero" style="border-color:#e6c8ce"><div class="k"><span v-html="icons.rings" style="display:flex"></span>{{ anualAberto.titulo }}</div><div class="sub"><span>{{ anualAberto.dia }} de {{ meses[anualAberto.mes0] }} de {{ anualAberto.ano }} · {{ anualAberto.hora }}</span><span>{{ anualAberto.local }}</span><span>{{ anualAberto.participantesCasais.length }} casais</span></div></div>
+
+        <div class="card cardpad" style="margin-bottom:14px">
+          <h3><span v-html="icons.money" style="display:flex;color:var(--muted)"></span>Caixa do evento</h3>
+          <div class="hint">Doações em dinheiro entram no caixa. O casal compras dá baixa nos itens informando o valor gasto.</div>
+          <div class="conta-stats">
+            <div class="conta-stat"><div class="v" style="color:var(--wine)">R$ {{ resumoCompras.saldo }}</div><div class="l">Saldo em caixa</div></div>
+            <div class="conta-stat"><div class="v" style="color:var(--ok)">R$ {{ resumoCompras.arrecadado }}</div><div class="l">Arrecadado · {{ anualAberto.conta.entradas.length }} doações</div></div>
+            <div class="conta-stat"><div class="v" style="color:var(--danger)">R$ {{ resumoCompras.gasto }}</div><div class="l">Gasto · {{ anualAberto.conta.saidas.length }} baixas</div></div>
+          </div>
+          <div class="lead" style="margin-bottom:0"><div class="couple sm"><div class="disc" :style="{background:corPessoa(casalById(anualAberto.casalComprasId).pessoaIds[0])}">{{ iniciaisPessoa(casalById(anualAberto.casalComprasId).pessoaIds[0]) }}</div><div class="disc" :style="{background:corPessoa(casalById(anualAberto.casalComprasId).pessoaIds[1])}">{{ iniciaisPessoa(casalById(anualAberto.casalComprasId).pessoaIds[1]) }}</div></div><div class="grow"><div class="nm">{{ nomeCasal(anualAberto.casalComprasId) }}</div><div style="font-size:12px;color:var(--muted)">responsável pelas compras</div></div><span class="badge" style="background:var(--gold-soft);color:#8a6414">Casal compras</span></div>
+          <button class="btn btn-primary btn-sm" style="margin-top:14px" @click="abrirDoacao"><span v-html="icons.plus"></span>Registrar doação em dinheiro</button>
+          <template v-if="extrato.length">
+            <div class="section-lbl" style="margin-top:16px">Extrato</div>
+            <div class="extr-row" v-for="mov in extrato" :key="mov.id">
+              <div class="extr-ic" :style="{background: mov.tipo==='in' ? '#E4F0EA' : '#F3E1E1', color: mov.tipo==='in' ? 'var(--ok)':'var(--danger)'}" v-html="mov.tipo==='in'?icons.plus:icons.cart"></div>
+              <div>{{ mov.label }}</div>
+              <div class="v" :class="mov.tipo==='in'?'pos':'neg'">{{ mov.tipo==='in'?'+':'−' }} R$ {{ mov.valor }}</div>
+            </div>
+          </template>
+        </div>
+
+        <div class="card">
+          <div class="section-lbl" style="padding:14px 16px 4px;margin:0"><span v-html="icons.cart" style="display:inline-flex;vertical-align:-2px;margin-right:6px"></span>Lista de compras</div>
+          <div class="compra-row" v-for="it in anualAberto.listaCompras" :key="it.id">
+            <div class="cinfo"><div class="cn">{{ it.nome }}</div><div class="cq">{{ it.qtd }} {{ it.unidade }}<template v-if="it.status==='doado'"> · {{ nomeCasal(it.doadorCasalId) }} doou o item</template><template v-if="it.status==='comprado'"> · comprado por R$ {{ it.valorGasto }} do caixa</template></div></div>
+            <span class="badge" :style="statusCompra(it.status).style">{{ statusCompra(it.status).label }}</span>
+            <div class="compra-actions">
+              <template v-if="it.status==='pendente'">
+                <button class="btn btn-ghost btn-sm" @click="abrirDoarItem(it)"><span v-html="icons.plus"></span>Doar item</button>
+                <button class="btn btn-ghost btn-sm" @click="abrirComprarItem(it)"><span v-html="icons.cart"></span>Comprar</button>
+              </template>
+              <button v-else class="btn btn-ghost btn-sm" @click="desfazerItem(it)">Desfazer</button>
+            </div>
+          </div>
+          <div style="padding:12px 16px;border-top:1px solid var(--line);display:flex;gap:8px;flex-wrap:wrap">
+            <input class="input" v-model="novoItem.nome" placeholder="Novo item" style="flex:2;min-width:140px" />
+            <input class="input" v-model="novoItem.qtd" placeholder="Qtd" style="flex:1;min-width:70px" />
+            <input class="input" v-model="novoItem.unidade" placeholder="un/kg…" style="flex:1;min-width:70px" />
+            <button class="btn btn-primary" :disabled="!novoItem.nome" @click="addItem">Adicionar</button>
+          </div>
+        </div>
+      </section>
+
+    </div></main>
+  </div>
+
+  <nav class="tabbar"><button v-for="t in tabs" :key="t.id" :class="{active:view===t.id}" @click="view=t.id"><span v-html="icons[t.icon]"></span>{{ t.short }}</button></nav>
+
+  <!-- MODAL nova pessoa -->
+  <div class="overlay" v-if="modal==='pessoa'" @click.self="modal=null"><div class="modal">
+    <div class="mh"><div><h3>Nova pessoa</h3></div><button class="x" @click="modal=null" v-html="icons.x"></button></div>
+    <div class="mb"><div class="field"><label class="fld">Nome completo</label><input class="input" v-model="form.nome" placeholder="Ex.: Maria da Silva" /></div><div class="field"><label class="fld">Papel na comunidade</label><select class="input" v-model="form.papel"><option>Servo(a)</option><option>Coordenação</option><option>Secretaria</option><option>Assessor espiritual</option></select></div><div class="field"><label class="fld">Telefone / WhatsApp</label><input class="input" v-model="form.fone" placeholder="(00) 00000-0000" /></div></div>
+    <div class="mf"><button class="btn btn-ghost" @click="modal=null">Cancelar</button><button class="btn btn-primary" :disabled="!form.nome" @click="salvarPessoa">Salvar</button></div>
+  </div></div>
+
+  <!-- MODAL escalar -->
+  <div class="overlay" v-if="modal==='picker'" @click.self="modal=null"><div class="modal">
+    <div class="mh"><div><h3>Escalar em {{ min(pickerMin).nome }}</h3><div class="sub">Ordenado por afinidade com a equipe</div></div><button class="x" @click="modal=null" v-html="icons.x"></button></div>
+    <div class="mb">
+      <template v-for="grupo in candidatosAgrupados" :key="grupo.chave">
+        <div v-if="grupo.itens.length" class="grp-lbl">{{ grupo.titulo }}</div>
+        <div v-for="c in grupo.itens" :key="c.id" class="pick" :class="{disabled:c.restrito}" @click="!c.restrito && escalar(pickerMin,c.id)">
+          <div class="couple sm"><div class="disc" :style="{background:corPessoa(c.pessoaIds[0])}">{{ iniciaisPessoa(c.pessoaIds[0]) }}</div><div class="disc" :style="{background:corPessoa(c.pessoaIds[1])}">{{ iniciaisPessoa(c.pessoaIds[1]) }}</div></div>
+          <div class="grow"><div class="nm">{{ c.nome }}</div><div class="aptidao">
+            <span v-if="c.preferido" class="badge" style="background:#E4F0EA;color:var(--ok)"><span v-html="icons.heart" style="display:flex"></span>Deseja servir</span>
+            <span v-if="c.experiente" class="badge" style="background:var(--gold-soft);color:#8a6414"><span v-html="icons.star" style="display:flex"></span>Experiência</span>
+            <span v-if="c.restrito" class="badge" style="background:#F3E1E1;color:var(--danger)">Restrição</span>
+            <span v-if="c.jaEscalado" class="badge" style="background:#F5E9DA;color:var(--warn)">Já em {{ min(c.jaEscalado).nome }}</span>
+            <span v-if="!c.preferido && !c.experiente && !c.restrito && !c.jaEscalado" style="font-size:12px;color:var(--muted)">Disponível</span>
+          </div></div>
+          <span v-if="!c.restrito" v-html="icons.plusCircle" style="color:var(--wine);display:flex;flex-shrink:0"></span>
+        </div>
+      </template>
+      <div v-if="candidatos.length===0" class="empty-hint" style="padding:20px">Todos já estão escalados nesta equipe.</div>
+    </div>
+  </div></div>
+
+  <!-- MODAL evento simples -->
+  <div class="overlay" v-if="modal==='evento' && eventoAberto" @click.self="modal=null"><div class="modal">
+    <div class="mh"><div><h3>{{ eventoAberto.titulo }}</h3><div class="sub" :style="{color:tipoCor(eventoAberto.tipo)}">{{ tipoLabel(eventoAberto.tipo) }}</div></div><button class="x" @click="modal=null" v-html="icons.x"></button></div>
+    <div class="mb">
+      <div class="detail-row"><span class="ic" v-html="icons.calendar"></span>{{ eventoAberto.dia }} de {{ meses[eventoAberto.mes0] }} de {{ eventoAberto.ano }} · {{ eventoAberto.hora }}</div>
+      <div class="detail-row"><span class="ic" v-html="icons.pin"></span>{{ eventoAberto.local }}</div>
+      <div class="section-lbl" style="margin-top:14px">Participantes · {{ eventoAberto.participantesCasais.length }} casais</div>
+      <div class="part-chip" v-for="cid in eventoAberto.participantesCasais" :key="cid"><div class="couple sm"><div class="disc" :style="{background:corPessoa(casalById(cid).pessoaIds[0])}">{{ iniciaisPessoa(casalById(cid).pessoaIds[0]) }}</div><div class="disc" :style="{background:corPessoa(casalById(cid).pessoaIds[1])}">{{ iniciaisPessoa(casalById(cid).pessoaIds[1]) }}</div></div><div class="grow"><div class="nm">{{ nomeCasal(cid) }}</div></div><button class="rm" @click="removerParticipante(eventoAberto,cid)" v-html="icons.x"></button></div>
+      <div v-if="eventoAberto.participantesCasais.length===0" class="empty-hint">Nenhum casal ainda</div>
+      <button v-if="!addingPart" class="btn btn-ghost btn-sm" style="margin-top:10px;width:100%;justify-content:center" @click="addingPart=true"><span v-html="icons.plus"></span>Adicionar casal</button>
+      <div v-if="addingPart" style="margin-top:12px"><div class="section-lbl">Escolher casal</div>
+        <div v-for="c in casaisForaDoEvento(eventoAberto)" :key="c.id" class="pick" @click="adicionarParticipante(eventoAberto,c.id)"><div class="couple sm"><div class="disc" :style="{background:corPessoa(c.pessoaIds[0])}">{{ iniciaisPessoa(c.pessoaIds[0]) }}</div><div class="disc" :style="{background:corPessoa(c.pessoaIds[1])}">{{ iniciaisPessoa(c.pessoaIds[1]) }}</div></div><div class="grow"><div class="nm">{{ c.nome }}</div></div><span v-html="icons.plusCircle" style="color:var(--wine);display:flex"></span></div>
+        <div v-if="casaisForaDoEvento(eventoAberto).length===0" class="empty-hint">Todos já estão no evento.</div>
+      </div>
+    </div>
+  </div></div>
+
+  <!-- MODAL novo evento -->
+  <div class="overlay" v-if="modal==='novoEvento'" @click.self="modal=null"><div class="modal">
+    <div class="mh"><div><h3>Novo evento</h3></div><button class="x" @click="modal=null" v-html="icons.x"></button></div>
+    <div class="mb">
+      <div class="field"><label class="fld">Título</label><input class="input" v-model="novoEvento.titulo" placeholder="Ex.: Reunião de servos" /></div>
+      <div class="field"><label class="fld">Tipo</label><select class="input" v-model="novoEvento.tipo"><option v-for="t in tiposEvento" :key="t.id" :value="t.id">{{ t.label }}</option></select></div>
+      <div class="field" v-if="novoEvento.tipo==='perseveranca'"><label class="fld">Equipe</label><select class="input" v-model="novoEvento.equipeId"><option :value="null">—</option><option v-for="e in equipesPerseveranca" :key="e.id" :value="e.id">Equipe {{ e.nome }}</option></select></div>
+      <div style="display:flex;gap:10px"><div class="field" style="flex:1"><label class="fld">Data</label><input class="input" type="date" v-model="novoEvento.data" /></div><div class="field" style="flex:1"><label class="fld">Hora</label><input class="input" v-model="novoEvento.hora" placeholder="20h00" /></div></div>
+      <div class="field"><label class="fld">Local</label><input class="input" v-model="novoEvento.local" placeholder="Ex.: Salão paroquial" /></div>
+    </div>
+    <div class="mf"><button class="btn btn-ghost" @click="modal=null">Cancelar</button><button class="btn btn-primary" :disabled="!novoEvento.titulo || !novoEvento.data" @click="salvarEvento">Criar evento</button></div>
+  </div></div>
+
+  <!-- MODAL doar item -->
+  <div class="overlay" v-if="modal==='doarItem' && itemAberto" @click.self="modal=null"><div class="modal">
+    <div class="mh"><div><h3>Doar o item</h3><div class="sub">{{ itemAberto.nome }} · {{ itemAberto.qtd }} {{ itemAberto.unidade }}</div></div><button class="x" @click="modal=null" v-html="icons.x"></button></div>
+    <div class="mb"><div class="section-lbl">Quem vai doar</div><div v-for="c in casais" :key="c.id" class="pick" :class="{sel:doarSel===c.id}" @click="doarSel=c.id"><div class="couple sm"><div class="disc" :style="{background:corPessoa(c.pessoaIds[0])}">{{ iniciaisPessoa(c.pessoaIds[0]) }}</div><div class="disc" :style="{background:corPessoa(c.pessoaIds[1])}">{{ iniciaisPessoa(c.pessoaIds[1]) }}</div></div><div class="grow"><div class="nm">{{ c.nome }}</div></div></div></div>
+    <div class="mf"><button class="btn btn-ghost" @click="modal=null">Cancelar</button><button class="btn btn-primary" :disabled="!doarSel" @click="confirmarDoarItem">Confirmar doação</button></div>
+  </div></div>
+
+  <!-- MODAL comprar item (baixa no caixa) -->
+  <div class="overlay" v-if="modal==='comprarItem' && itemAberto" @click.self="modal=null"><div class="modal">
+    <div class="mh"><div><h3>Dar baixa · comprar</h3><div class="sub">{{ itemAberto.nome }} · {{ itemAberto.qtd }} {{ itemAberto.unidade }}</div></div><button class="x" @click="modal=null" v-html="icons.x"></button></div>
+    <div class="mb"><div class="field"><label class="fld">Valor gasto (R$)</label><input class="input" v-model="compraValor" placeholder="0" /></div><div class="hint" style="font-size:12.5px;color:var(--muted)">Sai do caixa. Saldo atual: R$ {{ resumoCompras.saldo }}.</div></div>
+    <div class="mf"><button class="btn btn-ghost" @click="modal=null">Cancelar</button><button class="btn btn-primary" :disabled="compraValor===''" @click="confirmarComprarItem">Registrar compra</button></div>
+  </div></div>
+
+  <!-- MODAL doação em dinheiro -->
+  <div class="overlay" v-if="modal==='doacao'" @click.self="modal=null"><div class="modal">
+    <div class="mh"><div><h3>Doação em dinheiro</h3><div class="sub">Entra no caixa do evento</div></div><button class="x" @click="modal=null" v-html="icons.x"></button></div>
+    <div class="mb"><div class="field"><label class="fld">Valor doado (R$)</label><input class="input" v-model="doacaoValor" placeholder="0" /></div><div class="section-lbl">Casal que está doando</div><div v-for="c in casais" :key="c.id" class="pick" :class="{sel:doacaoSel===c.id}" @click="doacaoSel=c.id"><div class="couple sm"><div class="disc" :style="{background:corPessoa(c.pessoaIds[0])}">{{ iniciaisPessoa(c.pessoaIds[0]) }}</div><div class="disc" :style="{background:corPessoa(c.pessoaIds[1])}">{{ iniciaisPessoa(c.pessoaIds[1]) }}</div></div><div class="grow"><div class="nm">{{ c.nome }}</div></div></div></div>
+    <div class="mf"><button class="btn btn-ghost" @click="modal=null">Cancelar</button><button class="btn btn-primary" :disabled="!doacaoSel || doacaoValor===''" @click="confirmarDoacao">Registrar doação</button></div>
+  </div></div>
+</div>
+
+<script>
+const { createApp, reactive, computed, toRefs } = Vue;
+createApp({ setup(){
+  const s=(p)=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+  const icons={
+    rings:`<svg viewBox="0 0 24 24" fill="none" stroke="#B0812F" stroke-width="1.7"><circle cx="9" cy="14" r="5.2"/><circle cx="15" cy="14" r="5.2"/><path d="M9 3.5l1.4 2.2h-2.8L9 3.5z" fill="#B0812F" stroke="#B0812F"/><path d="M15 3.5l1.4 2.2h-2.8L15 3.5z" fill="#B0812F" stroke="#B0812F"/></svg>`,
+    home:s('<path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V20h14V9.5"/><path d="M9.5 20v-5h5v5"/>'),
+    people:s('<circle cx="9" cy="8" r="3.2"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0"/><path d="M16 6.5a3 3 0 0 1 0 5.7"/><path d="M17.5 14.2A5.5 5.5 0 0 1 20.5 19"/>'),
+    teams:s('<rect x="3" y="4" width="7" height="7" rx="1.5"/><rect x="14" y="4" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>'),
+    grid:s('<rect x="3" y="4" width="7" height="7" rx="1.5"/><rect x="14" y="4" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>'),
+    sprout:s('<path d="M12 21v-8"/><path d="M12 13c0-3-2.4-5.4-6-5.4 0 3.6 2.4 6 6 6z"/><path d="M12 11c0-3 2.4-5 5.5-5C17.5 9 15 11 12 11z"/>'),
+    calendar:s('<rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9h18M8 2.5v4M16 2.5v4"/>'),
+    pin:s('<path d="M12 21s7-5.6 7-11a7 7 0 0 0-14 0c0 5.4 7 11 7 11z"/><circle cx="12" cy="10" r="2.6"/>'),
+    search:s('<circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/>'),
+    plus:s('<path d="M12 5v14M5 12h14"/>'),
+    plusCircle:s('<circle cx="12" cy="12" r="9"/><path d="M12 8.5v7M8.5 12h7"/>'),
+    chevL:s('<path d="M15 6l-6 6 6 6"/>'),chevR:s('<path d="M9 6l6 6-6 6"/>'),
+    x:s('<path d="M18 6 6 18M6 6l12 12"/>'),
+    check:s('<path d="M20 6 9 17l-5-5"/>'),
+    doc:s('<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>'),
+    money:s('<rect x="2.5" y="6" width="19" height="12" rx="2.5"/><circle cx="12" cy="12" r="2.6"/><path d="M6 9v6M18 9v6"/>'),
+    cart:s('<circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2.5 3h2.2l2.3 12.4a1.6 1.6 0 0 0 1.6 1.3h8.4a1.6 1.6 0 0 0 1.6-1.2L21.5 7H6"/>'),
+    star:`<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 3.5l2.5 5.2 5.7.7-4.2 3.9 1.1 5.6L12 16.9 6.9 18.9 8 13.3 3.8 9.4l5.7-.7z"/></svg>`,
+    heart:`<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 20s-7-4.4-9.2-8.4C1.2 8.5 2.6 5.5 5.6 5.5c1.9 0 3.2 1.1 4.4 2.6C11.2 6.6 12.5 5.5 14.4 5.5c3 0 4.4 3 2.8 6.1C19 15.6 12 20 12 20z"/></svg>`,
+  };
+  const ministerios=[
+    {id:'acolhida',nome:'Acolhida',cor:'var(--m-acolhida)',coordenadorCasalId:'c4'},{id:'cozinha',nome:'Cozinha',cor:'var(--m-cozinha)',coordenadorCasalId:'c3'},
+    {id:'liturgia',nome:'Liturgia',cor:'var(--m-liturgia)',coordenadorCasalId:'c2'},{id:'animacao',nome:'Animação',cor:'var(--m-animacao)',coordenadorCasalId:null},
+    {id:'ordem',nome:'Ordem',cor:'var(--m-ordem)',coordenadorCasalId:'c7'},{id:'visitacao',nome:'Visitação',cor:'var(--m-visitacao)',coordenadorCasalId:'c5'},
+    {id:'secretaria',nome:'Secretaria',cor:'var(--m-secretaria)',coordenadorCasalId:'c6'},
+  ];
+  const pessoas=reactive([
+    {id:'p1',nome:'Ana Ferreira',papel:'Servo(a)',casalId:'c1'},{id:'p2',nome:'Bruno Ferreira',papel:'Servo(a)',casalId:'c1'},
+    {id:'p3',nome:'Carla Santos',papel:'Coordenação',casalId:'c2'},{id:'p4',nome:'Diego Santos',papel:'Coordenação',casalId:'c2'},
+    {id:'p5',nome:'Elaine Lima',papel:'Coordenação',casalId:'c3'},{id:'p6',nome:'Fábio Lima',papel:'Coordenação',casalId:'c3'},
+    {id:'p7',nome:'Gabriela Moraes',papel:'Coordenação',casalId:'c4'},{id:'p8',nome:'Hugo Moraes',papel:'Coordenação',casalId:'c4'},
+    {id:'p9',nome:'Isabel Prado',papel:'Coordenação',casalId:'c5'},{id:'p10',nome:'João Prado',papel:'Coordenação',casalId:'c5'},
+    {id:'p11',nome:'Kelly Nunes',papel:'Secretaria',casalId:'c6'},{id:'p12',nome:'Lucas Nunes',papel:'Secretaria',casalId:'c6'},
+    {id:'p13',nome:'Marta Reis',papel:'Coordenação',casalId:'c7'},{id:'p14',nome:'Nelson Reis',papel:'Coordenação',casalId:'c7'},
+    {id:'p15',nome:'Olívia Cruz',papel:'Servo(a)',casalId:'c8'},{id:'p16',nome:'Paulo Cruz',papel:'Servo(a)',casalId:'c8'},
+    {id:'p17',nome:'Pe. Tiago',papel:'Assessor espiritual',casalId:null},
+  ]);
+  const casais=reactive([
+    {id:'c1',nome:'Ana & Bruno',papel:'Servem juntos',pessoaIds:['p1','p2'],preferencias:['acolhida','cozinha'],historico:['acolhida'],restricoes:[]},
+    {id:'c2',nome:'Carla & Diego',papel:'Coord. de Liturgia',pessoaIds:['p3','p4'],preferencias:['liturgia'],historico:['liturgia','animacao'],restricoes:[]},
+    {id:'c3',nome:'Elaine & Fábio',papel:'Coord. de Cozinha',pessoaIds:['p5','p6'],preferencias:['cozinha'],historico:['cozinha','ordem'],restricoes:['animacao']},
+    {id:'c4',nome:'Gabriela & Hugo',papel:'Coord. de Acolhida',pessoaIds:['p7','p8'],preferencias:['acolhida','animacao'],historico:['animacao','acolhida'],restricoes:[]},
+    {id:'c5',nome:'Isabel & João',papel:'Coord. de Visitação',pessoaIds:['p9','p10'],preferencias:['visitacao'],historico:['visitacao','acolhida'],restricoes:[]},
+    {id:'c6',nome:'Kelly & Lucas',papel:'Secretaria',pessoaIds:['p11','p12'],preferencias:['secretaria'],historico:['secretaria'],restricoes:[]},
+    {id:'c7',nome:'Marta & Nelson',papel:'Coord. de Ordem',pessoaIds:['p13','p14'],preferencias:['ordem','cozinha'],historico:['cozinha'],restricoes:[]},
+    {id:'c8',nome:'Olívia & Paulo',papel:'Primeira vez servindo',pessoaIds:['p15','p16'],preferencias:['liturgia','acolhida'],historico:[],restricoes:[]},
+  ]);
+  const edicao={nome:'ECC 2026 · 1ª Etapa',data:'12 e 13 de setembro',local:'Paróquia São José'};
+  const escala=reactive({acolhida:['c4','c1'],cozinha:['c3'],liturgia:['c2'],animacao:[],ordem:[],visitacao:[],secretaria:[]});
+  const equipesPerseveranca=reactive([
+    {id:'pe1',nome:'Caná',liderCasalId:'c2',casalIds:['c1','c8'],recorrencia:'2ª sexta-feira',hora:'20h00',local:'Salão paroquial'},
+    {id:'pe2',nome:'Emaús',liderCasalId:'c4',casalIds:['c3','c6'],recorrencia:'4ª sexta-feira',hora:'20h00',local:'Casa da família Moraes'},
+    {id:'pe3',nome:'Nazaré',liderCasalId:'c5',casalIds:['c7'],recorrencia:'3ª sexta-feira',hora:'19h30',local:'Casa da família Prado'},
+  ]);
+  const eventoAnual=reactive({
+    id:'ev12',titulo:'Jornada Anual do ECC 2026',tipo:'anual',ano:2026,mes0:9,dia:18,hora:'09h00',local:'Santuário Diocesano',equipeId:null,
+    participantesCasais:['c1','c2','c3','c4','c5','c6','c7','c8'],casalComprasId:'c6',
+    conta:reactive({entradas:[{id:'d1',casalId:'c7',valor:180},{id:'d2',casalId:'c1',valor:100}],saidas:[{id:'s1',itemId:'i5',descricao:'Material de limpeza',valor:65}]}),
+    listaCompras:reactive([
+      {id:'i1',nome:'Café (torrado e moído)',qtd:5,unidade:'kg',status:'doado',doadorCasalId:'c1',valorGasto:0},
+      {id:'i2',nome:'Água mineral',qtd:10,unidade:'fardo',status:'pendente',doadorCasalId:null,valorGasto:0},
+      {id:'i3',nome:'Pão',qtd:200,unidade:'un',status:'pendente',doadorCasalId:null,valorGasto:0},
+      {id:'i4',nome:'Frango',qtd:15,unidade:'kg',status:'pendente',doadorCasalId:null,valorGasto:0},
+      {id:'i5',nome:'Material de limpeza',qtd:1,unidade:'kit',status:'comprado',doadorCasalId:null,valorGasto:65},
+      {id:'i6',nome:'Descartáveis (copos/pratos)',qtd:300,unidade:'un',status:'pendente',doadorCasalId:null,valorGasto:0},
+    ]),
+  });
+  const eventos=reactive([
+    {id:'ev1',titulo:'Reunião geral dos servos',tipo:'servos',ano:2026,mes0:7,dia:7,hora:'20h00',local:'Salão paroquial',equipeId:null,participantesCasais:['c2','c3','c4','c5','c7']},
+    {id:'ev2',titulo:'Perseverança · Equipe Caná',tipo:'perseveranca',ano:2026,mes0:7,dia:14,hora:'20h00',local:'Salão paroquial',equipeId:'pe1',participantesCasais:[]},
+    {id:'ev3',titulo:'Perseverança · Equipe Nazaré',tipo:'perseveranca',ano:2026,mes0:7,dia:21,hora:'19h30',local:'Casa da família Prado',equipeId:'pe3',participantesCasais:[]},
+    {id:'ev4',titulo:'Perseverança · Equipe Emaús',tipo:'perseveranca',ano:2026,mes0:7,dia:28,hora:'20h00',local:'Casa da família Moraes',equipeId:'pe2',participantesCasais:[]},
+    {id:'ev5',titulo:'Preparação — reunião dos servos',tipo:'servos',ano:2026,mes0:8,dia:4,hora:'20h00',local:'Salão paroquial',equipeId:null,participantesCasais:['c2','c3','c4']},
+    {id:'ev6',titulo:'Formação da assessoria',tipo:'formacao',ano:2026,mes0:8,dia:8,hora:'19h30',local:'Secretaria paroquial',equipeId:null,participantesCasais:['c2']},
+    {id:'ev7',titulo:'Preparação do espaço do encontro',tipo:'servos',ano:2026,mes0:8,dia:11,hora:'19h00',local:'Paróquia São José',equipeId:null,participantesCasais:['c3','c7']},
+    {id:'ev8',titulo:'ECC 2026 · 1ª Etapa — Dia 1',tipo:'encontro',ano:2026,mes0:8,dia:12,hora:'08h00',local:'Paróquia São José',equipeId:null,participantesCasais:['c4','c1','c3','c2']},
+    {id:'ev9',titulo:'ECC 2026 · 1ª Etapa — Dia 2',tipo:'encontro',ano:2026,mes0:8,dia:13,hora:'08h00',local:'Paróquia São José',equipeId:null,participantesCasais:['c4','c1','c3','c2']},
+    {id:'ev10',titulo:'Perseverança · Equipe Caná',tipo:'perseveranca',ano:2026,mes0:8,dia:18,hora:'20h00',local:'Salão paroquial',equipeId:'pe1',participantesCasais:[]},
+    {id:'ev11',titulo:'Perseverança · Equipe Emaús',tipo:'perseveranca',ano:2026,mes0:8,dia:25,hora:'20h00',local:'Casa da família Moraes',equipeId:'pe2',participantesCasais:[]},
+    eventoAnual,
+  ]);
+  const HOJE={ano:2026,mes0:7,dia:6};
+  const meses=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  const mesesAbrev=['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ'];
+  const tiposEvento=[{id:'encontro',label:'Encontro'},{id:'anual',label:'Jornada anual'},{id:'servos',label:'Reunião de servos'},{id:'perseveranca',label:'Perseverança'},{id:'formacao',label:'Formação'}];
+  const palette=['#7A2231','#B0812F','#4F9089','#8A6FB0','#CF7350','#5B84B1','#6B7C8C','#3E7C63','#C56A76','#9c6b3f'];
+  const corPessoa=(pid)=>{const i=pessoas.findIndex(p=>p.id===pid);return palette[(i>=0?i:0)%palette.length];};
+
+  const state=reactive({
+    view:'painel',subCom:'pessoas',subEv:'lista',filtroTipo:'todos',modal:null,pickerMin:null,buscaPessoa:'',
+    form:{nome:'',papel:'Servo(a)',fone:''},
+    calYear:2026,calMonth:8,selDia:null,eventoAberto:null,addingPart:false,
+    reuniaoAberta:null,anualAberto:null,novaAval:'',voltar:'eventos',
+    novoEvento:{titulo:'',tipo:'servos',data:'',hora:'',local:'',equipeId:null},
+    itemAberto:null,doarSel:null,compraValor:'',doacaoSel:null,doacaoValor:'',novoItem:{nome:'',qtd:'',unidade:''},
+  });
+  const tabs=[
+    {id:'painel',label:'Painel',short:'Painel',icon:'home'},{id:'comunidade',label:'Comunidade',short:'Comun.',icon:'people'},
+    {id:'equipes',label:'Equipes de serviço',short:'Equipes',icon:'teams'},{id:'escala',label:'Escala',short:'Escala',icon:'grid'},
+    {id:'perseveranca',label:'Perseverança',short:'Persev.',icon:'sprout'},{id:'eventos',label:'Eventos',short:'Eventos',icon:'calendar'},
+  ];
+  const iniciais=(nome)=> nome.split(' ').filter(w=>w.length>2||/^[A-Z]/.test(w)).slice(0,2).map(w=>w[0]).join('').toUpperCase().slice(0,2)||nome.slice(0,2).toUpperCase();
+  const pessoaById=(id)=> pessoas.find(p=>p.id===id)||{nome:'?'};
+  const iniciaisPessoa=(id)=> iniciais(pessoaById(id).nome);
+  const casalById=(id)=> casais.find(c=>c.id===id)||{nome:'?',pessoaIds:['','']};
+  const nomeCasal=(id)=> casalById(id).nome;
+  const min=(id)=> ministerios.find(m=>m.id===id)||{nome:'?',cor:'#999'};
+  const equipeById=(id)=> equipesPerseveranca.find(e=>e.id===id)||{nome:'?',liderCasalId:null,casalIds:[]};
+  const badgePapel=(papel)=>({'Coordenação':'background:var(--gold-soft);color:#8a6414','Servo(a)':'background:#E4F0EA;color:var(--ok)','Secretaria':'background:#E3ECF5;color:#3a5f86','Assessor espiritual':'background:#EEE6F2;color:#6a4e8c'}[papel]||'background:var(--surface-2);color:var(--muted)');
+  const tipoCor=(t)=>({encontro:'var(--wine)',anual:'var(--m-acolhida)',servos:'var(--gold)',perseveranca:'var(--m-visitacao)',formacao:'var(--m-liturgia)'}[t]||'var(--muted)');
+  const tipoLabel=(t)=>({encontro:'Encontro',anual:'Jornada anual',servos:'Reunião de servos',perseveranca:'Perseverança',formacao:'Formação'}[t]||t);
+  const eventoAbrev=(e)=>{if(e.tipo==='perseveranca'){const eq=equipeById(e.equipeId);return eq&&eq.nome?eq.nome:'Persev.';}if(e.tipo==='anual')return 'Jornada';if(e.tipo==='servos')return 'Servos';if(e.tipo==='formacao')return 'Formação';if(e.tipo==='encontro')return e.titulo.includes('Dia 2')?'ECC · D2':'ECC · D1';return e.titulo;};
+  const statusCompra=(s)=>({pendente:{label:'Pendente',style:'background:#F5E9DA;color:var(--warn)'},doado:{label:'Item doado',style:'background:#E3ECF5;color:#3a5f86'},comprado:{label:'Comprado',style:'background:#E4F0EA;color:var(--ok)'}}[s]);
+
+  const totalEscalados=computed(()=> new Set(Object.values(escala).flat()).size);
+  const metaEscala=computed(()=> casais.length);
+  const pctEscala=computed(()=> Math.round(totalEscalados.value/Math.max(metaEscala.value,1)*100));
+  const equipesComCoord=computed(()=> ministerios.filter(m=>m.coordenadorCasalId).length);
+  const pessoasFiltradas=computed(()=>{const q=state.buscaPessoa.trim().toLowerCase();return q?pessoas.filter(p=>p.nome.toLowerCase().includes(q)):pessoas;});
+  const candidatos=computed(()=>{
+    const mid=state.pickerMin;if(!mid)return[];
+    const jaNaEquipe=new Set(escala[mid]||[]);
+    return casais.filter(c=>!jaNaEquipe.has(c.id)).map(c=>{
+      const preferido=c.preferencias.includes(mid),experiente=c.historico.includes(mid),restrito=c.restricoes.includes(mid);
+      const jaEscalado=Object.keys(escala).find(k=>k!==mid&&(escala[k]||[]).includes(c.id))||null;
+      let score=0;if(restrito)score=-100;else{if(preferido)score+=10;if(experiente)score+=5;if(jaEscalado)score-=3;}
+      return{...c,preferido,experiente,restrito,jaEscalado,score};
+    }).sort((a,b)=>b.score-a.score);
+  });
+  const candidatosAgrupados=computed(()=>{const c=candidatos.value;return[
+    {chave:'pref',titulo:'Desejam servir aqui',itens:c.filter(x=>x.preferido&&!x.restrito)},
+    {chave:'exp',titulo:'Com experiência',itens:c.filter(x=>!x.preferido&&x.experiente&&!x.restrito)},
+    {chave:'livre',titulo:'Disponíveis',itens:c.filter(x=>!x.preferido&&!x.experiente&&!x.restrito)},
+    {chave:'rest',titulo:'Com restrição',itens:c.filter(x=>x.restrito)},
+  ];});
+  const gridDias=computed(()=>{const first=new Date(state.calYear,state.calMonth,1).getDay();const total=new Date(state.calYear,state.calMonth+1,0).getDate();const cells=[];for(let i=0;i<first;i++)cells.push(null);for(let d=1;d<=total;d++)cells.push(d);return cells;});
+  const eventosDoDia=(d)=> eventos.filter(e=>e.ano===state.calYear&&e.mes0===state.calMonth&&e.dia===d);
+  const ehHoje=(d)=> state.calYear===HOJE.ano&&state.calMonth===HOJE.mes0&&d===HOJE.dia;
+  const listaEventosMes=computed(()=>{let l=eventos.filter(e=>e.ano===state.calYear&&e.mes0===state.calMonth);if(state.selDia)l=l.filter(e=>e.dia===state.selDia);return l.slice().sort((a,b)=>a.dia-b.dia);});
+  const eventosLista=computed(()=>{
+    let l=eventos.slice();if(state.filtroTipo!=='todos')l=l.filter(e=>e.tipo===state.filtroTipo);
+    l.sort((a,b)=>(a.ano*10000+a.mes0*100+a.dia)-(b.ano*10000+b.mes0*100+b.dia));
+    const groups=[],mapa={};
+    l.forEach(e=>{const k=e.ano+'-'+e.mes0;if(!mapa[k]){mapa[k]={chave:k,label:meses[e.mes0]+' '+e.ano,itens:[]};groups.push(mapa[k]);}mapa[k].itens.push(e);});
+    return groups;
+  });
+  const proximosEventos=computed(()=>{const key=(e)=>e.ano*10000+e.mes0*100+e.dia;const hk=HOJE.ano*10000+HOJE.mes0*100+HOJE.dia;return eventos.filter(e=>key(e)>=hk).sort((a,b)=>key(a)-key(b)).slice(0,5);});
+  const casaisForaDoEvento=(ev)=> casais.filter(c=>!ev.participantesCasais.includes(c.id));
+  const casaisDaEquipe=(eqId)=>{const e=equipeById(eqId);return e.liderCasalId?[e.liderCasalId,...e.casalIds]:[...e.casalIds];};
+  const resumoCompras=computed(()=>{const l=eventoAnual.listaCompras;const total=l.length;const providos=l.filter(i=>i.status!=='pendente').length;const arrecadado=eventoAnual.conta.entradas.reduce((a,e)=>a+(Number(e.valor)||0),0);const gasto=eventoAnual.conta.saidas.reduce((a,e)=>a+(Number(e.valor)||0),0);return{total,providos,arrecadado,gasto,saldo:arrecadado-gasto};});
+  const extrato=computed(()=>{const ins=eventoAnual.conta.entradas.map(e=>({id:'in'+e.id,tipo:'in',valor:e.valor,label:'Doação · '+nomeCasal(e.casalId)}));const outs=eventoAnual.conta.saidas.map(e=>({id:'out'+e.id,tipo:'out',valor:e.valor,label:'Compra · '+e.descricao}));return[...ins,...outs];});
+
+  const abrirNovaPessoa=()=>{state.form={nome:'',papel:'Servo(a)',fone:''};state.modal='pessoa';};
+  const salvarPessoa=()=>{if(!state.form.nome)return;pessoas.push({id:'p'+(pessoas.length+1+Math.floor(Math.random()*999)),nome:state.form.nome,papel:state.form.papel,casalId:null});state.modal=null;};
+  const openPicker=(mid)=>{state.pickerMin=mid;state.modal='picker';};
+  const escalar=(mid,cid)=>{if(!escala[mid])escala[mid]=[];if(!escala[mid].includes(cid))escala[mid].push(cid);state.modal=null;};
+  const removerDaEscala=(mid,cid)=>{escala[mid]=(escala[mid]||[]).filter(x=>x!==cid);};
+  const mudarMes=(delta)=>{let m=state.calMonth+delta,y=state.calYear;if(m<0){m=11;y--;}if(m>11){m=0;y++;}state.calMonth=m;state.calYear=y;state.selDia=null;};
+  const hoje=()=>{state.calYear=HOJE.ano;state.calMonth=HOJE.mes0;state.selDia=HOJE.dia;};
+  const selecionarDia=(d)=>{state.selDia=state.selDia===d?null:d;};
+  const garantirReuniao=(ev)=>{if(!ev.presenca)ev.presenca={};if(!ev.contribuicao)ev.contribuicao={};if(ev.ata===undefined)ev.ata='';if(!ev.avaliacoes)ev.avaliacoes=[];};
+  const abrirEvento=(e,origem)=>{state.voltar=origem||'eventos';if(e.tipo==='perseveranca'){garantirReuniao(e);state.reuniaoAberta=e;state.view='reuniao';}else if(e.tipo==='anual'){state.anualAberto=e;state.view='eventoAnual';}else{state.eventoAberto=e;state.addingPart=false;state.modal='evento';}};
+  const irParaEvento=(e)=>{state.calYear=e.ano;state.calMonth=e.mes0;state.selDia=e.dia;if(e.tipo==='perseveranca'||e.tipo==='anual'){abrirEvento(e,'eventos');}else{state.view='eventos';state.subEv='calendario';abrirEvento(e,'eventos');}};
+  const voltar=()=>{state.modal=null;state.view=state.voltar||'eventos';};
+  const adicionarParticipante=(ev,cid)=>{if(!ev.participantesCasais.includes(cid))ev.participantesCasais.push(cid);};
+  const removerParticipante=(ev,cid)=>{ev.participantesCasais=ev.participantesCasais.filter(x=>x!==cid);};
+  const togglePresenca=(ev,cid)=>{ev.presenca[cid]=!ev.presenca[cid];};
+  const toggleContrib=(ev,cid)=>{ev.contribuicao[cid]=!ev.contribuicao[cid];};
+  const presencaCount=(ev)=> casaisDaEquipe(ev.equipeId).filter(cid=>ev.presenca&&ev.presenca[cid]).length;
+  const contribCount=(ev)=> casaisDaEquipe(ev.equipeId).filter(cid=>ev.contribuicao&&ev.contribuicao[cid]).length;
+  const addAvaliacao=(ev)=>{if(!state.novaAval)return;ev.avaliacoes.push({autor:nomeCasal(equipeById(ev.equipeId).liderCasalId),texto:state.novaAval});state.novaAval='';};
+  const proximaReuniao=(eqId)=>{const key=(e)=>e.ano*10000+e.mes0*100+e.dia;const hk=HOJE.ano*10000+HOJE.mes0*100+HOJE.dia;const lista=eventos.filter(e=>e.equipeId===eqId);const fut=lista.filter(e=>key(e)>=hk).sort((a,b)=>key(a)-key(b));return fut[0]||lista.slice().sort((a,b)=>key(a)-key(b))[0]||null;};
+  const abrirNovoEvento=()=>{state.novoEvento={titulo:'',tipo:'servos',data:'',hora:'',local:'',equipeId:null};state.modal='novoEvento';};
+  const salvarEvento=()=>{const f=state.novoEvento;if(!f.titulo||!f.data)return;const [y,m,d]=f.data.split('-').map(Number);eventos.push({id:'ev'+(eventos.length+1+Math.floor(Math.random()*999)),titulo:f.titulo,tipo:f.tipo,ano:y,mes0:m-1,dia:d,hora:f.hora||'—',local:f.local||'A definir',equipeId:f.tipo==='perseveranca'?f.equipeId:null,participantesCasais:[]});state.modal=null;};
+  const abrirDoarItem=(it)=>{state.itemAberto=it;state.doarSel=null;state.modal='doarItem';};
+  const confirmarDoarItem=()=>{const it=state.itemAberto;if(!it||!state.doarSel)return;it.status='doado';it.doadorCasalId=state.doarSel;state.modal=null;};
+  const abrirComprarItem=(it)=>{state.itemAberto=it;state.compraValor='';state.modal='comprarItem';};
+  const confirmarComprarItem=()=>{const it=state.itemAberto;if(!it||state.compraValor==='')return;const v=Number(state.compraValor)||0;it.status='comprado';it.valorGasto=v;eventoAnual.conta.saidas.push({id:'s'+(eventoAnual.conta.saidas.length+1+Math.floor(Math.random()*999)),itemId:it.id,descricao:it.nome,valor:v});state.modal=null;};
+  const desfazerItem=(it)=>{if(it.status==='comprado'){eventoAnual.conta.saidas=eventoAnual.conta.saidas.filter(x=>x.itemId!==it.id);}it.status='pendente';it.doadorCasalId=null;it.valorGasto=0;};
+  const abrirDoacao=()=>{state.doacaoSel=null;state.doacaoValor='';state.modal='doacao';};
+  const confirmarDoacao=()=>{if(!state.doacaoSel||state.doacaoValor==='')return;eventoAnual.conta.entradas.push({id:'d'+(eventoAnual.conta.entradas.length+1+Math.floor(Math.random()*999)),casalId:state.doacaoSel,valor:Number(state.doacaoValor)||0});state.modal=null;};
+  const addItem=()=>{if(!state.novoItem.nome)return;eventoAnual.listaCompras.push({id:'i'+(eventoAnual.listaCompras.length+1+Math.floor(Math.random()*999)),nome:state.novoItem.nome,qtd:state.novoItem.qtd||1,unidade:state.novoItem.unidade||'un',status:'pendente',doadorCasalId:null,valorGasto:0});state.novoItem={nome:'',qtd:'',unidade:''};};
+
+  return{icons,tabs,tiposEvento,ministerios,pessoas,casais,edicao,escala,equipesPerseveranca,eventos,eventoAnual,meses,mesesAbrev,
+    ...toRefs(state),
+    iniciais,iniciaisPessoa,pessoaById,casalById,nomeCasal,min,equipeById,badgePapel,tipoCor,tipoLabel,eventoAbrev,statusCompra,corPessoa,
+    totalEscalados,metaEscala,pctEscala,equipesComCoord,pessoasFiltradas,candidatos,candidatosAgrupados,
+    gridDias,eventosDoDia,ehHoje,listaEventosMes,eventosLista,proximosEventos,casaisForaDoEvento,casaisDaEquipe,resumoCompras,extrato,
+    abrirNovaPessoa,salvarPessoa,openPicker,escalar,removerDaEscala,mudarMes,hoje,selecionarDia,
+    abrirEvento,irParaEvento,voltar,adicionarParticipante,removerParticipante,
+    togglePresenca,toggleContrib,presencaCount,contribCount,addAvaliacao,proximaReuniao,
+    abrirNovoEvento,salvarEvento,abrirDoarItem,confirmarDoarItem,abrirComprarItem,confirmarComprarItem,desfazerItem,abrirDoacao,confirmarDoacao,addItem};
+}}).mount('#app');
+</script>
+</body>
+</html>
