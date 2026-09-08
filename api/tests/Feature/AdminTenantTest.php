@@ -99,6 +99,33 @@ class AdminTenantTest extends TestCase
         }
     }
 
+    public function test_can_create_tenant_with_database_cache_store(): void
+    {
+        config(['cache.default' => 'database']);
+
+        Sanctum::actingAs($this->admin());
+
+        $create = $this->postJson('/api/v1/admin/tenants', [
+            'name' => 'Paróquia Cache DB',
+            'slug' => 'paroquia-cache-db',
+        ]);
+
+        $create->assertCreated()
+            ->assertJsonPath('data.slug', 'paroquia-cache-db');
+
+        $tenantId = $create->json('data.id');
+        $this->assertNotEmpty($tenantId);
+
+        if (tenancy()->initialized) {
+            tenancy()->end();
+        }
+
+        $dbPath = database_path('tenant'.$tenantId);
+        if (File::exists($dbPath)) {
+            File::delete($dbPath);
+        }
+    }
+
     public function test_tenant_slug_must_be_unique(): void
     {
         Sanctum::actingAs($this->admin());

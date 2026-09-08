@@ -1,0 +1,98 @@
+name: Deploy
+
+on:
+  # Só após o workflow CI concluir com sucesso na branch de produção (não em paralelo).
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy production
+    runs-on: ubuntu-latest
+    environment: production
+    # workflow_dispatch sempre; workflow_run só se CI passou
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          # Commit que passou no CI (ou HEAD no dispatch manual)
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: front/package-lock.json
+
+      - name: Build front
+        working-directory: front
+        run: |
+          npm ci
+          npm run build
+        env:
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
+
+      - name: Setup SSH
+        env:
+          DEPLOY_SSH_KEY_B64: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+
+          if [ -z "${DEPLOY_SSH_KEY_B64}" ]; then
+            echo "::error::Secret DEPLOY_SSH_KEY está vazio (environment)."
+            exit 1
+          fi
+
+          # Secret = chave privada PEM em base64 (uma linha). Ex.: base64 -w0 < id_ed25519
+          printf '%s' "$DEPLOY_SSH_KEY_B64" | tr -d '\n\r\t ' | base64 -d > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+          if ! grep -q "BEGIN .*PRIVATE KEY" ~/.ssh/deploy_key; then
+            echo "::error::DEPLOY_SSH_KEY não decodificou para chave privada PEM. Regenere com: base64 -w0 < deploy_key"
+            exit 1
+          fi
+
+          # OpenSSH exige newline ao final do arquivo.
+          if [ "$(tail -c1 ~/.ssh/deploy_key | wc -l)" -eq 0 ]; then
+            printf '\n' >> ~/.ssh/deploy_key
+          fi
+
+          ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          ssh-keygen -y -f ~/.ssh/deploy_key > /dev/null
+
+      - name: Sync code to server
+        run: |
+          # -rlDz (sem -a/-p/-t/-o/-g): evita chown/chgrp/chmod no destino
+          # (usuário de deploy costuma falhar com code 23 em bootstrap/cache).
+          SSH_OPTS="-i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes"
+          rsync -rlDz --delete \
+            --exclude='.git' \
+            --exclude='api/.env' \
+            --exclude='api/vendor' \
+            --exclude='api/storage' \
+            --exclude='api/bootstrap/cache/' \
+            --exclude='api/node_modules' \
+            --exclude='front/node_modules' \
+            --exclude='front/.env' \
+            -e "ssh $SSH_OPTS" \
+            ./ "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:${{ secrets.DEPLOY_PATH }}/"
+
+      - name: Run remote deploy script
+        run: |
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes \
+            "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" \
+            "bash ${{ secrets.DEPLOY_PATH }}/scripts/deploy-remote.sh"

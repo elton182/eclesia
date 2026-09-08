@@ -1,7 +1,11 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthAdminStore } from '../stores/authAdmin'
+import { useAuthStore } from '../stores/auth'
+import { useTenantStore } from '../stores/tenant'
+import TenantLoginView from '../views/TenantLoginView.vue'
 import LoginView from '../views/LoginView.vue'
 import TenantsView from '../views/TenantsView.vue'
+import UsersView from '../views/UsersView.vue'
 import EccEquipesView from '../views/EccEquipesView.vue'
 import EccCasaisView from '../views/EccCasaisView.vue'
 import AdminLayout from '../layouts/AdminLayout.vue'
@@ -16,21 +20,49 @@ const router = createRouter({
       children: [
         {
           path: '',
-          name: 'login',
+          name: 'tenant-login',
+          component: TenantLoginView,
+        },
+        {
+          path: 'admin/login',
+          name: 'admin-login',
           component: LoginView,
         },
       ],
     },
     {
-      path: '/',
+      path: '/admin',
       component: AdminLayout,
-      meta: { requiresAuth: true },
+      meta: { requiresAuthAdmin: true },
       children: [
         {
           path: 'tenants',
           name: 'tenants',
           component: TenantsView,
         },
+        {
+          path: '',
+          redirect: '/admin/tenants',
+        },
+      ],
+    },
+    {
+      path: '/',
+      component: AdminLayout,
+      meta: { requiresAuthTenantOrAdmin: true },
+      children: [
+        {
+          path: 'usuarios',
+          name: 'usuarios',
+          component: UsersView,
+        },
+      ],
+    },
+    {
+      path: '/',
+      component: AdminLayout,
+      meta: { requiresAuthAdmin: true },
+      children: [
         {
           path: 'ecc/equipes',
           name: 'ecc-equipes',
@@ -41,27 +73,65 @@ const router = createRouter({
           name: 'ecc-casais',
           component: EccCasaisView,
         },
-        {
-          path: 'dashboard',
-          redirect: '/tenants',
-        },
       ],
     },
   ],
 })
 
 router.beforeEach(async (to, from, next) => {
-  const authStore = useAuthAdminStore()
-  const isAuthRoute = to.path === '/'
+  const authAdmin = useAuthAdminStore()
+  const authTenant = useAuthStore()
+  const tenantStore = useTenantStore()
 
-  if (isAuthRoute) {
-    const ok = await authStore.checkAuth()
-    next(ok ? '/tenants' : undefined)
+  if (to.name === 'tenant-login') {
+    const ok = await authTenant.checkAuth()
+    next(ok ? '/usuarios' : undefined)
     return
   }
 
-  if (to.matched.some((r) => r.meta.requiresAuth)) {
-    const ok = await authStore.checkAuth()
+  if (to.name === 'admin-login') {
+    const ok = await authAdmin.checkAuth()
+    next(ok ? '/admin/tenants' : undefined)
+    return
+  }
+
+  if (to.matched.some((r) => r.meta.requiresAuthTenantOrAdmin)) {
+    // Preferir sessão de usuário do tenant quando houver token
+    const hasTenantSession =
+      !!localStorage.getItem('tenant_token') && !!tenantStore.slug
+
+    if (hasTenantSession) {
+      if (authTenant.isAuthenticated && authTenant.user) {
+        next()
+        return
+      }
+      const tenantOk = await authTenant.checkAuth()
+      next(tenantOk ? undefined : '/')
+      return
+    }
+
+    const adminOk = await authAdmin.checkAuth()
+    if (adminOk) {
+      if (!tenantStore.slug) {
+        next('/admin/tenants')
+        return
+      }
+      next()
+      return
+    }
+
+    next('/')
+    return
+  }
+
+  if (to.matched.some((r) => r.meta.requiresAuthAdmin)) {
+    const ok = await authAdmin.checkAuth()
+    next(ok ? undefined : '/admin/login')
+    return
+  }
+
+  if (to.matched.some((r) => r.meta.requiresAuthTenant)) {
+    const ok = await authTenant.checkAuth()
     next(ok ? undefined : '/')
     return
   }

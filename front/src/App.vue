@@ -1,5 +1,6 @@
 <script setup>
 import { RouterView } from 'vue-router'
+import InnovToast from '@/components/base/InnovToast.vue'
 </script>
 
 <template>
@@ -8,6 +9,7 @@ import { RouterView } from 'vue-router'
       <component :is="Component" />
     </transition>
   </RouterView>
+  <InnovToast />
 </template>
 
 <style>

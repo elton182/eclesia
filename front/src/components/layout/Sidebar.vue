@@ -6,13 +6,15 @@ import {
   faBuilding,
   faUsers,
   faHeart,
-  faTachometerAlt,
+  faUserShield,
 } from '@fortawesome/free-solid-svg-icons'
 import { library } from '@fortawesome/fontawesome-svg-core'
 import { useTenantStore } from '@/stores/tenant'
+import { useAuthAdminStore } from '@/stores/authAdmin'
+import { useAuthStore } from '@/stores/auth'
 import logoUrl from '@/assets/logo-icon.png'
 
-library.add(faBuilding, faUsers, faHeart, faTachometerAlt)
+library.add(faBuilding, faUsers, faHeart, faUserShield)
 
 defineProps({
   isOpen: { type: Boolean, default: true },
@@ -20,15 +22,31 @@ defineProps({
 
 const route = useRoute()
 const tenantStore = useTenantStore()
+const authAdmin = useAuthAdminStore()
+const authTenant = useAuthStore()
 
 const isActive = (path) => route.path === path || route.path.startsWith(path + '/')
 
+const isPlatform = computed(() => authAdmin.isAuthenticated && route.path.startsWith('/admin'))
+const isTenantShell = computed(() => authTenant.isAuthenticated && !route.path.startsWith('/admin'))
+
 const platformItems = ref([
-  { label: 'Tenants', icon: faBuilding, path: '/tenants' },
+  { label: 'Tenants', icon: faBuilding, path: '/admin/tenants' },
 ])
 
+const tenantItems = computed(() => {
+  // Usuários do tenant: login da organização OU super-admin com tenant selecionado
+  if (authTenant.isAuthenticated && !route.path.startsWith('/admin')) {
+    return [{ label: 'Usuários', icon: faUserShield, path: '/usuarios' }]
+  }
+  if (authAdmin.isAuthenticated && tenantStore.slug) {
+    return [{ label: 'Usuários', icon: faUserShield, path: '/usuarios' }]
+  }
+  return []
+})
+
 const eccItems = computed(() => {
-  if (!tenantStore.slug) return []
+  if (!tenantStore.slug || !authAdmin.isAuthenticated) return []
   return [
     { label: 'Equipes', icon: faUsers, path: '/ecc/equipes' },
     { label: 'Casais', icon: faHeart, path: '/ecc/casais' },
@@ -57,29 +75,46 @@ const eccItems = computed(() => {
     </div>
 
     <nav class="flex-1 px-3 py-4 space-y-1">
-      <p v-if="isOpen" class="px-2 mb-2 text-[11px] uppercase tracking-wider text-[#D4B896] font-bold">
-        Plataforma
-      </p>
-      <router-link
-        v-for="item in platformItems"
-        :key="item.path"
-        :to="item.path"
-        :class="[
-          'flex items-center gap-3 py-2.5 px-3 rounded-xl text-[14.5px] font-medium transition-colors',
-          isActive(item.path)
-            ? 'bg-[#FCFAF6] text-[var(--color-primary)]'
-            : 'text-[#EBCFB8] hover:bg-white/10 hover:text-[#FBEEE4]',
-        ]"
-        data-testid="nav-tenants"
-      >
-        <FontAwesomeIcon :icon="item.icon" class="w-5 text-center" />
-        <span v-if="isOpen">{{ item.label }}</span>
-      </router-link>
-
-      <template v-if="eccItems.length">
-        <p v-if="isOpen" class="px-2 mt-5 mb-2 text-[11px] uppercase tracking-wider text-[#D4B896] font-bold">
-          ECC · {{ tenantStore.name || tenantStore.slug }}
+      <template v-if="isPlatform || (!isTenantShell && authAdmin.isAuthenticated)">
+        <p v-if="isOpen" class="px-2 mb-2 text-[11px] uppercase tracking-wider text-[#D4B896] font-bold">
+          Plataforma
         </p>
+        <router-link
+          v-for="item in platformItems"
+          :key="item.path"
+          :to="item.path"
+          :class="[
+            'flex items-center gap-3 py-2.5 px-3 rounded-xl text-[14.5px] font-medium transition-colors',
+            isActive(item.path)
+              ? 'bg-[#FCFAF6] text-[var(--color-primary)]'
+              : 'text-[#EBCFB8] hover:bg-white/10 hover:text-[#FBEEE4]',
+          ]"
+          data-testid="nav-tenants"
+        >
+          <FontAwesomeIcon :icon="item.icon" class="w-5 text-center" />
+          <span v-if="isOpen">{{ item.label }}</span>
+        </router-link>
+      </template>
+
+      <template v-if="tenantItems.length || eccItems.length">
+        <p v-if="isOpen" class="px-2 mt-5 mb-2 text-[11px] uppercase tracking-wider text-[#D4B896] font-bold">
+          {{ tenantStore.name || tenantStore.slug || 'Organização' }}
+        </p>
+        <router-link
+          v-for="item in tenantItems"
+          :key="item.path"
+          :to="item.path"
+          :class="[
+            'flex items-center gap-3 py-2.5 px-3 rounded-xl text-[14.5px] font-medium transition-colors',
+            isActive(item.path)
+              ? 'bg-[#FCFAF6] text-[var(--color-primary)]'
+              : 'text-[#EBCFB8] hover:bg-white/10 hover:text-[#FBEEE4]',
+          ]"
+          data-testid="nav-usuarios"
+        >
+          <FontAwesomeIcon :icon="item.icon" class="w-5 text-center" />
+          <span v-if="isOpen">{{ item.label }}</span>
+        </router-link>
         <router-link
           v-for="item in eccItems"
           :key="item.path"

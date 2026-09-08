@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import api from '@/services/api'
 import { useTenantStore } from '@/stores/tenant'
 import { innovToast } from '@/plugins/toast'
+import { parseTenantAliases, extractApiError } from '@/utils/tenantAuth'
 
 const router = useRouter()
 const tenantStore = useTenantStore()
@@ -11,8 +12,11 @@ const tenantStore = useTenantStore()
 const tenants = ref([])
 const loading = ref(false)
 const mode = ref('list')
-const form = ref({ id: null, name: '', slug: '' })
+const form = ref({ id: null, name: '', slug: '', aliasesText: '' })
 const saving = ref(false)
+const formError = ref('')
+
+const parseAliases = parseTenantAliases
 
 const load = async () => {
   loading.value = true
@@ -27,12 +31,19 @@ const load = async () => {
 }
 
 const openCreate = () => {
-  form.value = { id: null, name: '', slug: '' }
+  form.value = { id: null, name: '', slug: '', aliasesText: '' }
+  formError.value = ''
   mode.value = 'form'
 }
 
 const openEdit = (tenant) => {
-  form.value = { id: tenant.id, name: tenant.name, slug: tenant.slug }
+  form.value = {
+    id: tenant.id,
+    name: tenant.name,
+    slug: tenant.slug,
+    aliasesText: (tenant.aliases || []).join(', '),
+  }
+  formError.value = ''
   mode.value = 'form'
 }
 
@@ -52,27 +63,25 @@ const onNameInput = () => {
 
 const save = async () => {
   saving.value = true
+  formError.value = ''
   try {
+    const payload = {
+      name: form.value.name,
+      slug: form.value.slug,
+      aliases: parseAliases(form.value.aliasesText),
+    }
     if (form.value.id) {
-      await api.put(`/admin/tenants/${form.value.id}`, {
-        name: form.value.name,
-        slug: form.value.slug,
-      })
+      await api.put(`/admin/tenants/${form.value.id}`, payload)
       innovToast('success', 'OK', 'Tenant atualizado')
     } else {
-      await api.post('/admin/tenants', {
-        name: form.value.name,
-        slug: form.value.slug,
-      })
+      await api.post('/admin/tenants', payload)
       innovToast('success', 'OK', 'Tenant criado e banco provisionado')
     }
     mode.value = 'list'
     await load()
   } catch (e) {
-    const msg =
-      e.response?.data?.message ||
-      Object.values(e.response?.data?.errors || {}).flat().join(' ') ||
-      'Falha ao salvar'
+    const msg = extractApiError(e)
+    formError.value = msg
     innovToast('error', 'Erro', msg)
   } finally {
     saving.value = false
@@ -94,6 +103,11 @@ const remove = async (tenant) => {
 const enterTenant = (tenant) => {
   tenantStore.select(tenant)
   router.push('/ecc/equipes')
+}
+
+const enterUsers = (tenant) => {
+  tenantStore.select(tenant)
+  router.push('/usuarios')
 }
 
 onMounted(load)
@@ -131,11 +145,21 @@ onMounted(load)
               <div class="font-semibold">{{ tenant.name }}</div>
               <div class="text-sm" style="color: var(--color-muted)">
                 slug: <code>{{ tenant.slug }}</code>
+                <span v-if="tenant.aliases?.length">
+                  · apelidos: {{ tenant.aliases.join(', ') }}
+                </span>
               </div>
             </div>
             <div class="flex gap-2 flex-wrap">
               <button class="btn btn-accent btn-sm" @click="enterTenant(tenant)">
                 Abrir ECC
+              </button>
+              <button
+                class="btn btn-ghost btn-sm"
+                data-testid="tenant-users"
+                @click="enterUsers(tenant)"
+              >
+                Usuários
               </button>
               <button class="btn btn-ghost" @click="openEdit(tenant)">Editar</button>
               <button class="btn btn-ghost text-red-700" @click="remove(tenant)">Excluir</button>
@@ -148,6 +172,14 @@ onMounted(load)
     <div v-else class="card p-6 max-w-lg">
       <h3 class="text-xl mb-4">{{ form.id ? 'Editar tenant' : 'Novo tenant' }}</h3>
       <form class="space-y-4" @submit.prevent="save">
+        <div
+          v-if="formError"
+          class="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800"
+          role="alert"
+          data-testid="tenant-form-error"
+        >
+          {{ formError }}
+        </div>
         <div>
           <label class="fld" for="tenant-name">Nome</label>
           <input
@@ -168,6 +200,16 @@ onMounted(load)
             required
             pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
             data-testid="tenant-slug"
+          />
+        </div>
+        <div>
+          <label class="fld" for="tenant-aliases">Apelidos (separados por vírgula)</label>
+          <input
+            id="tenant-aliases"
+            v-model="form.aliasesText"
+            class="input"
+            placeholder="ex.: psj, são josé"
+            data-testid="tenant-aliases"
           />
         </div>
         <div class="flex gap-2">

@@ -28,6 +28,8 @@ class StoreTenantRequest extends FormRequest
                 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/',
                 Rule::unique('tenants', 'slug'),
             ],
+            'aliases' => ['sometimes', 'array'],
+            'aliases.*' => ['string', 'max:100'],
         ];
     }
 }

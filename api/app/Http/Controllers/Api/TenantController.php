@@ -37,7 +37,7 @@ class TenantController extends Controller
 
     public function show(Tenant $tenant): TenantResource
     {
-        return new TenantResource($tenant);
+        return new TenantResource($tenant->loadMissing('aliases'));
     }
 
     public function update(UpdateTenantRequest $request, Tenant $tenant): TenantResource

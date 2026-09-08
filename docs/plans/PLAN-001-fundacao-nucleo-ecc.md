@@ -4,7 +4,7 @@
 **Data:** 2026-09-03  
 **Brief:** [docs/product/BRIEF.md](../product/BRIEF.md)  
 **ADRs:** [ADR-0001](../architecture/ADR-0001-multitenancy-lgpd.md), [ADR-0002](../architecture/ADR-0002-hierarquia-tenant-igreja.md)  
-**Specs:** [SPEC-001](../specs/SPEC-001-admin-tenants-identidade.md), [SPEC-002](../specs/SPEC-002-ecc-equipes-casais.md)
+**Specs:** [SPEC-001](../specs/SPEC-001-admin-tenants-identidade.md), [SPEC-002](../specs/SPEC-002-ecc-equipes-casais.md), [SPEC-003](../specs/SPEC-003-usuarios-papeis-tenant.md)
 
 ## Objetivo
 
@@ -24,7 +24,7 @@ Entregar a fundação SaaS multi-tenant (banco por tenant), o núcleo compartilh
 - [x] Super-admin + CRUD tenants (header `X-Tenant`)
 - [x] ECC: equipes, casais, importação Excel (MVP)
 - [ ] Seletor de igreja / multi-igreja completo
-- [ ] spatie/permission com teams
+- [x] spatie/permission com teams (SPEC-003)
 - [ ] Demais telas ECC (escala, caixa, perseverança…)
 
 ## Etapas

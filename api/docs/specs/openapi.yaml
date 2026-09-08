@@ -1,11 +1,12 @@
 openapi: 3.0.3
 info:
   title: Eclesia API
-  version: 0.2.0
+  version: 0.3.0
   description: |
     API multi-tenant do Eclesia (gestão eclesial).
     Contexto central (landlord): `/admin/*`.
     Contexto tenant: header `X-Tenant` (slug) + auth web/Sanctum.
+    Login web resolve tenant por slug|apelido|nome no body (sem X-Tenant obrigatório).
     Dados pessoais criptografados em repouso (LGPD).
 servers:
   - url: http://localhost:8000/api/v1
@@ -31,12 +32,66 @@ components:
           type: string
         slug:
           type: string
+        aliases:
+          type: array
+          items:
+            type: string
         created_at:
           type: string
           format: date-time
         updated_at:
           type: string
           format: date-time
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          description: ULID público
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        is_active:
+          type: boolean
+        pessoa_id:
+          type: string
+          nullable: true
+        roles:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              igreja_id:
+                type: string
+                nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    Role:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        guard_name:
+          type: string
+    Permission:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        guard_name:
+          type: string
     EccEquipe:
       type: object
       properties:
@@ -181,6 +236,10 @@ paths:
                 slug:
                   type: string
                   pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$'
+                aliases:
+                  type: array
+                  items:
+                    type: string
       responses:
         '201':
           description: Tenant criado
@@ -223,6 +282,10 @@ paths:
                   type: string
                 slug:
                   type: string
+                aliases:
+                  type: array
+                  items:
+                    type: string
       responses:
         '200':
           description: Atualizado
@@ -242,17 +305,20 @@ paths:
   /web/login:
     post:
       summary: Login web (tenant)
-      description: Requer header X-Tenant. E-mail via whereEncrypted.
-      security:
-        - tenantHeader: []
+      description: |
+        Resolve a organização por `tenant` (slug, apelido ou nome único) sem exigir X-Tenant.
+        E-mail via whereEncrypted (LGPD). Retorna cookies + slug canônico.
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [email, password]
+              required: [tenant, email, password]
               properties:
+                tenant:
+                  type: string
+                  description: Slug, apelido ou nome da organização
                 email:
                   type: string
                   format: email
@@ -261,9 +327,13 @@ paths:
                   format: password
       responses:
         '200':
-          description: Login OK (cookies access/refresh)
+          description: Login OK (access_token + cookies + tenant.slug)
         '403':
           description: Credenciais inválidas
+        '404':
+          description: Organização não encontrada
+        '422':
+          description: Validação ou nome ambíguo
   /web/me:
     post:
       summary: Usuário autenticado (tenant)
@@ -271,7 +341,7 @@ paths:
         - tenantHeader: []
       responses:
         '200':
-          description: Dados do usuário
+          description: Dados do usuário (roles/permissions)
         '401':
           description: Não autenticado
   /web/logout:
@@ -282,6 +352,180 @@ paths:
       responses:
         '200':
           description: Logout efetuado
+  /users:
+    get:
+      summary: Listar usuários do tenant
+      security:
+        - tenantHeader: []
+      responses:
+        '200':
+          description: Lista paginada
+        '401':
+          description: Não autenticado
+        '403':
+          description: Sem permissão
+    post:
+      summary: Criar usuário
+      security:
+        - tenantHeader: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, password]
+              properties:
+                name:
+                  type: string
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+                is_active:
+                  type: boolean
+                pessoa_id:
+                  type: string
+                  nullable: true
+      responses:
+        '201':
+          description: Criado
+        '422':
+          description: Validação
+  /users/{id}:
+    get:
+      summary: Detalhe do usuário
+      security:
+        - tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: ULID
+      responses:
+        '200':
+          description: Usuário
+        '404':
+          description: Não encontrado
+    patch:
+      summary: Atualizar usuário
+      security:
+        - tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                email:
+                  type: string
+                password:
+                  type: string
+                is_active:
+                  type: boolean
+                pessoa_id:
+                  type: string
+                  nullable: true
+      responses:
+        '200':
+          description: Atualizado
+    delete:
+      summary: Remover ou desativar usuário
+      security:
+        - tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Removido
+  /users/{id}/roles:
+    post:
+      summary: Atribuir papel ao usuário
+      security:
+        - tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role]
+              properties:
+                role:
+                  type: string
+                igreja_id:
+                  type: string
+                  nullable: true
+                  description: Obrigatório exceto para admin-tenant
+      responses:
+        '200':
+          description: Papel atribuído
+        '422':
+          description: Validação
+    delete:
+      summary: Remover papel do usuário
+      security:
+        - tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role]
+              properties:
+                role:
+                  type: string
+                igreja_id:
+                  type: string
+                  nullable: true
+      responses:
+        '200':
+          description: Papel removido
+  /roles:
+    get:
+      summary: Catálogo de papéis (somente leitura)
+      security:
+        - tenantHeader: []
+      responses:
+        '200':
+          description: Lista de papéis
+  /permissions:
+    get:
+      summary: Catálogo de permissões (somente leitura)
+      security:
+        - tenantHeader: []
+      responses:
+        '200':
+          description: Lista de permissões
   /ecc/equipes:
     get:
       summary: Listar equipes ECC

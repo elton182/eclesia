@@ -31,6 +31,8 @@ class UpdateTenantRequest extends FormRequest
                 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/',
                 Rule::unique('tenants', 'slug')->ignore($tenantId),
             ],
+            'aliases' => ['sometimes', 'array'],
+            'aliases.*' => ['string', 'max:100'],
         ];
     }
 }

@@ -13,10 +13,31 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->statefulApi();
+        $middleware->appendToGroup('api', [
+            \App\Http\Middleware\ForgetTenantUserFromCentralSession::class,
+        ]);
         $middleware->alias([
             'cookie.to.token' => \App\Http\Middleware\CookieToTokenMiddleware::class,
             'tenancy.slug' => \App\Http\Middleware\InitializeTenancyBySlug::class,
+            'auth.tenant' => \App\Http\Middleware\AuthenticateTenantApi::class,
         ]);
+
+        // Ordem necessária:
+        // 1) tenancy / cookie→token antes de auth:sanctum (token do User no DB do tenant)
+        // 2) AuthenticateTenantApi antes de SubstituteBindings ({user} no DB do tenant)
+        // InitializeTenancyBySlug só pode aparecer uma vez em prependPriority (última sobrescreve).
+        $middleware->prependToPriorityList(
+            before: \Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests::class,
+            prepend: \App\Http\Middleware\InitializeTenancyBySlug::class,
+        );
+        $middleware->prependToPriorityList(
+            before: \Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests::class,
+            prepend: \App\Http\Middleware\CookieToTokenMiddleware::class,
+        );
+        $middleware->prependToPriorityList(
+            before: \Illuminate\Routing\Middleware\SubstituteBindings::class,
+            prepend: \App\Http\Middleware\AuthenticateTenantApi::class,
+        );
     })
     ->withExceptions(function (Exceptions $exceptions) {
         $exceptions->render(function (

@@ -24,7 +24,7 @@ const handleLogin = async () => {
   const result = await authStore.login(email.value, password.value)
 
   if (result.success) {
-    router.push('/tenants')
+    router.push('/admin/tenants')
   } else {
     errorMessage.value = result.error
   }
@@ -96,5 +96,9 @@ const handleLogin = async () => {
         {{ isLoading ? 'Entrando…' : 'Entrar' }}
       </button>
     </form>
+
+    <p class="text-center text-xs" style="color: var(--color-muted)">
+      <router-link to="/" class="underline">Voltar ao login da organização</router-link>
+    </p>
   </div>
 </template>

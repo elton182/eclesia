@@ -1,6 +1,6 @@
 <script setup>
-import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted, computed } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import {
   faBars,
@@ -9,15 +9,24 @@ import {
 } from '@fortawesome/free-solid-svg-icons'
 import { library } from '@fortawesome/fontawesome-svg-core'
 import { useAuthAdminStore } from '@/stores/authAdmin'
+import { useAuthStore } from '@/stores/auth'
 import { useTenantStore } from '@/stores/tenant'
 
 library.add(faBars, faSignOutAlt, faChevronDown)
 
 const emit = defineEmits(['toggleSidebar'])
-const authStore = useAuthAdminStore()
+const authAdmin = useAuthAdminStore()
+const authTenant = useAuthStore()
 const tenantStore = useTenantStore()
 const router = useRouter()
+const route = useRoute()
 const userMenuOpen = ref(false)
+
+const displayName = computed(
+  () => authTenant.user?.name || authAdmin.user?.name || 'Usuário',
+)
+
+const isAdminArea = computed(() => route.path.startsWith('/admin') || route.path.startsWith('/ecc'))
 
 onMounted(() => {
   document.addEventListener('click', (e) => {
@@ -28,8 +37,14 @@ onMounted(() => {
 })
 
 const logout = async () => {
-  tenantStore.clear()
-  await authStore.logout()
+  if (isAdminArea.value && authAdmin.isAuthenticated) {
+    tenantStore.clear()
+    await authAdmin.logout()
+    router.push('/admin/login')
+    return
+  }
+
+  await authTenant.logout()
   router.push('/')
 }
 </script>
@@ -62,7 +77,7 @@ const logout = async () => {
           class="user-menu-toggle top-navbar__btn flex items-center gap-2 px-3 py-2 rounded-xl"
           @click="userMenuOpen = !userMenuOpen"
         >
-          <span class="text-sm font-medium">{{ authStore.user?.name || 'Admin' }}</span>
+          <span class="text-sm font-medium">{{ displayName }}</span>
           <FontAwesomeIcon :icon="faChevronDown" class="text-xs" />
         </button>
         <div
@@ -85,43 +100,22 @@ const logout = async () => {
 
 <style scoped>
 .top-navbar {
-  background: var(--color-surface);
+  background: #fff;
   border-color: var(--color-line);
-  /* Escopo local: base.css com prefers-color-scheme:dark força texto claro no body */
-  color: var(--color-ink);
 }
-
 .top-navbar__btn {
   color: var(--color-primary);
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  transition: background-color 0.2s, color 0.2s;
 }
-
 .top-navbar__btn:hover {
-  background: var(--color-surface-2);
-  color: var(--color-primary-dark);
+  background: var(--color-bg);
 }
-
 .top-navbar__eyebrow {
   color: var(--color-accent);
 }
-
 .top-navbar__tenant {
   color: var(--color-primary);
 }
-
-.top-navbar__menu-item {
-  color: var(--color-ink);
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
 .top-navbar__menu-item:hover {
-  background: var(--color-surface-2);
-  color: var(--color-primary);
+  background: var(--color-bg);
 }
 </style>

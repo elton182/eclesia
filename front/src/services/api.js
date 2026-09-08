@@ -1,6 +1,9 @@
 import axios from 'axios'
 import { useTenantStore } from '../stores/tenant'
 
+const TENANT_TOKEN_KEY = 'tenant_token'
+const ADMIN_TOKEN_KEY = 'auth_token'
+
 const api = axios.create({
   baseURL: (import.meta.env.VITE_API_URL || 'http://localhost:8000/') + 'api/v1/',
   headers: {
@@ -14,21 +17,33 @@ api.defaults.withXSRFToken = true
 
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('auth_token')
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
-    }
-
+    let tenantSlug = ''
     try {
       const tenantStore = useTenantStore()
-      if (tenantStore.slug) {
-        config.headers['X-Tenant'] = tenantStore.slug
+      tenantSlug = tenantStore.slug || ''
+      if (tenantSlug) {
+        config.headers['X-Tenant'] = tenantSlug
       }
     } catch {
-      const slug = localStorage.getItem('eclesia_tenant_slug')
-      if (slug) {
-        config.headers['X-Tenant'] = slug
+      tenantSlug = localStorage.getItem('eclesia_tenant_slug') || ''
+      if (tenantSlug) {
+        config.headers['X-Tenant'] = tenantSlug
       }
+    }
+
+    // Token do tenant tem prioridade quando há X-Tenant (evita Bearer de super-admin)
+    const tenantToken = localStorage.getItem(TENANT_TOKEN_KEY)
+    const adminToken = localStorage.getItem(ADMIN_TOKEN_KEY)
+
+    if (tenantSlug && tenantToken) {
+      config.headers.Authorization = `Bearer ${tenantToken}`
+    } else if (adminToken && !tenantSlug) {
+      config.headers.Authorization = `Bearer ${adminToken}`
+    } else if (adminToken && !tenantToken) {
+      // ECC ainda usa super-admin + X-Tenant
+      config.headers.Authorization = `Bearer ${adminToken}`
+    } else {
+      delete config.headers.Authorization
     }
 
     return config
@@ -39,14 +54,26 @@ api.interceptors.request.use(
 export const setAuthToken = (token) => {
   if (token) {
     api.defaults.headers.common.Authorization = `Bearer ${token}`
-    localStorage.setItem('auth_token', token)
+    localStorage.setItem(ADMIN_TOKEN_KEY, token)
   } else {
     delete api.defaults.headers.common.Authorization
-    localStorage.removeItem('auth_token')
+    localStorage.removeItem(ADMIN_TOKEN_KEY)
   }
 }
 
-const savedToken = localStorage.getItem('auth_token')
+export const setTenantToken = (token) => {
+  if (token) {
+    localStorage.setItem(TENANT_TOKEN_KEY, token)
+  } else {
+    localStorage.removeItem(TENANT_TOKEN_KEY)
+  }
+}
+
+export const clearTenantToken = () => {
+  localStorage.removeItem(TENANT_TOKEN_KEY)
+}
+
+const savedToken = localStorage.getItem(ADMIN_TOKEN_KEY)
 if (savedToken) {
   setAuthToken(savedToken)
 }

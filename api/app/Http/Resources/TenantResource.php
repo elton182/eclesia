@@ -21,6 +21,11 @@ class TenantResource extends JsonResource
             'id' => $this->id,
             'name' => $this->name,
             'slug' => $this->slug,
+            'aliases' => $this->whenLoaded(
+                'aliases',
+                fn () => $this->aliases->pluck('alias')->values()->all(),
+                []
+            ),
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
         ];

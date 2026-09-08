@@ -70,6 +70,16 @@ class EccEquipeCasalTest extends TestCase
         $this->getJson('/api/v1/ecc/equipes')->assertStatus(400);
     }
 
+    public function test_super_admin_bearer_can_list_equipes(): void
+    {
+        $token = $this->admin->createToken('admin')->plainTextToken;
+
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->withHeader('X-Tenant', 'demo')
+            ->getJson('/api/v1/ecc/equipes')
+            ->assertOk();
+    }
+
     public function test_can_manage_equipes_and_casais(): void
     {
         $equipe = $this->tenantJson('POST', '/api/v1/ecc/equipes', [
