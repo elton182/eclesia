@@ -1,11 +1,15 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import api from '@/services/api'
 import { innovToast } from '@/plugins/toast'
+import { buildSyncRolesPayload, roleLabel } from '@/utils/userRoles'
+import { filterEquipesBySearch } from '@/utils/eccFilters'
 
 const users = ref([])
 const roles = ref([])
 const igrejas = ref([])
+const equipes = ref([])
+const equipeSearch = ref('')
 const loading = ref(false)
 const mode = ref('list')
 const saving = ref(false)
@@ -19,9 +23,15 @@ const form = ref({
 const roleForm = ref({
   userId: null,
   userName: '',
-  role: 'secretaria',
   igreja_id: '',
+  toggles: {},
+  equipe_ids: [],
 })
+
+const liderAtivo = computed(() => !!roleForm.value.toggles['lider-equipe'])
+const equipesFiltradas = computed(() =>
+  filterEquipesBySearch(equipes.value, equipeSearch.value),
+)
 
 const load = async () => {
   loading.value = true
@@ -41,6 +51,15 @@ const load = async () => {
   }
 }
 
+const loadEquipes = async () => {
+  try {
+    const res = await api.get('/ecc/equipes')
+    equipes.value = res.data.data || res.data || []
+  } catch {
+    equipes.value = []
+  }
+}
+
 const openCreate = () => {
   form.value = { id: null, name: '', email: '', password: '', is_active: true }
   mode.value = 'form'
@@ -57,15 +76,38 @@ const openEdit = (user) => {
   mode.value = 'form'
 }
 
-const openRoles = (user) => {
+const openRoles = async (user) => {
+  const igrejaId = igrejas.value[0]?.id || ''
+  const toggles = {}
+  for (const role of roles.value) {
+    const match = (user.roles || []).some((r) => {
+      if (r.name !== role.name) return false
+      if (role.name === 'admin-tenant') return true
+      return !r.igreja_id || r.igreja_id === igrejaId
+    })
+    toggles[role.name] = match
+  }
+
   roleForm.value = {
     userId: user.id,
     userName: user.name,
-    role: 'secretaria',
-    igreja_id: igrejas.value[0]?.id || '',
+    igreja_id: igrejaId,
+    toggles,
+    equipe_ids: (user.equipes_lideradas || []).map((e) => e.id),
   }
+  equipeSearch.value = ''
   mode.value = 'roles'
+  await loadEquipes()
 }
+
+watch(
+  () => roleForm.value.igreja_id,
+  async () => {
+    if (mode.value === 'roles') {
+      await loadEquipes()
+    }
+  },
+)
 
 const save = async () => {
   saving.value = true
@@ -112,37 +154,31 @@ const remove = async (user) => {
   }
 }
 
-const assignRole = async () => {
+const saveRoles = async () => {
+  if (liderAtivo.value && roleForm.value.equipe_ids.length < 1) {
+    innovToast('error', 'Erro', 'Selecione ao menos uma equipe para o líder.')
+    return
+  }
+
   saving.value = true
   try {
-    const payload = { role: roleForm.value.role }
-    if (roleForm.value.role !== 'admin-tenant') {
-      payload.igreja_id = roleForm.value.igreja_id
-    }
-    await api.post(`/users/${roleForm.value.userId}/roles`, payload)
-    innovToast('success', 'OK', 'Papel atribuído')
+    const payload = buildSyncRolesPayload({
+      igrejaId: roleForm.value.igreja_id,
+      toggles: roleForm.value.toggles,
+      equipeIds: roleForm.value.equipe_ids,
+    })
+    await api.put(`/users/${roleForm.value.userId}/roles`, payload)
+    innovToast('success', 'OK', 'Papéis atualizados')
     mode.value = 'list'
     await load()
   } catch (e) {
     const msg =
       e.response?.data?.message ||
       Object.values(e.response?.data?.errors || {}).flat().join(' ') ||
-      'Falha ao atribuir papel'
+      'Falha ao salvar papéis'
     innovToast('error', 'Erro', msg)
   } finally {
     saving.value = false
-  }
-}
-
-const removeRole = async (user, role) => {
-  try {
-    await api.delete(`/users/${user.id}/roles`, {
-      data: { role: role.name, igreja_id: role.igreja_id },
-    })
-    innovToast('success', 'OK', 'Papel removido')
-    await load()
-  } catch (e) {
-    innovToast('error', 'Erro', e.response?.data?.message || 'Falha ao remover papel')
   }
 }
 
@@ -155,7 +191,7 @@ onMounted(load)
       <p class="page-eyebrow">Organização</p>
       <h2 class="text-3xl" style="color: var(--color-primary)">Usuários</h2>
       <p class="mt-1 text-[14.5px]" style="color: var(--color-muted)">
-        Cadastre usuários e atribua papéis por igreja.
+        Cadastre usuários e marque os perfis (N papéis por usuário).
       </p>
     </div>
 
@@ -194,18 +230,22 @@ onMounted(load)
               </div>
             </div>
             <div v-if="user.roles?.length" class="flex flex-wrap gap-2">
-              <button
+              <span
                 v-for="(role, idx) in user.roles"
                 :key="`${role.name}-${role.igreja_id}-${idx}`"
-                type="button"
                 class="text-xs px-2 py-1 rounded-lg bg-[var(--color-bg)] border"
                 style="border-color: var(--color-line)"
-                :title="'Clique para remover'"
-                @click="removeRole(user, role)"
               >
-                {{ role.name }}
-                <span v-if="role.igreja_id" style="color: var(--color-muted)"> · igreja</span>
-              </button>
+                {{ roleLabel(role.name) }}
+              </span>
+            </div>
+            <div
+              v-if="user.equipes_lideradas?.length"
+              class="text-xs"
+              style="color: var(--color-muted)"
+            >
+              Equipes:
+              {{ user.equipes_lideradas.map((e) => e.nome).join(', ') }}
             </div>
           </div>
         </div>
@@ -259,33 +299,82 @@ onMounted(load)
     <div v-else class="card p-6 max-w-lg">
       <h3 class="text-xl mb-1">Papéis</h3>
       <p class="text-sm mb-4" style="color: var(--color-muted)">{{ roleForm.userName }}</p>
-      <form class="space-y-4" @submit.prevent="assignRole">
-        <div>
-          <label class="fld" for="role-name">Papel</label>
-          <select id="role-name" v-model="roleForm.role" class="input" data-testid="role-select">
-            <option v-for="role in roles" :key="role.name" :value="role.name">
-              {{ role.name }}
-            </option>
-          </select>
-        </div>
-        <div v-if="roleForm.role !== 'admin-tenant'">
+      <form class="space-y-4" @submit.prevent="saveRoles">
+        <div v-if="igrejas.length">
           <label class="fld" for="role-igreja">Igreja</label>
           <select
             id="role-igreja"
             v-model="roleForm.igreja_id"
             class="input"
-            required
             data-testid="role-igreja"
           >
-            <option disabled value="">Selecione</option>
             <option v-for="igreja in igrejas" :key="igreja.id" :value="igreja.id">
               {{ igreja.nome }}
             </option>
           </select>
         </div>
+
+        <div class="space-y-3" data-testid="role-toggles">
+          <label
+            v-for="role in roles"
+            :key="role.name"
+            class="flex items-center justify-between gap-3 text-sm border rounded-lg px-3 py-2"
+            style="border-color: var(--color-line)"
+          >
+            <span>{{ roleLabel(role.name) }}</span>
+            <input
+              v-model="roleForm.toggles[role.name]"
+              type="checkbox"
+              class="h-4 w-4"
+              :data-testid="`role-toggle-${role.name}`"
+            />
+          </label>
+        </div>
+
+        <div v-if="liderAtivo" class="space-y-2">
+          <p class="fld">Equipes lideradas</p>
+          <input
+            v-if="equipes.length"
+            v-model="equipeSearch"
+            type="search"
+            class="input"
+            placeholder="Pesquisar equipe…"
+            data-testid="equipe-search"
+          />
+          <div
+            v-if="!equipes.length"
+            class="text-sm"
+            style="color: var(--color-muted)"
+          >
+            Nenhuma equipe cadastrada. Crie equipes no módulo ECC primeiro.
+          </div>
+          <div
+            v-else-if="!equipesFiltradas.length"
+            class="text-sm"
+            style="color: var(--color-muted)"
+          >
+            Nenhuma equipe encontrada para “{{ equipeSearch }}”.
+          </div>
+          <div v-else class="max-h-48 overflow-y-auto space-y-2">
+            <label
+              v-for="equipe in equipesFiltradas"
+              :key="equipe.id"
+              class="flex items-center gap-2 text-sm"
+            >
+              <input
+                v-model="roleForm.equipe_ids"
+                type="checkbox"
+                :value="equipe.id"
+                :data-testid="`equipe-toggle-${equipe.id}`"
+              />
+              {{ equipe.nome }}
+            </label>
+          </div>
+        </div>
+
         <div class="flex gap-2">
-          <button type="submit" class="btn btn-primary" :disabled="saving" data-testid="role-assign">
-            {{ saving ? 'Salvando…' : 'Atribuir' }}
+          <button type="submit" class="btn btn-primary" :disabled="saving" data-testid="role-save">
+            {{ saving ? 'Salvando…' : 'Salvar papéis' }}
           </button>
           <button type="button" class="btn btn-ghost" @click="mode = 'list'">Cancelar</button>
         </div>

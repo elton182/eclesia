@@ -98,7 +98,7 @@ const handleLogin = async () => {
     </form>
 
     <p class="text-center text-xs" style="color: var(--color-muted)">
-      <router-link to="/" class="underline">Voltar ao login da organização</router-link>
+      <router-link to="/entrar" class="underline">Voltar ao login da organização</router-link>
     </p>
   </div>
 </template>

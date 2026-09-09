@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\SuperAdmin;
+use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Spatie\Permission\Models\Permission;
@@ -18,8 +20,13 @@ class RolePermissionController extends Controller
 
         setPermissionsTeamId(null);
 
+        $allowed = $request->user() instanceof SuperAdmin
+            ? RolesAndPermissionsSeeder::ROLES
+            : RolesAndPermissionsSeeder::ROLES_TENANT_UI;
+
         $roles = Role::query()
             ->where('guard_name', 'web')
+            ->whereIn('name', $allowed)
             ->orderBy('name')
             ->get(['id', 'name', 'guard_name']);
 

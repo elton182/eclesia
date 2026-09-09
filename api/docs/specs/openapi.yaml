@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Eclesia API
-  version: 0.3.0
+  version: 0.4.0
   description: |
     API multi-tenant do Eclesia (gestão eclesial).
     Contexto central (landlord): `/admin/*`.
@@ -68,6 +68,15 @@ components:
               igreja_id:
                 type: string
                 nullable: true
+        equipes_lideradas:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              nome:
+                type: string
         created_at:
           type: string
           format: date-time
@@ -455,8 +464,55 @@ paths:
         '204':
           description: Removido
   /users/{id}/roles:
+    put:
+      summary: Sincronizar papéis do usuário (N papéis)
+      description: |
+        Substitui papéis do escopo igreja (e admin-tenant se o ator for SuperAdmin).
+        Papéis canônicos: admin-tenant, admin-igreja, cadastros, lider-equipe.
+        lider-equipe exige equipe_ids (min 1).
+      security:
+        - tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [roles]
+              properties:
+                igreja_id:
+                  type: string
+                  nullable: true
+                  description: Obrigatório se houver papel de igreja
+                roles:
+                  type: array
+                  items:
+                    type: object
+                    required: [name]
+                    properties:
+                      name:
+                        type: string
+                        enum: [admin-tenant, admin-igreja, cadastros, lider-equipe]
+                      equipe_ids:
+                        type: array
+                        items:
+                          type: string
+                        description: Obrigatório quando name=lider-equipe
+      responses:
+        '200':
+          description: Papéis sincronizados
+        '403':
+          description: Tentativa de gerenciar admin-tenant sem SuperAdmin
+        '422':
+          description: Validação
     post:
-      summary: Atribuir papel ao usuário
+      summary: Atribuir um papel (atalho; preferir PUT sync)
       security:
         - tenantHeader: []
       parameters:
@@ -478,14 +534,17 @@ paths:
                 igreja_id:
                   type: string
                   nullable: true
-                  description: Obrigatório exceto para admin-tenant
+                equipe_ids:
+                  type: array
+                  items:
+                    type: string
       responses:
         '200':
           description: Papel atribuído
         '422':
           description: Validação
     delete:
-      summary: Remover papel do usuário
+      summary: Remover um papel (atalho; preferir PUT sync)
       security:
         - tenantHeader: []
       parameters:
@@ -513,11 +572,12 @@ paths:
   /roles:
     get:
       summary: Catálogo de papéis (somente leitura)
+      description: SuperAdmin vê admin-tenant; usuários do tenant não.
       security:
         - tenantHeader: []
       responses:
         '200':
-          description: Lista de papéis
+          description: Lista de papéis canônicos
   /permissions:
     get:
       summary: Catálogo de permissões (somente leitura)

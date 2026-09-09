@@ -55,6 +55,7 @@ Route::middleware([
     Route::get('igrejas', [IgrejaController::class, 'index']);
 
     Route::post('users/{user}/roles', [UserController::class, 'assignRole']);
+    Route::put('users/{user}/roles', [UserController::class, 'syncRoles']);
     Route::delete('users/{user}/roles', [UserController::class, 'removeRole']);
     Route::apiResource('users', UserController::class);
 

@@ -7,6 +7,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class EccEquipe extends Model
@@ -32,5 +33,15 @@ class EccEquipe extends Model
     public function casais(): HasMany
     {
         return $this->hasMany(Casal::class, 'ecc_equipe_id');
+    }
+
+    public function lideres(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            User::class,
+            'ecc_equipe_user',
+            'ecc_equipe_id',
+            'user_id'
+        );
     }
 }

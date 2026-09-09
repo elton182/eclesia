@@ -2,24 +2,41 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthAdminStore } from '../stores/authAdmin'
 import { useAuthStore } from '../stores/auth'
 import { useTenantStore } from '../stores/tenant'
+import LandingView from '../views/LandingView.vue'
 import TenantLoginView from '../views/TenantLoginView.vue'
 import LoginView from '../views/LoginView.vue'
+import WelcomeView from '../views/WelcomeView.vue'
 import TenantsView from '../views/TenantsView.vue'
 import UsersView from '../views/UsersView.vue'
 import EccEquipesView from '../views/EccEquipesView.vue'
 import EccCasaisView from '../views/EccCasaisView.vue'
 import AdminLayout from '../layouts/AdminLayout.vue'
 import AuthLayout from '../layouts/AuthLayout.vue'
+import PublicLayout from '../layouts/PublicLayout.vue'
+
+export const LOGIN_TENANT_PATH = '/entrar'
+export const HOME_PATH = '/inicio'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     {
       path: '/',
-      component: AuthLayout,
+      component: PublicLayout,
       children: [
         {
           path: '',
+          name: 'landing',
+          component: LandingView,
+        },
+      ],
+    },
+    {
+      path: '/',
+      component: AuthLayout,
+      children: [
+        {
+          path: 'entrar',
           name: 'tenant-login',
           component: TenantLoginView,
         },
@@ -51,6 +68,11 @@ const router = createRouter({
       component: AdminLayout,
       meta: { requiresAuthTenantOrAdmin: true },
       children: [
+        {
+          path: 'inicio',
+          name: 'inicio',
+          component: WelcomeView,
+        },
         {
           path: 'usuarios',
           name: 'usuarios',
@@ -85,7 +107,7 @@ router.beforeEach(async (to, from, next) => {
 
   if (to.name === 'tenant-login') {
     const ok = await authTenant.checkAuth()
-    next(ok ? '/usuarios' : undefined)
+    next(ok ? HOME_PATH : undefined)
     return
   }
 
@@ -106,7 +128,7 @@ router.beforeEach(async (to, from, next) => {
         return
       }
       const tenantOk = await authTenant.checkAuth()
-      next(tenantOk ? undefined : '/')
+      next(tenantOk ? undefined : LOGIN_TENANT_PATH)
       return
     }
 
@@ -120,7 +142,7 @@ router.beforeEach(async (to, from, next) => {
       return
     }
 
-    next('/')
+    next(LOGIN_TENANT_PATH)
     return
   }
 
@@ -132,7 +154,7 @@ router.beforeEach(async (to, from, next) => {
 
   if (to.matched.some((r) => r.meta.requiresAuthTenant)) {
     const ok = await authTenant.checkAuth()
-    next(ok ? undefined : '/')
+    next(ok ? undefined : LOGIN_TENANT_PATH)
     return
   }
 

@@ -7,8 +7,10 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\AssignUserRoleRequest;
 use App\Http\Requests\StoreUserRequest;
+use App\Http\Requests\SyncUserRolesRequest;
 use App\Http\Requests\UpdateUserRequest;
 use App\Http\Resources\UserResource;
+use App\Models\SuperAdmin;
 use App\Models\User;
 use App\Services\UserService;
 use Illuminate\Http\JsonResponse;
@@ -61,18 +63,46 @@ class UserController extends Controller
     public function assignRole(AssignUserRoleRequest $request, User $user): UserResource
     {
         $data = $request->validated();
+        $actorIsSuperAdmin = $request->user() instanceof SuperAdmin;
 
         return new UserResource(
-            $this->users->assignRole($user, $data['role'], $data['igreja_id'] ?? null)
+            $this->users->assignRole(
+                $user,
+                $data['role'],
+                $data['igreja_id'] ?? null,
+                $data['equipe_ids'] ?? null,
+                $actorIsSuperAdmin
+            )
+        );
+    }
+
+    public function syncRoles(SyncUserRolesRequest $request, User $user): UserResource
+    {
+        $data = $request->validated();
+        $actorIsSuperAdmin = $request->user() instanceof SuperAdmin;
+
+        return new UserResource(
+            $this->users->syncRoles(
+                $user,
+                $data['igreja_id'] ?? null,
+                $data['roles'],
+                $actorIsSuperAdmin
+            )
         );
     }
 
     public function removeRole(AssignUserRoleRequest $request, User $user): UserResource
     {
         $data = $request->validated();
+        $actorIsSuperAdmin = $request->user() instanceof SuperAdmin;
 
         return new UserResource(
-            $this->users->removeRole($user, $data['role'], $data['igreja_id'] ?? null)
+            $this->users->removeRole(
+                $user,
+                $data['role'],
+                $data['igreja_id'] ?? null,
+                $actorIsSuperAdmin
+            )
         );
     }
 }

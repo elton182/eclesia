@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Models\EccEquipe;
 use App\Models\Igreja;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
@@ -17,6 +18,7 @@ class UserService
     public function paginate(int $perPage = 15): LengthAwarePaginator
     {
         return User::query()
+            ->with('equipesLideradas:id,nome')
             ->orderBy('id')
             ->paginate($perPage);
     }
@@ -85,11 +87,110 @@ class UserService
         ])->values()->all();
     }
 
-    public function assignRole(User $user, string $roleName, ?string $igrejaId): User
+    /**
+     * @return list<array{id: string, nome: string}>
+     */
+    public function equipesLideradasFor(User $user): array
     {
+        return $user->equipesLideradas()
+            ->get(['ecc_equipes.id', 'ecc_equipes.nome'])
+            ->map(fn (EccEquipe $equipe) => [
+                'id' => $equipe->id,
+                'nome' => $equipe->nome,
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  list<array{name: string, equipe_ids?: list<string>}>  $roles
+     */
+    public function syncRoles(User $user, ?string $igrejaId, array $roles, bool $actorIsSuperAdmin): User
+    {
+        $names = [];
+        $liderEquipeIds = [];
+
+        foreach ($roles as $index => $role) {
+            $name = (string) ($role['name'] ?? '');
+            $this->assertValidRole($name);
+
+            if ($name === 'admin-tenant' && ! $actorIsSuperAdmin) {
+                throw ValidationException::withMessages([
+                    "roles.{$index}.name" => ['Apenas SuperAdmin pode gerenciar o papel admin-tenant.'],
+                ]);
+            }
+
+            $names[] = $name;
+
+            if ($name === 'lider-equipe') {
+                $equipeIds = $role['equipe_ids'] ?? [];
+                if (! is_array($equipeIds) || count($equipeIds) < 1) {
+                    throw ValidationException::withMessages([
+                        "roles.{$index}.equipe_ids" => ['Selecione ao menos uma equipe para o líder.'],
+                    ]);
+                }
+                $liderEquipeIds = array_values(array_unique(array_map('strval', $equipeIds)));
+            }
+        }
+
+        $churchRoles = array_values(array_intersect($names, RolesAndPermissionsSeeder::ROLES_TENANT_UI));
+        $wantsAdminTenant = in_array('admin-tenant', $names, true);
+
+        if ($churchRoles !== [] && ($igrejaId === null || $igrejaId === '')) {
+            throw ValidationException::withMessages([
+                'igreja_id' => ['A igreja é obrigatória para papéis de igreja.'],
+            ]);
+        }
+
+        if ($igrejaId !== null && $igrejaId !== '' && ! Igreja::query()->whereKey($igrejaId)->exists()) {
+            throw ValidationException::withMessages([
+                'igreja_id' => ['Igreja não encontrada.'],
+            ]);
+        }
+
+        if ($liderEquipeIds !== []) {
+            $this->assertEquipesBelongToIgreja($liderEquipeIds, (string) $igrejaId);
+        }
+
+        if ($igrejaId !== null && $igrejaId !== '') {
+            setPermissionsTeamId($igrejaId);
+            $user->syncRoles($churchRoles);
+
+            if (in_array('lider-equipe', $churchRoles, true)) {
+                $user->equipesLideradas()->sync($liderEquipeIds);
+            } else {
+                $user->equipesLideradas()->detach();
+            }
+        }
+
+        if ($actorIsSuperAdmin) {
+            setPermissionsTeamId(null);
+            $user->syncRoles($wantsAdminTenant ? ['admin-tenant'] : []);
+        }
+
+        setPermissionsTeamId(null);
+
+        return $user->refresh()->load('equipesLideradas');
+    }
+
+    /**
+     * @param  list<string>|null  $equipeIds
+     */
+    public function assignRole(
+        User $user,
+        string $roleName,
+        ?string $igrejaId,
+        ?array $equipeIds,
+        bool $actorIsSuperAdmin
+    ): User {
         $this->assertValidRole($roleName);
 
         if ($roleName === 'admin-tenant') {
+            if (! $actorIsSuperAdmin) {
+                throw ValidationException::withMessages([
+                    'role' => ['Apenas SuperAdmin pode gerenciar o papel admin-tenant.'],
+                ]);
+            }
             setPermissionsTeamId(null);
             $user->assignRole($roleName);
 
@@ -108,17 +209,37 @@ class UserService
             ]);
         }
 
-        setPermissionsTeamId($igrejaId);
-        $user->assignRole($roleName);
+        if ($roleName === 'lider-equipe') {
+            $ids = array_values(array_unique(array_map('strval', $equipeIds ?? [])));
+            if ($ids === []) {
+                throw ValidationException::withMessages([
+                    'equipe_ids' => ['Selecione ao menos uma equipe para o líder.'],
+                ]);
+            }
+            $this->assertEquipesBelongToIgreja($ids, $igrejaId);
+            setPermissionsTeamId($igrejaId);
+            $user->assignRole($roleName);
+            $user->equipesLideradas()->sync($ids);
+        } else {
+            setPermissionsTeamId($igrejaId);
+            $user->assignRole($roleName);
+        }
 
-        return $user->refresh();
+        setPermissionsTeamId(null);
+
+        return $user->refresh()->load('equipesLideradas');
     }
 
-    public function removeRole(User $user, string $roleName, ?string $igrejaId): User
+    public function removeRole(User $user, string $roleName, ?string $igrejaId, bool $actorIsSuperAdmin): User
     {
         $this->assertValidRole($roleName);
 
         if ($roleName === 'admin-tenant') {
+            if (! $actorIsSuperAdmin) {
+                throw ValidationException::withMessages([
+                    'role' => ['Apenas SuperAdmin pode gerenciar o papel admin-tenant.'],
+                ]);
+            }
             setPermissionsTeamId(null);
             $user->removeRole($roleName);
 
@@ -134,7 +255,30 @@ class UserService
         setPermissionsTeamId($igrejaId);
         $user->removeRole($roleName);
 
+        if ($roleName === 'lider-equipe') {
+            $user->equipesLideradas()->detach();
+        }
+
+        setPermissionsTeamId(null);
+
         return $user->refresh();
+    }
+
+    /**
+     * @param  list<string>  $equipeIds
+     */
+    private function assertEquipesBelongToIgreja(array $equipeIds, string $igrejaId): void
+    {
+        $count = EccEquipe::query()
+            ->whereIn('id', $equipeIds)
+            ->where('igreja_id', $igrejaId)
+            ->count();
+
+        if ($count !== count($equipeIds)) {
+            throw ValidationException::withMessages([
+                'equipe_ids' => ['Uma ou mais equipes são inválidas para a igreja selecionada.'],
+            ]);
+        }
     }
 
     private function assertValidRole(string $roleName): void

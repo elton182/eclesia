@@ -117,28 +117,38 @@ class TenantUserAuthTest extends TestCase
 
         $create = $this->withHeader('X-Tenant', 'paroquia-teste')
             ->postJson('/api/v1/users', [
-                'name' => 'Secretária',
-                'email' => 'sec@paroquia-teste.local',
+                'name' => 'Cadastros User',
+                'email' => 'cad@paroquia-teste.local',
                 'password' => 'password123',
             ]);
 
         $create->assertCreated()
-            ->assertJsonPath('data.email', 'sec@paroquia-teste.local');
+            ->assertJsonPath('data.email', 'cad@paroquia-teste.local');
 
         $userId = $create->json('data.id');
 
         $this->withHeader('X-Tenant', 'paroquia-teste')
-            ->postJson("/api/v1/users/{$userId}/roles", [
-                'role' => 'secretaria',
+            ->putJson("/api/v1/users/{$userId}/roles", [
                 'igreja_id' => $igrejaId,
+                'roles' => [
+                    ['name' => 'cadastros'],
+                    ['name' => 'admin-igreja'],
+                ],
             ])
             ->assertOk()
-            ->assertJsonFragment(['name' => 'secretaria']);
+            ->assertJsonFragment(['name' => 'cadastros'])
+            ->assertJsonFragment(['name' => 'admin-igreja']);
 
-        $this->withHeader('X-Tenant', 'paroquia-teste')
+        $roles = $this->withHeader('X-Tenant', 'paroquia-teste')
             ->getJson('/api/v1/roles')
             ->assertOk()
-            ->assertJsonFragment(['name' => 'admin-tenant']);
+            ->json('data');
+
+        $roleNames = collect($roles)->pluck('name')->all();
+        $this->assertContains('cadastros', $roleNames);
+        $this->assertContains('admin-igreja', $roleNames);
+        $this->assertContains('lider-equipe', $roleNames);
+        $this->assertNotContains('admin-tenant', $roleNames);
 
         $this->withHeader('X-Tenant', 'paroquia-teste')
             ->getJson('/api/v1/permissions')
@@ -148,6 +158,78 @@ class TenantUserAuthTest extends TestCase
         $this->withHeader('X-Tenant', 'paroquia-teste')
             ->getJson('/api/v1/users')
             ->assertOk();
+    }
+
+    public function test_sync_lider_equipe_requires_equipe_ids(): void
+    {
+        tenancy()->initialize($this->tenant);
+        $admin = User::findByEmail('admin@paroquia-teste.local');
+        $igrejaId = Igreja::query()->firstOrFail()->id;
+        tenancy()->end();
+
+        Sanctum::actingAs($admin);
+
+        $userId = $this->withHeader('X-Tenant', 'paroquia-teste')
+            ->postJson('/api/v1/users', [
+                'name' => 'Líder',
+                'email' => 'lider@paroquia-teste.local',
+                'password' => 'password123',
+            ])
+            ->assertCreated()
+            ->json('data.id');
+
+        $this->withHeader('X-Tenant', 'paroquia-teste')
+            ->putJson("/api/v1/users/{$userId}/roles", [
+                'igreja_id' => $igrejaId,
+                'roles' => [
+                    ['name' => 'lider-equipe'],
+                ],
+            ])
+            ->assertStatus(422);
+    }
+
+    public function test_sync_lider_equipe_links_multiple_equipes(): void
+    {
+        tenancy()->initialize($this->tenant);
+        $admin = User::findByEmail('admin@paroquia-teste.local');
+        $igrejaId = Igreja::query()->firstOrFail()->id;
+        tenancy()->end();
+
+        Sanctum::actingAs($admin);
+
+        $eq1 = $this->withHeader('X-Tenant', 'paroquia-teste')
+            ->postJson('/api/v1/ecc/equipes', ['nome' => 'Equipe Alpha', 'cor' => '#111111'])
+            ->assertCreated()
+            ->json('data.id');
+
+        $eq2 = $this->withHeader('X-Tenant', 'paroquia-teste')
+            ->postJson('/api/v1/ecc/equipes', ['nome' => 'Equipe Beta', 'cor' => '#222222'])
+            ->assertCreated()
+            ->json('data.id');
+
+        $userId = $this->withHeader('X-Tenant', 'paroquia-teste')
+            ->postJson('/api/v1/users', [
+                'name' => 'Líder Multi',
+                'email' => 'lider-multi@paroquia-teste.local',
+                'password' => 'password123',
+            ])
+            ->assertCreated()
+            ->json('data.id');
+
+        $this->withHeader('X-Tenant', 'paroquia-teste')
+            ->putJson("/api/v1/users/{$userId}/roles", [
+                'igreja_id' => $igrejaId,
+                'roles' => [
+                    [
+                        'name' => 'lider-equipe',
+                        'equipe_ids' => [$eq1, $eq2],
+                    ],
+                ],
+            ])
+            ->assertOk()
+            ->assertJsonFragment(['name' => 'lider-equipe'])
+            ->assertJsonPath('data.equipes_lideradas.0.id', $eq1)
+            ->assertJsonPath('data.equipes_lideradas.1.id', $eq2);
     }
 
     public function test_login_then_me_with_bearer_token(): void
@@ -196,6 +278,23 @@ class TenantUserAuthTest extends TestCase
             ->assertJsonStructure(['data']);
     }
 
+    public function test_super_admin_sees_admin_tenant_role_in_catalog(): void
+    {
+        $platform = SuperAdmin::query()->create([
+            'name' => 'Platform Roles',
+            'email' => 'platform-roles@test.local',
+            'password' => 'password',
+        ]);
+
+        Sanctum::actingAs($platform);
+
+        $this->withHeader('X-Tenant', 'paroquia-teste')
+            ->getJson('/api/v1/roles')
+            ->assertOk()
+            ->assertJsonFragment(['name' => 'admin-tenant'])
+            ->assertJsonFragment(['name' => 'cadastros']);
+    }
+
     public function test_super_admin_bearer_can_list_users_and_ecc(): void
     {
         $platform = SuperAdmin::query()->create([
@@ -222,7 +321,8 @@ class TenantUserAuthTest extends TestCase
         $this->withHeader('Authorization', 'Bearer '.$token)
             ->withHeader('X-Tenant', 'paroquia-teste')
             ->getJson('/api/v1/roles')
-            ->assertOk();
+            ->assertOk()
+            ->assertJsonFragment(['name' => 'admin-tenant']);
     }
 
     public function test_super_admin_bearer_can_assign_role_with_cold_tenancy(): void
@@ -244,11 +344,15 @@ class TenantUserAuthTest extends TestCase
 
         $this->withHeader('Authorization', 'Bearer '.$token)
             ->withHeader('X-Tenant', 'paroquia-teste')
-            ->postJson("/api/v1/users/{$ulid}/roles", [
-                'role' => 'secretaria',
+            ->putJson("/api/v1/users/{$ulid}/roles", [
                 'igreja_id' => $igrejaId,
+                'roles' => [
+                    ['name' => 'admin-tenant'],
+                    ['name' => 'cadastros'],
+                ],
             ])
             ->assertOk()
-            ->assertJsonFragment(['name' => 'secretaria']);
+            ->assertJsonFragment(['name' => 'cadastros'])
+            ->assertJsonFragment(['name' => 'admin-tenant']);
     }
 }

@@ -13,7 +13,7 @@ A autenticação web do tenant existe (`web/login|me|logout`), mas não há gest
 1. Apelidos de tenant no banco central e resolução no login por slug | apelido | nome (único).
 2. `spatie/laravel-permission` no banco do tenant com teams = `igreja_id`.
 3. Papéis fixos via seed (sem CRUD de roles customizados).
-4. CRUD de usuários do tenant + atribuição de papéis por igreja.
+4. CRUD de usuários do tenant + **N papéis** por usuário (sync) + vínculo líder↔equipes.
 5. Front: `/` = login do usuário do tenant; `/admin/login` = super-admin; telas de gestão de usuários.
 
 ## Critérios de aceite (testáveis)
@@ -23,21 +23,21 @@ A autenticação web do tenant existe (`web/login|me|logout`), mas não há gest
 - [ ] Resolução: slug → apelido → nome (case-insensitive); nome ambíguo → 422; inexistente → 404/422.
 - [ ] Resposta de login bem-sucedido inclui `tenant.slug` (canônico) para o front setar `X-Tenant`.
 - [ ] Tabelas Spatie existem nas migrations de tenant; `teams` = `igreja_id`.
-- [ ] Seed cria papéis: `admin-tenant`, `admin-igreja`, `coordenador-modulo`, `secretaria`, `lider-equipe`, `membro`.
+- [ ] Seed cria papéis canônicos: `admin-tenant`, `admin-igreja`, `cadastros`, `lider-equipe`.
 - [ ] Seed cria permissões de gestão: `users.view|create|update|delete`, `roles.assign`, `permissions.view` (+ stubs `ecc.*`).
 - [ ] Provisionar tenant cria usuário admin inicial com papel `admin-tenant`.
 - [ ] `GET/POST/PATCH/DELETE /api/v1/users` (ULID público); PII `name`/`email` encryptable.
-- [ ] `POST/DELETE /api/v1/users/{id}/roles` atribui/remove papel por `igreja_id` (exceto `admin-tenant`, team null).
-- [ ] `GET /api/v1/roles` e `GET /api/v1/permissions` listam catálogo (sem CRUD).
+- [ ] `PUT /api/v1/users/{id}/roles` sincroniza N papéis (`igreja_id` + `roles[]`); `lider-equipe` exige `equipe_ids` (N:M em `ecc_equipe_user`).
+- [ ] `GET /api/v1/roles`: SuperAdmin vê `admin-tenant` + papéis de igreja; usuário do tenant não vê `admin-tenant`.
+- [ ] `GET /api/v1/permissions` lista catálogo (sem CRUD).
 - [ ] Sem permissão → 403; sem auth → 401; validação → 422.
 - [ ] Isolamento: usuário de um tenant não acessa dados de outro.
-- [ ] Front `/` login tenant (organização + e-mail + senha); `/admin/login` super-admin.
-- [ ] Front gestão de usuários + aliases no formulário de tenants (admin).
+- [ ] Front `/` login tenant; `/admin/login` super-admin; gestão de usuários com **toggles** de papéis.
 
 ## Fora de escopo
 
 - CRUD de papéis/permissões customizados.
-- Permissões finas ECC (líder só na própria equipe, etc.).
+- Permissões finas ECC (líder só na própria equipe nas queries).
 - Vínculo obrigatório User ↔ Pessoa; `pessoa_id` nullable.
 - Seletor de igreja completo no shell.
 
@@ -47,6 +47,7 @@ Ver `api/docs/specs/openapi.yaml` — paths `/web/*`, `/users*`, `/roles`, `/per
 
 ## Notas
 
-- Papéis guard `web`. `admin-tenant` com `team_id` null (escopo todas as igrejas).
+- Papéis guard `web`. `admin-tenant` com `team_id` null (escopo organização).
 - URLs públicas de usuário usam ULID (`users.ulid`), não id sequencial.
 - Cache Spatie limpo ao inicializar tenancy.
+- Um usuário pode ter vários papéis; UI usa toggles + `PUT` sync.

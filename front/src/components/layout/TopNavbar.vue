@@ -45,7 +45,7 @@ const logout = async () => {
   }
 
   await authTenant.logout()
-  router.push('/')
+  router.push('/entrar')
 }
 </script>
 

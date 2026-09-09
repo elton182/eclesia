@@ -102,7 +102,7 @@ const remove = async (tenant) => {
 
 const enterTenant = (tenant) => {
   tenantStore.select(tenant)
-  router.push('/ecc/equipes')
+  router.push('/inicio')
 }
 
 const enterUsers = (tenant) => {

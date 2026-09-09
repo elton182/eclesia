@@ -31,7 +31,7 @@ const handleLogin = async () => {
   const result = await authStore.login(tenant.value, email.value, password.value)
 
   if (result.success) {
-    router.push('/usuarios')
+    router.push('/inicio')
   } else {
     errorMessage.value = result.error
   }
@@ -43,7 +43,9 @@ const handleLogin = async () => {
 <template>
   <div class="card p-8 space-y-6" data-testid="tenant-login-card">
     <div class="text-center space-y-3">
-      <img :src="logoUrl" alt="Eclésia" class="mx-auto h-28 w-auto object-contain" />
+      <router-link to="/" class="inline-block" aria-label="Voltar à página inicial">
+        <img :src="logoUrl" alt="Eclésias" class="mx-auto h-28 w-auto object-contain" />
+      </router-link>
       <p class="text-sm" style="color: var(--color-muted)">
         Acesso à sua organização
       </p>
@@ -119,9 +121,12 @@ const handleLogin = async () => {
       </button>
     </form>
 
-    <p class="text-center text-xs" style="color: var(--color-muted)">
+    <p class="text-center text-xs space-x-3" style="color: var(--color-muted)">
       <router-link to="/admin/login" class="underline" data-testid="link-admin-login">
         Acesso administrativo da plataforma
+      </router-link>
+      <router-link to="/" class="underline" data-testid="link-landing">
+        Voltar ao site
       </router-link>
     </p>
   </div>

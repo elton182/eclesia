@@ -7,6 +7,7 @@ namespace App\Models;
 use ESolution\DBEncryption\Traits\EncryptedAttribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\DB;
@@ -105,5 +106,15 @@ class User extends Authenticatable
     public function pessoa(): BelongsTo
     {
         return $this->belongsTo(Pessoa::class);
+    }
+
+    public function equipesLideradas(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            EccEquipe::class,
+            'ecc_equipe_user',
+            'user_id',
+            'ecc_equipe_id'
+        );
     }
 }

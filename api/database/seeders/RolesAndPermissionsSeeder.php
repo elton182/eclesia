@@ -17,10 +17,16 @@ class RolesAndPermissionsSeeder extends Seeder
     public const ROLES = [
         'admin-tenant',
         'admin-igreja',
-        'coordenador-modulo',
-        'secretaria',
+        'cadastros',
         'lider-equipe',
-        'membro',
+    ];
+
+    /** Papéis visíveis/atribuíveis por usuários do tenant (sem SuperAdmin). */
+    /** @var list<string> */
+    public const ROLES_TENANT_UI = [
+        'admin-igreja',
+        'cadastros',
+        'lider-equipe',
     ];
 
     /** @var list<string> */
@@ -60,25 +66,20 @@ class RolesAndPermissionsSeeder extends Seeder
         $adminTenant->syncPermissions(Permission::where('guard_name', self::GUARD)->get());
 
         $adminIgreja = Role::findByName('admin-igreja', self::GUARD);
-        $adminIgreja->syncPermissions(self::MANAGEMENT_PERMISSIONS);
-
-        $coordenador = Role::findByName('coordenador-modulo', self::GUARD);
-        $coordenador->syncPermissions([
-            'users.view',
-            'permissions.view',
+        $adminIgreja->syncPermissions([
+            ...self::MANAGEMENT_PERMISSIONS,
             ...self::ECC_STUB_PERMISSIONS,
         ]);
 
-        $secretaria = Role::findByName('secretaria', self::GUARD);
-        $secretaria->syncPermissions([
+        $cadastros = Role::findByName('cadastros', self::GUARD);
+        $cadastros->syncPermissions([
             'users.view',
             'users.create',
             'users.update',
-            'roles.assign',
             'permissions.view',
+            'ecc.equipes.view',
             'ecc.casais.view',
             'ecc.casais.manage',
-            'ecc.equipes.view',
         ]);
 
         $lider = Role::findByName('lider-equipe', self::GUARD);
@@ -86,12 +87,6 @@ class RolesAndPermissionsSeeder extends Seeder
             'ecc.equipes.view',
             'ecc.casais.view',
             'ecc.escala.editar',
-        ]);
-
-        $membro = Role::findByName('membro', self::GUARD);
-        $membro->syncPermissions([
-            'ecc.equipes.view',
-            'ecc.casais.view',
         ]);
 
         app()[PermissionRegistrar::class]->forgetCachedPermissions();

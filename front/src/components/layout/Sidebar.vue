@@ -7,6 +7,7 @@ import {
   faUsers,
   faHeart,
   faUserShield,
+  faHouse,
 } from '@fortawesome/free-solid-svg-icons'
 import { library } from '@fortawesome/fontawesome-svg-core'
 import { useTenantStore } from '@/stores/tenant'
@@ -14,7 +15,7 @@ import { useAuthAdminStore } from '@/stores/authAdmin'
 import { useAuthStore } from '@/stores/auth'
 import logoUrl from '@/assets/logo-icon.png'
 
-library.add(faBuilding, faUsers, faHeart, faUserShield)
+library.add(faBuilding, faUsers, faHeart, faUserShield, faHouse)
 
 defineProps({
   isOpen: { type: Boolean, default: true },
@@ -35,12 +36,13 @@ const platformItems = ref([
 ])
 
 const tenantItems = computed(() => {
+  const home = { label: 'Início', icon: faHouse, path: '/inicio' }
   // Usuários do tenant: login da organização OU super-admin com tenant selecionado
   if (authTenant.isAuthenticated && !route.path.startsWith('/admin')) {
-    return [{ label: 'Usuários', icon: faUserShield, path: '/usuarios' }]
+    return [home, { label: 'Usuários', icon: faUserShield, path: '/usuarios' }]
   }
   if (authAdmin.isAuthenticated && tenantStore.slug) {
-    return [{ label: 'Usuários', icon: faUserShield, path: '/usuarios' }]
+    return [home, { label: 'Usuários', icon: faUserShield, path: '/usuarios' }]
   }
   return []
 })
@@ -110,7 +112,7 @@ const eccItems = computed(() => {
               ? 'bg-[#FCFAF6] text-[var(--color-primary)]'
               : 'text-[#EBCFB8] hover:bg-white/10 hover:text-[#FBEEE4]',
           ]"
-          data-testid="nav-usuarios"
+          :data-testid="item.path === '/inicio' ? 'nav-inicio' : 'nav-usuarios'"
         >
           <FontAwesomeIcon :icon="item.icon" class="w-5 text-center" />
           <span v-if="isOpen">{{ item.label }}</span>
