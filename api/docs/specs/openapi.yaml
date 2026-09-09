@@ -468,7 +468,7 @@ paths:
       summary: Sincronizar papéis do usuário (N papéis)
       description: |
         Substitui papéis do escopo igreja (e admin-tenant se o ator for SuperAdmin).
-        Papéis canônicos: admin-tenant, admin-igreja, cadastros, lider-equipe.
+        Papéis canônicos: admin-tenant, admin-igreja, cadastros-usuarios, cadastros-equipes, cadastros-casais, lider-equipe.
         lider-equipe exige equipe_ids (min 1).
       security:
         - tenantHeader: []
@@ -498,7 +498,7 @@ paths:
                     properties:
                       name:
                         type: string
-                        enum: [admin-tenant, admin-igreja, cadastros, lider-equipe]
+                        enum: [admin-tenant, admin-igreja, cadastros-usuarios, cadastros-equipes, cadastros-casais, lider-equipe]
                       equipe_ids:
                         type: array
                         items:

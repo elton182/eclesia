@@ -13,6 +13,7 @@ import { library } from '@fortawesome/fontawesome-svg-core'
 import { useTenantStore } from '@/stores/tenant'
 import { useAuthAdminStore } from '@/stores/authAdmin'
 import { useAuthStore } from '@/stores/auth'
+import { userHasPermission } from '@/utils/userRoles'
 import logoUrl from '@/assets/logo-icon.png'
 
 library.add(faBuilding, faUsers, faHeart, faUserShield, faHouse)
@@ -30,29 +31,41 @@ const isActive = (path) => route.path === path || route.path.startsWith(path + '
 
 const isPlatform = computed(() => authAdmin.isAuthenticated && route.path.startsWith('/admin'))
 const isTenantShell = computed(() => authTenant.isAuthenticated && !route.path.startsWith('/admin'))
+const inTenantContext = computed(
+  () => !!tenantStore.slug && (authTenant.isAuthenticated || authAdmin.isAuthenticated),
+)
+
+const can = (permission) =>
+  userHasPermission(authTenant.user, permission, {
+    isSuperAdmin: authAdmin.isAuthenticated && !authTenant.isAuthenticated,
+  })
 
 const platformItems = ref([
   { label: 'Tenants', icon: faBuilding, path: '/admin/tenants' },
 ])
 
 const tenantItems = computed(() => {
-  const home = { label: 'Início', icon: faHouse, path: '/inicio' }
-  // Usuários do tenant: login da organização OU super-admin com tenant selecionado
-  if (authTenant.isAuthenticated && !route.path.startsWith('/admin')) {
-    return [home, { label: 'Usuários', icon: faUserShield, path: '/usuarios' }]
+  if (!inTenantContext.value) return []
+
+  const items = [{ label: 'Início', icon: faHouse, path: '/inicio' }]
+  if (can('telas.usuarios') || (authAdmin.isAuthenticated && !authTenant.isAuthenticated)) {
+    items.push({ label: 'Usuários', icon: faUserShield, path: '/usuarios' })
   }
-  if (authAdmin.isAuthenticated && tenantStore.slug) {
-    return [home, { label: 'Usuários', icon: faUserShield, path: '/usuarios' }]
-  }
-  return []
+  return items
 })
 
 const eccItems = computed(() => {
-  if (!tenantStore.slug || !authAdmin.isAuthenticated) return []
-  return [
-    { label: 'Equipes', icon: faUsers, path: '/ecc/equipes' },
-    { label: 'Casais', icon: faHeart, path: '/ecc/casais' },
-  ]
+  if (!inTenantContext.value) return []
+
+  const isPlatformAdmin = authAdmin.isAuthenticated && !authTenant.isAuthenticated
+  const items = []
+  if (can('telas.equipes') || isPlatformAdmin) {
+    items.push({ label: 'Equipes', icon: faUsers, path: '/ecc/equipes' })
+  }
+  if (can('telas.casais') || isPlatformAdmin) {
+    items.push({ label: 'Casais', icon: faHeart, path: '/ecc/casais' })
+  }
+  return items
 })
 </script>
 

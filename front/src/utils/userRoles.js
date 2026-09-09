@@ -5,7 +5,9 @@
 export const ROLE_LABELS = {
   'admin-tenant': 'Admin Organização',
   'admin-igreja': 'Admin Igreja',
-  cadastros: 'Cadastros',
+  'cadastros-usuarios': 'Cadastros · Usuários',
+  'cadastros-equipes': 'Cadastros · Equipes',
+  'cadastros-casais': 'Cadastros · Casais',
   'lider-equipe': 'Líder de Equipe',
 }
 
@@ -15,6 +17,32 @@ export const ROLE_LABELS = {
  */
 export function roleLabel(name) {
   return ROLE_LABELS[name] || name
+}
+
+/**
+ * @param {{ permissions?: string[], roles?: Array<{ name: string }> }|null|undefined} user
+ * @param {string} permission
+ * @param {{ isSuperAdmin?: boolean }} [opts]
+ */
+export function userHasPermission(user, permission, opts = {}) {
+  if (opts.isSuperAdmin) return true
+  if (!user) return false
+  if (Array.isArray(user.permissions) && user.permissions.includes(permission)) {
+    return true
+  }
+  // Fallback por papel (login ainda sem lista de permissions)
+  const roleNames = (user.roles || []).map((r) => r.name)
+  if (roleNames.includes('admin-tenant') || roleNames.includes('admin-igreja')) {
+    return true
+  }
+  if (permission === 'telas.usuarios' && roleNames.includes('cadastros-usuarios')) return true
+  if (permission === 'telas.equipes' && (roleNames.includes('cadastros-equipes') || roleNames.includes('lider-equipe'))) {
+    return true
+  }
+  if (permission === 'telas.casais' && (roleNames.includes('cadastros-casais') || roleNames.includes('lider-equipe'))) {
+    return true
+  }
+  return false
 }
 
 /**

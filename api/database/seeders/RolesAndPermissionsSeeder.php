@@ -17,7 +17,9 @@ class RolesAndPermissionsSeeder extends Seeder
     public const ROLES = [
         'admin-tenant',
         'admin-igreja',
-        'cadastros',
+        'cadastros-usuarios',
+        'cadastros-equipes',
+        'cadastros-casais',
         'lider-equipe',
     ];
 
@@ -25,7 +27,9 @@ class RolesAndPermissionsSeeder extends Seeder
     /** @var list<string> */
     public const ROLES_TENANT_UI = [
         'admin-igreja',
-        'cadastros',
+        'cadastros-usuarios',
+        'cadastros-equipes',
+        'cadastros-casais',
         'lider-equipe',
     ];
 
@@ -37,6 +41,14 @@ class RolesAndPermissionsSeeder extends Seeder
         'users.delete',
         'roles.assign',
         'permissions.view',
+    ];
+
+    /** Uma permissão por tela do shell (menu + rota). */
+    /** @var list<string> */
+    public const SCREEN_PERMISSIONS = [
+        'telas.usuarios',
+        'telas.equipes',
+        'telas.casais',
     ];
 
     /** @var list<string> */
@@ -54,7 +66,11 @@ class RolesAndPermissionsSeeder extends Seeder
 
         setPermissionsTeamId(null);
 
-        foreach ([...self::MANAGEMENT_PERMISSIONS, ...self::ECC_STUB_PERMISSIONS] as $name) {
+        foreach ([
+            ...self::MANAGEMENT_PERMISSIONS,
+            ...self::SCREEN_PERMISSIONS,
+            ...self::ECC_STUB_PERMISSIONS,
+        ] as $name) {
             Permission::findOrCreate($name, self::GUARD);
         }
 
@@ -68,22 +84,33 @@ class RolesAndPermissionsSeeder extends Seeder
         $adminIgreja = Role::findByName('admin-igreja', self::GUARD);
         $adminIgreja->syncPermissions([
             ...self::MANAGEMENT_PERMISSIONS,
+            ...self::SCREEN_PERMISSIONS,
             ...self::ECC_STUB_PERMISSIONS,
         ]);
 
-        $cadastros = Role::findByName('cadastros', self::GUARD);
-        $cadastros->syncPermissions([
+        Role::findByName('cadastros-usuarios', self::GUARD)->syncPermissions([
+            'telas.usuarios',
             'users.view',
             'users.create',
             'users.update',
             'permissions.view',
+        ]);
+
+        Role::findByName('cadastros-equipes', self::GUARD)->syncPermissions([
+            'telas.equipes',
             'ecc.equipes.view',
+            'ecc.equipes.manage',
+        ]);
+
+        Role::findByName('cadastros-casais', self::GUARD)->syncPermissions([
+            'telas.casais',
             'ecc.casais.view',
             'ecc.casais.manage',
         ]);
 
-        $lider = Role::findByName('lider-equipe', self::GUARD);
-        $lider->syncPermissions([
+        Role::findByName('lider-equipe', self::GUARD)->syncPermissions([
+            'telas.equipes',
+            'telas.casais',
             'ecc.equipes.view',
             'ecc.casais.view',
             'ecc.escala.editar',

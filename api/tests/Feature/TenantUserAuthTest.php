@@ -131,12 +131,12 @@ class TenantUserAuthTest extends TestCase
             ->putJson("/api/v1/users/{$userId}/roles", [
                 'igreja_id' => $igrejaId,
                 'roles' => [
-                    ['name' => 'cadastros'],
+                    ['name' => 'cadastros-usuarios'],
                     ['name' => 'admin-igreja'],
                 ],
             ])
             ->assertOk()
-            ->assertJsonFragment(['name' => 'cadastros'])
+            ->assertJsonFragment(['name' => 'cadastros-usuarios'])
             ->assertJsonFragment(['name' => 'admin-igreja']);
 
         $roles = $this->withHeader('X-Tenant', 'paroquia-teste')
@@ -145,7 +145,9 @@ class TenantUserAuthTest extends TestCase
             ->json('data');
 
         $roleNames = collect($roles)->pluck('name')->all();
-        $this->assertContains('cadastros', $roleNames);
+        $this->assertContains('cadastros-usuarios', $roleNames);
+        $this->assertContains('cadastros-equipes', $roleNames);
+        $this->assertContains('cadastros-casais', $roleNames);
         $this->assertContains('admin-igreja', $roleNames);
         $this->assertContains('lider-equipe', $roleNames);
         $this->assertNotContains('admin-tenant', $roleNames);
@@ -292,7 +294,7 @@ class TenantUserAuthTest extends TestCase
             ->getJson('/api/v1/roles')
             ->assertOk()
             ->assertJsonFragment(['name' => 'admin-tenant'])
-            ->assertJsonFragment(['name' => 'cadastros']);
+            ->assertJsonFragment(['name' => 'cadastros-usuarios']);
     }
 
     public function test_super_admin_bearer_can_list_users_and_ecc(): void
@@ -348,11 +350,11 @@ class TenantUserAuthTest extends TestCase
                 'igreja_id' => $igrejaId,
                 'roles' => [
                     ['name' => 'admin-tenant'],
-                    ['name' => 'cadastros'],
+                    ['name' => 'cadastros-usuarios'],
                 ],
             ])
             ->assertOk()
-            ->assertJsonFragment(['name' => 'cadastros'])
+            ->assertJsonFragment(['name' => 'cadastros-usuarios'])
             ->assertJsonFragment(['name' => 'admin-tenant']);
     }
 }

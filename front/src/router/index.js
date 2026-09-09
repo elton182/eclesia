@@ -83,7 +83,7 @@ const router = createRouter({
     {
       path: '/',
       component: AdminLayout,
-      meta: { requiresAuthAdmin: true },
+      meta: { requiresAuthTenantOrAdmin: true },
       children: [
         {
           path: 'ecc/equipes',

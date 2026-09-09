@@ -77,6 +77,9 @@ export const useAuthStore = defineStore('auth', () => {
       setTenantToken(response.data.access_token)
       setUser(response.data.user)
 
+      // Carrega permissions (telas.*) via /web/me
+      await checkAuth()
+
       return { success: true }
     } catch (error) {
       clearTenantToken()

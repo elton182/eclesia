@@ -82,8 +82,8 @@ const filtered = computed(() =>
 )
 const ensureTenant = () => {
   if (!tenantStore.slug) {
-    innovToast('error', 'Tenant', 'Selecione um tenant em Tenants → Abrir ECC')
-    router.push('/tenants')
+    innovToast('error', 'Organização', 'Nenhuma organização selecionada.')
+    router.push('/inicio')
     return false
   }
   return true
