@@ -10,16 +10,22 @@ use App\Http\Requests\StoreEccCasalRequest;
 use App\Http\Requests\UpdateEccCasalRequest;
 use App\Http\Resources\EccCasalResource;
 use App\Services\EccCasalService;
+use App\Services\EccVisibilityScope;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
 
 class EccCasalController extends Controller
 {
-    public function __construct(private readonly EccCasalService $casais) {}
+    public function __construct(
+        private readonly EccCasalService $casais,
+        private readonly EccVisibilityScope $visibility,
+    ) {}
 
     public function index(): AnonymousResourceCollection
     {
+        abort_unless($this->visibility->userCan('ecc.casais.view') || $this->visibility->userCan('ecc.casais.manage'), 403);
+
         return EccCasalResource::collection($this->casais->list());
     }
 
@@ -34,6 +40,8 @@ class EccCasalController extends Controller
 
     public function show(string $id): EccCasalResource
     {
+        abort_unless($this->visibility->userCan('ecc.casais.view') || $this->visibility->userCan('ecc.casais.manage'), 403);
+
         return new EccCasalResource($this->casais->find($id));
     }
 
@@ -46,6 +54,8 @@ class EccCasalController extends Controller
 
     public function destroy(string $id): Response
     {
+        abort_unless($this->visibility->userCan('ecc.casais.manage'), 403);
+
         $this->casais->delete($this->casais->find($id));
 
         return response()->noContent();

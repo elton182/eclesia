@@ -42,7 +42,40 @@ export function userHasPermission(user, permission, opts = {}) {
   if (permission === 'telas.casais' && (roleNames.includes('cadastros-casais') || roleNames.includes('lider-equipe'))) {
     return true
   }
+  if (permission === 'ecc.casais.manage' && roleNames.includes('cadastros-casais')) return true
+  if (permission === 'ecc.equipes.manage' && roleNames.includes('cadastros-equipes')) return true
+  if (permission === 'ecc.casais.view' && (roleNames.includes('cadastros-casais') || roleNames.includes('lider-equipe'))) {
+    return true
+  }
+  if (permission === 'ecc.equipes.view' && (roleNames.includes('cadastros-equipes') || roleNames.includes('lider-equipe'))) {
+    return true
+  }
   return false
+}
+
+/**
+ * IDs das equipes lideradas pelo usuário (vazio = sem vínculo de líder).
+ * @param {{ equipes_lideradas?: Array<{ id: string }> }|null|undefined} user
+ * @returns {string[]}
+ */
+export function equipesLideradasIds(user) {
+  if (!user || !Array.isArray(user.equipes_lideradas)) return []
+  return user.equipes_lideradas.map((e) => e.id).filter(Boolean)
+}
+
+/**
+ * Líder sem manage vê só as equipes vinculadas.
+ * @param {{ permissions?: string[], roles?: Array<{ name: string }>, equipes_lideradas?: Array<{ id: string }> }|null|undefined} user
+ * @param {{ isSuperAdmin?: boolean }} [opts]
+ */
+export function isLiderEquipeScoped(user, opts = {}) {
+  if (opts.isSuperAdmin) return false
+  if (!user) return false
+  if (userHasPermission(user, 'ecc.casais.manage', opts) || userHasPermission(user, 'ecc.equipes.manage', opts)) {
+    return false
+  }
+  const roleNames = (user.roles || []).map((r) => r.name)
+  return roleNames.includes('lider-equipe') || equipesLideradasIds(user).length > 0
 }
 
 /**

@@ -3,17 +3,28 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '@/services/api'
 import { useTenantStore } from '@/stores/tenant'
+import { useAuthStore } from '@/stores/auth'
+import { useAuthAdminStore } from '@/stores/authAdmin'
 import { innovToast } from '@/plugins/toast'
 import { filterEquipesBySearch, casaisRouteForEquipe } from '@/utils/eccFilters'
+import { userHasPermission } from '@/utils/userRoles'
 
 const router = useRouter()
 const tenantStore = useTenantStore()
+const authStore = useAuthStore()
+const authAdminStore = useAuthAdminStore()
 const equipes = ref([])
 const search = ref('')
 const loading = ref(false)
 const mode = ref('list')
 const form = ref({ id: null, nome: '', cor: '#00234E' })
 const saving = ref(false)
+
+const canManageEquipes = computed(() =>
+  userHasPermission(authStore.user, 'ecc.equipes.manage', {
+    isSuperAdmin: authAdminStore.isAuthenticated,
+  }),
+)
 
 const filteredEquipes = computed(() => filterEquipesBySearch(equipes.value, search.value))
 
@@ -102,7 +113,14 @@ onMounted(load)
 
     <div v-if="mode === 'list'" class="space-y-4">
       <div class="flex flex-wrap gap-3 items-center">
-        <button class="btn btn-primary" @click="openCreate">Nova equipe</button>
+        <button
+          v-if="canManageEquipes"
+          class="btn btn-primary"
+          data-testid="equipes-nova"
+          @click="openCreate"
+        >
+          Nova equipe
+        </button>
         <input
           v-model="search"
           type="search"
@@ -154,8 +172,22 @@ onMounted(load)
               >
                 Ver casais
               </button>
-              <button class="btn btn-ghost" @click="openEdit(equipe)">Editar</button>
-              <button class="btn btn-ghost text-red-700" @click="remove(equipe)">Excluir</button>
+              <button
+                v-if="canManageEquipes"
+                class="btn btn-ghost"
+                data-testid="equipe-editar"
+                @click="openEdit(equipe)"
+              >
+                Editar
+              </button>
+              <button
+                v-if="canManageEquipes"
+                class="btn btn-ghost text-red-700"
+                data-testid="equipe-excluir"
+                @click="remove(equipe)"
+              >
+                Excluir
+              </button>
             </div>
           </div>
         </div>

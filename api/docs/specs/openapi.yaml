@@ -589,14 +589,20 @@ paths:
   /ecc/equipes:
     get:
       summary: Listar equipes ECC
+      description: >
+        Líder de equipe (sem ecc.*.manage) recebe apenas as equipes vinculadas em ecc_equipe_user.
+        Quem tem ecc.equipes.manage ou ecc.casais.manage vê todas da igreja atual.
       security:
         - bearerAuth: []
           tenantHeader: []
       responses:
         '200':
           description: Lista
+        '403':
+          description: Sem permissão de visualização
     post:
       summary: Criar equipe
+      description: Requer ecc.equipes.manage.
       security:
         - bearerAuth: []
           tenantHeader: []
@@ -661,14 +667,20 @@ paths:
   /ecc/casais:
     get:
       summary: Listar casais
+      description: >
+        Líder de equipe (sem ecc.casais.manage) recebe apenas casais das equipes que lidera.
+        Pessoas exibidas são os cônjuges desses casais.
       security:
         - bearerAuth: []
           tenantHeader: []
       responses:
         '200':
           description: Lista
+        '403':
+          description: Sem permissão de visualização
     post:
       summary: Criar casal
+      description: Requer ecc.casais.manage.
       security:
         - bearerAuth: []
           tenantHeader: []
@@ -678,6 +690,7 @@ paths:
   /ecc/casais/import:
     post:
       summary: Importar casais (linhas da planilha)
+      description: Requer ecc.casais.manage.
       security:
         - bearerAuth: []
           tenantHeader: []
