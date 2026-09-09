@@ -11,6 +11,17 @@ describe('userRoles', () => {
     assert.equal(roleLabel('admin-tenant'), 'Admin Organização')
   })
 
+  it('userHasPermission reconhece telas.igrejas para admin-igreja', () => {
+    assert.equal(
+      userHasPermission({ roles: [{ name: 'admin-igreja' }] }, 'telas.igrejas'),
+      true,
+    )
+    assert.equal(
+      userHasPermission({ roles: [{ name: 'cadastros-equipes' }] }, 'telas.igrejas'),
+      false,
+    )
+  })
+
   it('buildSyncRolesPayload monta N papéis e equipe_ids do líder', () => {
     const payload = buildSyncRolesPayload({
       igrejaId: '01IGREJA',

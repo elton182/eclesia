@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\RolePermissionController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Middleware\AuthenticateTenantApi;
 use App\Http\Middleware\InitializeTenancyBySlug;
+use App\Http\Middleware\SetIgrejaFromHeader;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -41,7 +42,7 @@ Route::middleware([
     });
 
     // Só usuário do tenant (token no DB do tenant)
-    Route::post('web/me', [AuthWebController::class, 'me'])->middleware(['cookie.to.token', 'auth:sanctum']);
+    Route::post('web/me', [AuthWebController::class, 'me'])->middleware(['cookie.to.token', 'auth:sanctum', SetIgrejaFromHeader::class]);
     Route::post('web/logout', [AuthWebController::class, 'logout'])->middleware(['cookie.to.token', 'auth:sanctum']);
 });
 
@@ -49,10 +50,11 @@ Route::middleware([
     'api',
     'cookie.to.token',
     AuthenticateTenantApi::class,
+    SetIgrejaFromHeader::class,
 ])->prefix('api/v1')->group(function () {
     Route::get('roles', [RolePermissionController::class, 'roles']);
     Route::get('permissions', [RolePermissionController::class, 'permissions']);
-    Route::get('igrejas', [IgrejaController::class, 'index']);
+    Route::apiResource('igrejas', IgrejaController::class);
 
     Route::post('users/{user}/roles', [UserController::class, 'assignRole']);
     Route::put('users/{user}/roles', [UserController::class, 'syncRoles']);

@@ -3,8 +3,10 @@ import { RouterView } from 'vue-router'
 import { ref } from 'vue'
 import TopNavbar from '@/components/layout/TopNavbar.vue'
 import Sidebar from '@/components/layout/Sidebar.vue'
+import { useIgrejaStore } from '@/stores/igreja'
 
 const isSidebarOpen = ref(true)
+const igrejaStore = useIgrejaStore()
 
 const toggleSidebar = () => {
   isSidebarOpen.value = !isSidebarOpen.value
@@ -33,7 +35,7 @@ const toggleSidebar = () => {
         <div class="flex-1 max-w-6xl w-full mx-auto">
           <router-view v-slot="{ Component }">
             <transition name="fade" mode="out-in">
-              <component :is="Component" />
+              <component :is="Component" :key="igrejaStore.currentId || 'no-igreja'" />
             </transition>
           </router-view>
         </div>

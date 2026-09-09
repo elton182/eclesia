@@ -49,6 +49,15 @@ class RolesAndPermissionsSeeder extends Seeder
         'telas.usuarios',
         'telas.equipes',
         'telas.casais',
+        'telas.igrejas',
+    ];
+
+    /** @var list<string> */
+    public const IGREJA_PERMISSIONS = [
+        'igrejas.view',
+        'igrejas.create',
+        'igrejas.update',
+        'igrejas.delete',
     ];
 
     /** @var list<string> */
@@ -69,6 +78,7 @@ class RolesAndPermissionsSeeder extends Seeder
         foreach ([
             ...self::MANAGEMENT_PERMISSIONS,
             ...self::SCREEN_PERMISSIONS,
+            ...self::IGREJA_PERMISSIONS,
             ...self::ECC_STUB_PERMISSIONS,
         ] as $name) {
             Permission::findOrCreate($name, self::GUARD);
@@ -86,6 +96,8 @@ class RolesAndPermissionsSeeder extends Seeder
             ...self::MANAGEMENT_PERMISSIONS,
             ...self::SCREEN_PERMISSIONS,
             ...self::ECC_STUB_PERMISSIONS,
+            'igrejas.view',
+            'igrejas.update',
         ]);
 
         Role::findByName('cadastros-usuarios', self::GUARD)->syncPermissions([

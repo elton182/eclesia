@@ -8,6 +8,7 @@ import {
   faHeart,
   faUserShield,
   faHouse,
+  faChurch,
 } from '@fortawesome/free-solid-svg-icons'
 import { library } from '@fortawesome/fontawesome-svg-core'
 import { useTenantStore } from '@/stores/tenant'
@@ -16,7 +17,7 @@ import { useAuthStore } from '@/stores/auth'
 import { userHasPermission } from '@/utils/userRoles'
 import logoUrl from '@/assets/logo-icon.png'
 
-library.add(faBuilding, faUsers, faHeart, faUserShield, faHouse)
+library.add(faBuilding, faUsers, faHeart, faUserShield, faHouse, faChurch)
 
 defineProps({
   isOpen: { type: Boolean, default: true },
@@ -48,6 +49,9 @@ const tenantItems = computed(() => {
   if (!inTenantContext.value) return []
 
   const items = [{ label: 'Início', icon: faHouse, path: '/inicio' }]
+  if (can('telas.igrejas') || (authAdmin.isAuthenticated && !authTenant.isAuthenticated)) {
+    items.push({ label: 'Igrejas', icon: faChurch, path: '/igrejas' })
+  }
   if (can('telas.usuarios') || (authAdmin.isAuthenticated && !authTenant.isAuthenticated)) {
     items.push({ label: 'Usuários', icon: faUserShield, path: '/usuarios' })
   }

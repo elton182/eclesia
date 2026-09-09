@@ -4,10 +4,11 @@ import api from '@/services/api'
 import { innovToast } from '@/plugins/toast'
 import { buildSyncRolesPayload, roleLabel } from '@/utils/userRoles'
 import { filterEquipesBySearch } from '@/utils/eccFilters'
+import { useIgrejaStore } from '@/stores/igreja'
 
+const igrejaStore = useIgrejaStore()
 const users = ref([])
 const roles = ref([])
-const igrejas = ref([])
 const equipes = ref([])
 const equipeSearch = ref('')
 const loading = ref(false)
@@ -28,6 +29,8 @@ const roleForm = ref({
   equipe_ids: [],
 })
 
+const igrejas = computed(() => igrejaStore.igrejas)
+
 const liderAtivo = computed(() => !!roleForm.value.toggles['lider-equipe'])
 const equipesFiltradas = computed(() =>
   filterEquipesBySearch(equipes.value, equipeSearch.value),
@@ -36,14 +39,13 @@ const equipesFiltradas = computed(() =>
 const load = async () => {
   loading.value = true
   try {
-    const [usersRes, rolesRes, igrejasRes] = await Promise.all([
+    const [usersRes, rolesRes] = await Promise.all([
       api.get('/users'),
       api.get('/roles'),
-      api.get('/igrejas'),
+      igrejaStore.load(),
     ])
     users.value = usersRes.data.data || usersRes.data || []
     roles.value = rolesRes.data.data || rolesRes.data || []
-    igrejas.value = igrejasRes.data.data || igrejasRes.data || []
   } catch (e) {
     innovToast('error', 'Erro', e.response?.data?.message || 'Falha ao listar usuários')
   } finally {
@@ -77,7 +79,7 @@ const openEdit = (user) => {
 }
 
 const openRoles = async (user) => {
-  const igrejaId = igrejas.value[0]?.id || ''
+  const igrejaId = igrejaStore.currentId || igrejas.value[0]?.id || ''
   const toggles = {}
   for (const role of roles.value) {
     const match = (user.roles || []).some((r) => {

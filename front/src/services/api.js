@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { useTenantStore } from '../stores/tenant'
+import { loadIgrejaId } from '../utils/igrejaContext'
 
 const TENANT_TOKEN_KEY = 'tenant_token'
 const ADMIN_TOKEN_KEY = 'auth_token'
@@ -29,6 +30,13 @@ api.interceptors.request.use(
       if (tenantSlug) {
         config.headers['X-Tenant'] = tenantSlug
       }
+    }
+
+    const igrejaId = loadIgrejaId()
+    if (igrejaId) {
+      config.headers['X-Igreja'] = igrejaId
+    } else {
+      delete config.headers['X-Igreja']
     }
 
     // Token do tenant tem prioridade quando há X-Tenant (evita Bearer de super-admin)
