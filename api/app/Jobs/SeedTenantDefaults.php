@@ -34,6 +34,7 @@ class SeedTenantDefaults implements ShouldQueue
             if (! Igreja::query()->exists()) {
                 Igreja::query()->create([
                     'nome' => $this->tenant->name ?? 'Igreja principal',
+                    'tipo' => 'paroquia',
                 ]);
             }
 

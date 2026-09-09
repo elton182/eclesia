@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import api, { setTenantToken, clearTenantToken, setAuthToken } from '../services/api'
 import { useTenantStore } from './tenant'
+import { useIgrejaStore } from './igreja'
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref(null)
@@ -26,6 +27,7 @@ export const useAuthStore = defineStore('auth', () => {
     } finally {
       clearAuth()
       useTenantStore().clear()
+      useIgrejaStore().reset()
     }
   }
 

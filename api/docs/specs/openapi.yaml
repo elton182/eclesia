@@ -1,11 +1,12 @@
 openapi: 3.0.3
 info:
   title: Eclesia API
-  version: 0.4.0
+  version: 0.5.0
   description: |
     API multi-tenant do Eclesia (gestão eclesial).
     Contexto central (landlord): `/admin/*`.
     Contexto tenant: header `X-Tenant` (slug) + auth web/Sanctum.
+    Igreja atual: header `X-Igreja` (ULID) validado contra o acesso do ator → IgrejaContext.
     Login web resolve tenant por slug|apelido|nome no body (sem X-Tenant obrigatório).
     Dados pessoais criptografados em repouso (LGPD).
 servers:
@@ -21,7 +22,52 @@ components:
       type: apiKey
       in: header
       name: X-Tenant
+    igrejaHeader:
+      type: apiKey
+      in: header
+      name: X-Igreja
+      description: ULID da igreja atual (opcional; sem header usa a primeira acessível)
   schemas:
+    Igreja:
+      type: object
+      properties:
+        id:
+          type: string
+          description: ULID
+        nome:
+          type: string
+        tipo:
+          type: string
+          enum: [paroquia, comunidade, outro]
+        endereco:
+          type: string
+          nullable: true
+        bairro:
+          type: string
+          nullable: true
+        cidade:
+          type: string
+          nullable: true
+        uf:
+          type: string
+          nullable: true
+          maxLength: 2
+        cep:
+          type: string
+          nullable: true
+        telefone:
+          type: string
+          nullable: true
+        email:
+          type: string
+          format: email
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
     Tenant:
       type: object
       properties:
@@ -361,6 +407,172 @@ paths:
       responses:
         '200':
           description: Logout efetuado
+  /igrejas:
+    get:
+      summary: Listar igrejas acessíveis ao ator (seletor + cadastro)
+      security:
+        - tenantHeader: []
+          bearerAuth: []
+        - tenantHeader: []
+          igrejaHeader: []
+          bearerAuth: []
+      responses:
+        '200':
+          description: Lista de igrejas
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Igreja'
+        '401':
+          description: Não autenticado
+    post:
+      summary: Criar igreja (admin-tenant)
+      security:
+        - tenantHeader: []
+          bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nome, tipo]
+              properties:
+                nome:
+                  type: string
+                tipo:
+                  type: string
+                  enum: [paroquia, comunidade, outro]
+                endereco:
+                  type: string
+                  nullable: true
+                bairro:
+                  type: string
+                  nullable: true
+                cidade:
+                  type: string
+                  nullable: true
+                uf:
+                  type: string
+                  nullable: true
+                  maxLength: 2
+                cep:
+                  type: string
+                  nullable: true
+                telefone:
+                  type: string
+                  nullable: true
+                email:
+                  type: string
+                  format: email
+                  nullable: true
+      responses:
+        '201':
+          description: Igreja criada
+        '401':
+          description: Não autenticado
+        '403':
+          description: Sem permissão
+        '422':
+          description: Validação
+  /igrejas/{id}:
+    get:
+      summary: Detalhe da igreja
+      security:
+        - tenantHeader: []
+          bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Igreja
+        '403':
+          description: Sem acesso
+        '404':
+          description: Não encontrada
+    put:
+      summary: Atualizar igreja (admin-tenant qualquer; admin-igreja só a própria)
+      security:
+        - tenantHeader: []
+          bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nome:
+                  type: string
+                tipo:
+                  type: string
+                  enum: [paroquia, comunidade, outro]
+                endereco:
+                  type: string
+                  nullable: true
+                bairro:
+                  type: string
+                  nullable: true
+                cidade:
+                  type: string
+                  nullable: true
+                uf:
+                  type: string
+                  nullable: true
+                cep:
+                  type: string
+                  nullable: true
+                telefone:
+                  type: string
+                  nullable: true
+                email:
+                  type: string
+                  format: email
+                  nullable: true
+      responses:
+        '200':
+          description: Igreja atualizada
+        '403':
+          description: Sem permissão
+        '404':
+          description: Não encontrada
+        '422':
+          description: Validação
+    delete:
+      summary: Excluir igreja (admin-tenant; bloqueado se houver vínculos)
+      security:
+        - tenantHeader: []
+          bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Removida
+        '403':
+          description: Sem permissão
+        '404':
+          description: Não encontrada
+        '409':
+          description: Possui vínculos (pessoas, equipes ou casais)
   /users:
     get:
       summary: Listar usuários do tenant

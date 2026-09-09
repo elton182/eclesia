@@ -36,6 +36,8 @@ export function userHasPermission(user, permission, opts = {}) {
     return true
   }
   if (permission === 'telas.usuarios' && roleNames.includes('cadastros-usuarios')) return true
+  if (permission === 'telas.igrejas' && roleNames.includes('admin-igreja')) return true
+  if (permission === 'igrejas.update' && roleNames.includes('admin-igreja')) return true
   if (permission === 'telas.equipes' && (roleNames.includes('cadastros-equipes') || roleNames.includes('lider-equipe'))) {
     return true
   }

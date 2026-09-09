@@ -8,6 +8,7 @@ import LoginView from '../views/LoginView.vue'
 import WelcomeView from '../views/WelcomeView.vue'
 import TenantsView from '../views/TenantsView.vue'
 import UsersView from '../views/UsersView.vue'
+import IgrejasView from '../views/IgrejasView.vue'
 import EccEquipesView from '../views/EccEquipesView.vue'
 import EccCasaisView from '../views/EccCasaisView.vue'
 import AdminLayout from '../layouts/AdminLayout.vue'
@@ -72,6 +73,11 @@ const router = createRouter({
           path: 'inicio',
           name: 'inicio',
           component: WelcomeView,
+        },
+        {
+          path: 'igrejas',
+          name: 'igrejas',
+          component: IgrejasView,
         },
         {
           path: 'usuarios',
