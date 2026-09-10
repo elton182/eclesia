@@ -29,11 +29,14 @@ class SiteAdminController extends Controller
         private readonly SiteService $site,
     ) {}
 
-    public function settings(): SiteSettingResource
+    public function settings(): JsonResponse
     {
         $this->authorizePermission('site.settings.view');
 
-        return new SiteSettingResource($this->site->settings());
+        $settings = $this->site->settings();
+        $settings->wasRecentlyCreated = false;
+
+        return (new SiteSettingResource($settings))->response();
     }
 
     public function updateSettings(UpdateSiteSettingsRequest $request): JsonResponse
@@ -147,6 +150,11 @@ class SiteAdminController extends Controller
 
     private function authorizePermission(string $permission): void
     {
-        abort_unless(auth()->user()?->can($permission), 403);
+        $user = auth()->user();
+        if ($user instanceof \App\Models\SuperAdmin) {
+            return;
+        }
+
+        abort_unless($user?->can($permission), 403);
     }
 }
