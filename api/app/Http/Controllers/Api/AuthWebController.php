@@ -128,6 +128,63 @@ class AuthWebController extends Controller
             ->withCookie($this->cookieManager->forgetRefreshTokenCookie());
     }
 
+    /**
+     * Renova o access token a partir do cookie de refresh (ou body).
+     */
+    public function refresh(Request $request): JsonResponse
+    {
+        $refreshPlain = $this->cookieManager->getRefreshTokenFromRequest($request);
+        if (! is_string($refreshPlain) || $refreshPlain === '') {
+            $refreshPlain = $request->input('refresh_token');
+        }
+
+        if (! is_string($refreshPlain) || $refreshPlain === '' || ! str_contains($refreshPlain, '|')) {
+            return response()->json(['message' => 'Sessão expirada. Faça login novamente.'], 401);
+        }
+
+        [$id, $secret] = explode('|', $refreshPlain, 2);
+        if (! is_numeric($id) || $secret === '') {
+            return response()->json(['message' => 'Sessão expirada. Faça login novamente.'], 401);
+        }
+
+        $record = \Laravel\Sanctum\PersonalAccessToken::query()->find($id);
+        if (
+            $record === null
+            || $record->name !== WebAuthService::REFRESH_TOKEN_NAME
+            || ! hash_equals($record->token, hash('sha256', $secret))
+        ) {
+            return response()->json(['message' => 'Sessão expirada. Faça login novamente.'], 401);
+        }
+
+        if ($record->expires_at !== null && $record->expires_at->isPast()) {
+            return response()->json(['message' => 'Sessão expirada. Faça login novamente.'], 401);
+        }
+
+        $user = $record->tokenable;
+        if (! $user instanceof User) {
+            return response()->json(['message' => 'Sessão expirada. Faça login novamente.'], 401);
+        }
+
+        $user->tokens()->where('name', WebAuthService::ACCESS_TOKEN_NAME)->delete();
+
+        $accessToken = $user->createToken(
+            WebAuthService::ACCESS_TOKEN_NAME,
+            ['*'],
+            now()->addMinutes(CookieManager::ACCESS_TOKEN_EXPIRY)
+        );
+
+        $record->forceFill(['last_used_at' => now()])->save();
+
+        $plainAccess = $accessToken->plainTextToken;
+
+        return response()->json([
+            'success' => true,
+            'access_token' => $plainAccess,
+        ])
+            ->withCookie($this->cookieManager->createAccessTokenCookie($plainAccess))
+            ->withCookie($this->cookieManager->createRefreshTokenCookie($refreshPlain));
+    }
+
     private function forgetWebSession(Request $request): void
     {
         // Não chamar Auth::logout(): ele hidrata User e quebra no banco central.

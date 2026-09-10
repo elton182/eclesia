@@ -1,115 +1,120 @@
 <script setup>
 import { computed, ref } from 'vue'
-import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
-import { library } from '@fortawesome/fontawesome-svg-core'
-import { faDesktop, faMobileScreen } from '@fortawesome/free-solid-svg-icons'
 import { normalizeBlocks, resolveMenuLinks } from '@/utils/siteBlocks'
 import SiteBlockRenderer from '@/components/site/SiteBlockRenderer.vue'
-
-library.add(faDesktop, faMobileScreen)
 
 const props = defineProps({
   blocks: { type: Array, default: () => [] },
   settings: { type: Object, default: () => ({}) },
   tenantSlug: { type: String, default: '' },
   pageTitle: { type: String, default: '' },
+  highlightIndex: { type: Number, default: -1 },
+  compact: { type: Boolean, default: false },
+  selectable: { type: Boolean, default: false },
 })
+
+const emit = defineEmits(['select'])
 
 const viewport = ref('desktop')
 
+const allBlocks = computed(() => {
+  if (!Array.isArray(props.blocks)) return []
+  return props.blocks
+    .slice()
+    .sort((a, b) => (Number(a.ordem) || 0) - (Number(b.ordem) || 0))
+})
+
 const visibleBlocks = computed(() => normalizeBlocks(props.blocks))
 const menuLinks = computed(() => resolveMenuLinks(props.settings?.menu, props.tenantSlug))
-const brandTitle = computed(() => props.settings?.titulo || 'Site da organização')
-const headerBg = computed(() => props.settings?.cores?.primary || '#00234E')
+const brandTitle = computed(() => props.settings?.titulo || 'Paróquia')
+const brandInitial = computed(() => (brandTitle.value || 'P')[0].toUpperCase())
+
+function onSelect(idx) {
+  if (!props.selectable) return
+  emit('select', idx)
+}
 </script>
 
 <template>
-  <div class="space-y-3" data-testid="site-page-preview">
-    <div class="flex flex-wrap items-center justify-between gap-2">
-      <p class="text-xs" style="color: var(--color-muted)">
-        Prévia aproximada — listas e formulários carregam apenas com o site publicado.
-      </p>
-      <div class="inline-flex rounded-lg p-0.5" style="background: var(--color-surface-2)">
-        <button
-          type="button"
-          class="px-3 py-1.5 rounded-md text-xs font-semibold"
-          :style="viewport === 'desktop'
-            ? 'background: var(--color-surface); color: var(--color-primary)'
-            : 'color: var(--color-muted)'"
-          data-testid="preview-desktop"
-          @click="viewport = 'desktop'"
-        >
-          <FontAwesomeIcon :icon="faDesktop" class="mr-1.5" />
-          Computador
-        </button>
-        <button
-          type="button"
-          class="px-3 py-1.5 rounded-md text-xs font-semibold"
-          :style="viewport === 'mobile'
-            ? 'background: var(--color-surface); color: var(--color-primary)'
-            : 'color: var(--color-muted)'"
-          data-testid="preview-mobile"
-          @click="viewport = 'mobile'"
-        >
-          <FontAwesomeIcon :icon="faMobileScreen" class="mr-1.5" />
-          Celular
-        </button>
+  <div data-testid="site-page-preview">
+    <div v-if="!compact" class="space-y-3 mb-3">
+      <div class="flex gap-1 justify-end">
+        <button type="button" class="text-xs px-2 py-1" @click="viewport = 'desktop'">desktop</button>
+        <button type="button" class="text-xs px-2 py-1" @click="viewport = 'mobile'">celular</button>
       </div>
     </div>
 
     <div
-      class="rounded-2xl overflow-hidden mx-auto transition-all duration-300"
-      style="border: 1px solid var(--color-line); background: #f7f4ef"
-      :class="viewport === 'mobile' ? 'max-w-[380px]' : 'w-full'"
+      class="overflow-hidden"
+      :class="!compact && viewport === 'mobile' ? 'max-w-[380px] mx-auto' : 'w-full'"
+      style="background: #FFFDFA"
     >
-      <div
-        class="flex items-center gap-2 px-3 py-2"
-        style="background: var(--color-surface-2); border-bottom: 1px solid var(--color-line)"
-      >
-        <span class="h-2.5 w-2.5 rounded-full" style="background: #e06c5e" />
-        <span class="h-2.5 w-2.5 rounded-full" style="background: #e8be5c" />
-        <span class="h-2.5 w-2.5 rounded-full" style="background: #7cbf8e" />
-        <span
-          class="ml-2 flex-1 truncate rounded-md px-2.5 py-1 text-[11px] font-mono"
-          style="background: var(--color-surface); color: var(--color-muted)"
+      <div class="select-none" style="color: #2A1418">
+        <header
+          class="sticky top-0 z-10 px-4 h-12 flex items-center justify-between gap-2"
+          style="background: rgba(255, 253, 250, 0.94); border-bottom: 1px solid rgba(42, 20, 24, 0.09)"
         >
-          /site/{{ tenantSlug || 'organizacao' }}
-        </span>
-      </div>
+          <div class="flex items-center gap-2 min-w-0">
+            <div
+              class="w-6 h-6 rounded-full flex items-center justify-center font-serif text-[11px] shrink-0"
+              style="background: #6B1C2B; color: #F0D8C2"
+            >{{ brandInitial }}</div>
+            <span class="font-serif text-[13px] font-medium truncate">{{ brandTitle }}</span>
+          </div>
+          <nav class="hidden sm:flex gap-3 text-[10px]" style="color: rgba(42, 20, 24, 0.7)">
+            <span v-for="link in menuLinks" :key="link.href">{{ link.label }}</span>
+          </nav>
+        </header>
 
-      <div class="max-h-[70vh] overflow-y-auto">
-        <div class="select-none pointer-events-none" style="color: #1a1a1a">
-          <header :style="{ background: headerBg, color: '#f7f4ef' }">
-            <div class="px-4 py-3 flex flex-wrap items-center justify-between gap-2">
-              <span class="font-semibold tracking-tight">{{ brandTitle }}</span>
-              <nav class="flex flex-wrap gap-3 text-xs opacity-90">
-                <span v-for="link in menuLinks" :key="link.href">{{ link.label }}</span>
-              </nav>
-            </div>
-          </header>
-
-          <div v-if="visibleBlocks.length">
+        <div v-if="allBlocks.length">
+          <div
+            v-for="(block, idx) in allBlocks"
+            :key="`${block.tipo}-${idx}`"
+            class="relative"
+            :class="selectable ? 'cursor-pointer group/preview-block' : ''"
+            :data-testid="`preview-block-${idx}`"
+            @click="onSelect(idx)"
+          >
+            <div
+              v-if="selectable"
+              class="absolute inset-0 z-[5] transition-opacity pointer-events-none"
+              :class="idx === highlightIndex ? 'opacity-100' : 'opacity-0 group-hover/preview-block:opacity-100'"
+              :style="idx === highlightIndex
+                ? 'box-shadow: inset 0 0 0 2px #8A2436'
+                : 'box-shadow: inset 0 0 0 2px rgba(138,36,54,0.35)'"
+            />
+            <span
+              v-if="selectable && idx === highlightIndex"
+              class="absolute top-2 right-2 z-10 text-[10px] font-medium px-2 py-0.5 rounded-full"
+              style="background: #8A2436; color: #FFFDFA"
+            >editando</span>
+            <span
+              v-else-if="selectable"
+              class="absolute top-2 right-2 z-10 text-[10px] font-medium px-2 py-0.5 rounded-full opacity-0 group-hover/preview-block:opacity-100 transition-opacity"
+              style="background: rgba(42,20,24,0.72); color: #FFFDFA"
+            >editar</span>
             <SiteBlockRenderer
-              v-for="(block, idx) in visibleBlocks"
-              :key="`${block.tipo}-${idx}`"
               :block="block"
               :tenant-slug="tenantSlug"
+              :highlight="idx === highlightIndex"
             />
           </div>
-          <p v-else class="px-4 py-16 text-center text-sm" style="color: var(--color-muted)">
-            Nenhum bloco visível nesta página.
-          </p>
-
-          <footer class="px-4 py-5 text-center text-xs" style="color: rgba(0,0,0,0.45)">
-            {{ brandTitle }}
-            <span v-if="settings?.subtitulo"> · {{ settings.subtitulo }}</span>
-          </footer>
         </div>
+        <p
+          v-else-if="!visibleBlocks.length"
+          class="px-4 py-16 text-center text-sm"
+          style="color: rgba(42, 20, 24, 0.5)"
+        >
+          Nenhum bloco nesta página.
+        </p>
+
+        <footer
+          class="px-4 py-4 text-[10px] flex justify-between gap-2"
+          style="background: #2A1418; color: rgba(255, 253, 250, 0.6)"
+        >
+          <span>{{ brandTitle }} · Eclesias</span>
+        </footer>
       </div>
     </div>
-
-    <p v-if="pageTitle" class="text-center text-xs" style="color: var(--color-muted)">
-      {{ pageTitle }}
-    </p>
   </div>
 </template>

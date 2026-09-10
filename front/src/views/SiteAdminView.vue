@@ -1,6 +1,6 @@
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, onMounted, ref, watch, nextTick } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import { library } from '@fortawesome/fontawesome-svg-core'
 import {
@@ -20,6 +20,7 @@ import {
   blockMeta,
   blockSummary,
   createBlock,
+  createHomeOnePagerBlocks,
   menuItemsToPayload,
   normalizeMenuItems,
   reindexBlocks,
@@ -34,13 +35,19 @@ import SitePagePreview from '@/components/site/admin/SitePagePreview.vue'
 library.add(faArrowUpRightFromSquare, faCircleInfo, faPlus, faTrash)
 
 const router = useRouter()
+const route = useRoute()
 const tenantStore = useTenantStore()
 const authTenant = useAuthStore()
 const authAdmin = useAuthAdminStore()
 
-const tab = ref('settings')
+const tab = ref('pages')
 const loading = ref(false)
 const saving = ref(false)
+const previewMode = ref('desktop')
+const dirty = ref(false)
+const lastSavedAt = ref(null)
+const showSectionPicker = ref(false)
+const dragFrom = ref(null)
 
 const settings = ref({
   publicado: false,
@@ -57,7 +64,7 @@ const pages = ref([])
 const pageForm = ref(null)
 const selectedBlock = ref(0)
 const newBlockType = ref('richtext')
-const pagePane = ref('editor')
+const comOverlay = ref(false)
 
 const comunicados = ref([])
 const comForm = ref(null)
@@ -176,7 +183,7 @@ const loadTab = async () => {
     }
     if (tab.value === 'pages' && canPages.value) {
       await loadPages()
-      await loadOptional([loadForms])
+      await loadOptional([loadForms, loadComunicados, loadSettings])
     }
     if (tab.value === 'comunicados' && canCom.value) {
       await loadComunicados()
@@ -226,18 +233,18 @@ const saveSettings = async () => {
 const openNewPage = () => {
   pageForm.value = {
     id: null,
-    slug: '',
-    titulo: '',
+    slug: 'home',
+    titulo: 'Página inicial',
     status: 'rascunho',
-    is_home: false,
+    is_home: true,
     mostrar_no_menu: true,
-    blocks: [createBlock('hero', 0)],
+    blocks: createHomeOnePagerBlocks(),
   }
   selectedBlock.value = 0
-  pagePane.value = 'editor'
+  dirty.value = true
 }
 
-const openEditPage = (p) => {
+const openEditPage = async (p) => {
   pageForm.value = {
     ...p,
     blocks: reindexBlocks(
@@ -251,18 +258,73 @@ const openEditPage = (p) => {
     ),
   }
   selectedBlock.value = 0
-  pagePane.value = 'editor'
+  dirty.value = false
+  showSectionPicker.value = false
+  await loadOptional([loadComunicados, loadForms])
 }
 
-const selectBlock = (index) => {
+const selectBlock = async (index, { fromPreview = false } = {}) => {
   selectedBlock.value = index
-  pagePane.value = 'editor'
+  await nextTick()
+  const el = document.querySelector(`[data-testid="bloco-item-${index}"]`)
+  if (el) {
+    el.scrollIntoView({ behavior: 'smooth', block: fromPreview ? 'center' : 'nearest' })
+  }
 }
 
-const addBlock = () => {
-  pageForm.value.blocks.push(createBlock(newBlockType.value, pageForm.value.blocks.length))
+const toggleBlock = (index) => {
+  if (selectedBlock.value === index) {
+    selectedBlock.value = -1
+    return
+  }
+  selectBlock(index)
+}
+
+const addBlock = (tipo = newBlockType.value) => {
+  pageForm.value.blocks.push(createBlock(tipo, pageForm.value.blocks.length))
   selectedBlock.value = pageForm.value.blocks.length - 1
-  pagePane.value = 'editor'
+  dirty.value = true
+  showSectionPicker.value = false
+}
+
+const onDragStart = (idx) => {
+  dragFrom.value = idx
+}
+
+const onDrop = (idx) => {
+  const from = dragFrom.value
+  dragFrom.value = null
+  if (from === null || from === idx || !pageForm.value) return
+  const list = [...pageForm.value.blocks]
+  const [item] = list.splice(from, 1)
+  list.splice(idx, 0, item)
+  pageForm.value.blocks = reindexBlocks(list)
+  selectedBlock.value = idx
+  dirty.value = true
+}
+
+const savedLabel = computed(() => {
+  if (dirty.value) return 'alterações pendentes'
+  if (!lastSavedAt.value) return 'salvo automaticamente'
+  const t = lastSavedAt.value
+  const hh = String(t.getHours()).padStart(2, '0')
+  const mm = String(t.getMinutes()).padStart(2, '0')
+  return `salvo automaticamente às ${hh}:${mm}`
+})
+
+const openNewComFromBlock = () => {
+  openNewCom()
+  comOverlay.value = true
+}
+
+const openEditComFromBlock = (c) => {
+  comForm.value = { ...c }
+  comOverlay.value = true
+}
+
+const closeComOverlay = () => {
+  comForm.value = null
+  comOverlay.value = false
 }
 
 const removeBlock = (index) => {
@@ -270,6 +332,62 @@ const removeBlock = (index) => {
     pageForm.value.blocks.filter((_, i) => i !== index),
   )
   selectedBlock.value = Math.max(0, Math.min(selectedBlock.value, pageForm.value.blocks.length - 1))
+  dirty.value = true
+}
+
+const toggleBlockVisible = (index) => {
+  const block = pageForm.value.blocks[index]
+  if (!block) return
+  block.visivel = block.visivel === false
+  dirty.value = true
+}
+
+const publishPage = async () => {
+  if (!pageForm.value) return
+  pageForm.value.status = 'publicado'
+  saving.value = true
+  try {
+    // Publicar a página E o site (settings.publicado) — o público exige os dois
+    if (!settings.value.publicado) {
+      if (!settings.value.titulo) {
+        settings.value.titulo = pageForm.value.titulo || 'Site'
+      }
+      await api.put('/site/settings', {
+        publicado: true,
+        titulo: settings.value.titulo,
+        subtitulo: settings.value.subtitulo,
+        menu: menuItemsToPayload(menuItems.value),
+        seo: settings.value.seo,
+        cores: settings.value.cores,
+        contato: settings.value.contato,
+      })
+      settings.value.publicado = true
+    }
+
+    const body = {
+      slug: pageForm.value.slug,
+      titulo: pageForm.value.titulo,
+      status: pageForm.value.status,
+      is_home: pageForm.value.is_home,
+      mostrar_no_menu: pageForm.value.mostrar_no_menu,
+      blocks: reindexBlocks(pageForm.value.blocks),
+    }
+    if (pageForm.value.id) {
+      await api.put(`/site/pages/${pageForm.value.id}`, body)
+    } else {
+      await api.post('/site/pages', body)
+    }
+    innovToast('success', 'Site', 'Publicado — o site está no ar')
+    dirty.value = false
+    lastSavedAt.value = new Date()
+    await loadPages()
+    const saved = pages.value.find((p) => p.slug === pageForm.value.slug || p.id === pageForm.value.id)
+    if (saved) await openEditPage(saved)
+  } catch (e) {
+    innovToast('error', 'Erro', e.response?.data?.message || 'Falha ao publicar')
+  } finally {
+    saving.value = false
+  }
 }
 
 const savePage = async () => {
@@ -289,8 +407,11 @@ const savePage = async () => {
       await api.post('/site/pages', body)
     }
     innovToast('success', 'Site', 'Página salva')
-    pageForm.value = null
+    dirty.value = false
+    lastSavedAt.value = new Date()
     await loadPages()
+    const saved = pages.value.find((p) => p.slug === pageForm.value.slug || p.id === pageForm.value.id)
+    if (saved) await openEditPage(saved)
   } catch (e) {
     innovToast('error', 'Erro', e.response?.data?.message || 'Falha ao salvar página')
   } finally {
@@ -333,7 +454,7 @@ const saveCom = async () => {
       await api.post('/site/comunicados', body)
     }
     innovToast('success', 'Site', 'Comunicado salvo')
-    comForm.value = null
+    closeComOverlay()
     await loadComunicados()
   } catch (e) {
     innovToast('error', 'Erro', e.response?.data?.message || 'Falha ao salvar')
@@ -471,35 +592,71 @@ watch(
   },
 )
 
+const enterPageBuilder = async () => {
+  if (tab.value !== 'pages') return
+  if (pageForm.value) return
+  if (pages.value.length) {
+    const home = pages.value.find((p) => p.is_home) || pages.value[0]
+    await openEditPage(home)
+    return
+  }
+  // Sem páginas: entra direto no editor 2a com o one-pager (não na lista Innov)
+  openNewPage()
+  await loadOptional([loadComunicados, loadForms])
+}
+
 onMounted(async () => {
-  tab.value = tabs.value[0]?.id || 'settings'
-  // O selo de publicação e a prévia dependem das configurações em qualquer aba.
+  applyTabFromRoute()
   if (canSettings.value) await loadOptional([loadSettings])
   await loadTab()
+  await enterPageBuilder()
 })
 
-const setTab = async (t) => {
-  tab.value = t
-  pageForm.value = null
-  comForm.value = null
-  pastForm.value = null
-  formForm.value = null
-  formErrors.value = []
-  submissions.value = []
-  submissionsForm.value = null
-  await loadTab()
+const applyTabFromRoute = () => {
+  const q = route.query.tab ? String(route.query.tab) : 'pages'
+  const allowed = tabs.value.map((t) => t.id)
+  const next = allowed.includes(q) ? q : (allowed[0] || 'pages')
+  tab.value = next
 }
+
+watch(
+  () => route.query.tab,
+  async () => {
+    const prev = tab.value
+    applyTabFromRoute()
+    if (tab.value !== prev) {
+      pageForm.value = null
+      comForm.value = null
+      comOverlay.value = false
+      pastForm.value = null
+      formForm.value = null
+      formErrors.value = []
+      submissions.value = []
+      submissionsForm.value = null
+      await loadTab()
+      await enterPageBuilder()
+    }
+  },
+)
+
+const setTab = async (t) => {
+  const query = t === 'pages' ? {} : { tab: t }
+  await router.replace({ path: '/site', query })
+}
+
+/** Páginas = só o builder 2a (sem chrome Innov). */
+const showLegacyChrome = computed(() => tab.value !== 'pages')
 </script>
 
 <template>
   <div data-testid="site-admin">
-    <div class="mb-6 flex flex-wrap items-end justify-between gap-4">
+    <template v-if="showLegacyChrome">
+    <div class="mb-6 flex flex-wrap items-end justify-between gap-4 px-6 pt-6">
       <div>
-        <p class="page-eyebrow">Presença digital</p>
-        <h2 class="text-3xl" style="color: var(--color-primary)">Site público</h2>
-        <p class="mt-1 text-[14.5px]" style="color: var(--color-muted)">
-          Monte as páginas, o conteúdo e os formulários da vitrine da organização.
-        </p>
+        <p class="page-eyebrow">Site</p>
+        <h2 class="font-serif text-[28px]" style="color: #2A1418">
+          {{ tabs.find((t) => t.id === tab)?.label || 'Site' }}
+        </h2>
       </div>
       <div class="flex flex-wrap items-center gap-3">
         <span
@@ -515,29 +672,15 @@ const setTab = async (t) => {
         </a>
       </div>
     </div>
+    </template>
 
-    <div class="card p-1.5 inline-flex flex-wrap gap-1 mb-6">
-      <button
-        v-for="t in tabs"
-        :key="t.id"
-        type="button"
-        class="px-4 py-2 rounded-[11px] text-sm font-semibold transition-colors"
-        :style="tab === t.id
-          ? 'background: var(--color-primary); color: #F7F4EE'
-          : 'color: var(--color-muted)'"
-        :data-testid="`site-tab-${t.id}`"
-        @click="setTab(t.id)"
-      >
-        {{ t.label }}
-      </button>
-    </div>
-
-    <div v-if="loading" class="card p-8 text-center" style="color: var(--color-muted)">
+    <div v-if="loading" class="card p-8 text-center mx-6" style="color: var(--color-muted)">
       Carregando…
     </div>
 
+    <div v-else class="px-0" :class="{ 'px-6': showLegacyChrome }">
     <!-- Configurações -->
-    <div v-else-if="tab === 'settings'" class="space-y-5">
+    <div v-if="tab === 'settings'" class="space-y-5">
       <div class="card p-6">
         <div class="flex flex-wrap items-start justify-between gap-4">
           <div>
@@ -628,215 +771,299 @@ const setTab = async (t) => {
       </div>
     </div>
 
-    <!-- Páginas -->
+    <!-- Páginas — sempre o builder 2a -->
     <div v-else-if="tab === 'pages'">
-      <div v-if="!pageForm" class="space-y-4">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <p class="text-sm" style="color: var(--color-muted)">
-            {{ pages.length }} página(s) no site.
-          </p>
-          <button
-            v-if="can('site.pages.manage')"
-            type="button"
-            class="btn btn-primary"
-            data-testid="site-nova-pagina"
-            @click="openNewPage"
-          >
-            <FontAwesomeIcon :icon="faPlus" />
-            Nova página
-          </button>
-        </div>
-
-        <div class="grid gap-4 sm:grid-cols-2">
-          <div
-            v-if="!pages.length"
-            class="card p-8 sm:col-span-2 text-center"
-            style="color: var(--color-muted)"
-          >
-            Nenhuma página criada. Comece pela página inicial.
-          </div>
-          <div v-for="p in pages" :key="p.id" class="card p-5">
-            <div class="flex items-start justify-between gap-3">
-              <div>
-                <h3 class="text-lg leading-tight">{{ p.titulo }}</h3>
-                <p class="text-xs font-mono mt-1" style="color: var(--color-muted)">/{{ p.slug }}</p>
-              </div>
-              <span class="badge" :class="p.status === 'publicado' ? 'badge-success' : 'badge-warning'">
-                {{ p.status === 'publicado' ? 'Publicada' : 'Rascunho' }}
-              </span>
-            </div>
-            <p class="mt-3 text-sm" style="color: var(--color-muted)">
-              {{ (p.blocks || []).length }} bloco(s)
-              <span v-if="p.is_home"> · página inicial</span>
-            </p>
-            <div class="mt-4 flex flex-wrap gap-2">
-              <button class="btn btn-ghost" data-testid="pagina-editar" @click="openEditPage(p)">
-                Editar
-              </button>
-              <button
-                v-if="can('site.pages.manage')"
-                class="btn btn-ghost"
-                style="color: var(--color-danger)"
-                @click="removePage(p)"
-              >
-                Excluir
-              </button>
-            </div>
-          </div>
-        </div>
+      <div
+        v-if="!pageForm"
+        class="p-10 text-center text-[14px]"
+        style="color: rgba(42, 20, 24, 0.55)"
+        data-testid="site-builder-booting"
+      >
+        Abrindo editor…
       </div>
 
-      <div v-else class="space-y-4" data-testid="site-page-builder">
-        <div class="card px-5 py-4 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p class="text-xs font-bold uppercase tracking-wider" style="color: var(--color-muted)">
-              Construtor de página
-            </p>
-            <h3 class="text-lg leading-tight">
-              {{ pageForm.titulo || (pageForm.id ? 'Página sem título' : 'Nova página') }}
-            </h3>
+      <div
+        v-else
+        class="site-editor-2a flex flex-col"
+        data-testid="site-page-builder"
+      >
+        <!-- Top bar 2a -->
+        <div class="site-editor-2a__top shrink-0 flex items-center justify-between px-6 gap-4">
+          <div class="flex items-center gap-2.5 min-w-0 text-[13px]">
+            <span class="truncate" style="color: rgba(42, 20, 24, 0.62)">{{ tenantStore.name || 'Paróquia' }}</span>
+            <span style="color: rgba(42, 20, 24, 0.3)">/</span>
+            <span class="font-medium truncate" style="color: #2A1418">{{ pageForm.titulo || 'Página inicial' }}</span>
+            <span
+              v-if="dirty || pageForm.status !== 'publicado'"
+              class="inline-flex items-center gap-1.5 text-[11.5px] font-medium px-2.5 py-1 rounded-full shrink-0"
+              style="color: #B4703F; background: #F6EDE4"
+            >
+              <span class="w-1.5 h-1.5 rounded-full" style="background: #B4703F" />
+              {{ dirty ? 'alterações não publicadas' : 'rascunho' }}
+            </span>
           </div>
-          <div class="flex flex-wrap gap-2">
-            <button type="button" class="btn btn-ghost" @click="pageForm = null">Cancelar</button>
+          <div class="flex items-center gap-2 shrink-0">
+            <a
+              v-if="tenantStore.slug"
+              :href="publicUrl"
+              target="_blank"
+              rel="noopener"
+              class="rounded-lg px-3.5 py-2.5 text-[12.5px] font-medium no-underline"
+              style="border: 1px solid rgba(42, 20, 24, 0.16); background: #fff; color: #2A1418"
+            >
+              Pré-visualizar
+            </a>
             <button
               type="button"
-              class="btn btn-primary disabled:opacity-50"
+              class="rounded-lg px-4 py-2.5 text-[12.5px] font-medium border-0 disabled:opacity-50"
+              style="background: #6B1C2B; color: #FFFDFA"
               :disabled="saving"
               data-testid="pagina-salvar"
-              @click="savePage"
+              @click="publishPage"
             >
-              {{ saving ? 'Salvando…' : 'Salvar página' }}
+              {{ saving ? 'Publicando…' : 'Publicar' }}
             </button>
           </div>
         </div>
 
-        <div class="grid gap-4 lg:grid-cols-12 items-start">
-          <div class="lg:col-span-4 space-y-4">
-            <div class="card p-5 space-y-4">
-              <h4 class="text-base">Dados da página</h4>
+        <div class="site-editor-2a__body flex-1 min-h-0">
+          <div
+            class="border-r min-w-0 overflow-y-auto px-6 py-[26px]"
+            style="border-color: rgba(42, 20, 24, 0.1)"
+          >
+            <div class="flex items-end justify-between gap-4 mb-5">
               <div>
-                <label class="fld" for="pg-titulo">Título</label>
-                <input id="pg-titulo" v-model="pageForm.titulo" class="input" data-testid="pagina-titulo" />
+                <div class="font-serif text-[25px] leading-tight" style="color: #2A1418">Seções da página</div>
+                <div class="text-[13px] mt-1 leading-relaxed" style="color: rgba(42, 20, 24, 0.62)">
+                  Arraste para reordenar. Desligue o que a paróquia ainda não quer mostrar.
+                </div>
               </div>
-              <div>
-                <label class="fld" for="pg-slug">Endereço (slug)</label>
-                <input id="pg-slug" v-model="pageForm.slug" class="input" placeholder="sobre" />
-              </div>
-              <div>
-                <label class="fld" for="pg-status">Situação</label>
-                <select id="pg-status" v-model="pageForm.status" class="input">
-                  <option value="rascunho">Rascunho</option>
-                  <option value="publicado">Publicada</option>
-                </select>
-              </div>
-              <label class="flex items-center gap-2 text-sm">
-                <input v-model="pageForm.is_home" type="checkbox" />
-                Usar como página inicial
-              </label>
-              <label class="flex items-center gap-2 text-sm">
-                <input v-model="pageForm.mostrar_no_menu" type="checkbox" />
-                Sugerir no menu
-              </label>
-            </div>
-
-            <div class="card p-5 space-y-3">
-              <h4 class="text-base">Blocos</h4>
-              <ul class="space-y-2">
-                <li v-for="(b, idx) in pageForm.blocks" :key="idx">
-                  <div
-                    class="rounded-xl p-3 flex items-start gap-3 cursor-pointer transition-colors"
-                    :style="idx === selectedBlock
-                      ? 'background: rgba(0,35,78,0.07); border: 1px solid var(--color-primary)'
-                      : 'background: var(--color-surface-2); border: 1px solid transparent'"
-                    :data-testid="`bloco-item-${idx}`"
-                    @click="selectBlock(idx)"
-                  >
-                    <span class="mt-0.5" style="color: var(--color-primary)">
-                      <SiteBlockIcon :tipo="b.tipo" />
-                    </span>
-                    <div class="min-w-0 flex-1">
-                      <p class="text-sm font-semibold leading-tight">{{ blockMeta(b.tipo).label }}</p>
-                      <p class="text-xs truncate mt-0.5" style="color: var(--color-muted)">
-                        {{ blockSummary(b) }}
-                      </p>
+              <div class="relative shrink-0">
+                <button
+                  type="button"
+                  class="rounded-lg px-3.5 py-2.5 text-[12.5px] font-medium whitespace-nowrap"
+                  style="border: 1px dashed rgba(42, 20, 24, 0.24); background: transparent; color: #2A1418"
+                  data-testid="bloco-adicionar"
+                  @click="showSectionPicker = !showSectionPicker"
+                >
+                  + Seção
+                </button>
+                <div
+                  v-if="showSectionPicker"
+                  class="absolute right-0 top-full mt-2 z-20 w-64 max-h-72 overflow-y-auto rounded-[10px] p-2 shadow-lg"
+                  style="background: #FFFDFA; border: 1px solid rgba(42, 20, 24, 0.14)"
+                  data-testid="bloco-picker"
+                >
+                  <template v-for="g in blockGroups" :key="g.grupo">
+                    <div class="text-[10.5px] font-medium tracking-wide uppercase px-2 pt-2 pb-1" style="color: #B4703F">
+                      {{ g.grupo }}
                     </div>
                     <button
+                      v-for="b in g.itens"
+                      :key="b.tipo"
                       type="button"
-                      class="text-xs shrink-0 h-7 w-7 rounded-lg hover:bg-red-50"
-                      style="color: var(--color-danger)"
-                      aria-label="Remover bloco"
-                      :data-testid="`bloco-remover-${idx}`"
-                      @click.stop="removeBlock(idx)"
+                      class="w-full text-left px-2.5 py-2 rounded-lg text-[13px] border-0 cursor-pointer"
+                      style="background: transparent; color: #2A1418"
+                      @click="addBlock(b.tipo)"
                     >
-                      <FontAwesomeIcon :icon="faTrash" />
+                      {{ b.label }}
                     </button>
-                  </div>
-                </li>
-              </ul>
-              <p v-if="!pageForm.blocks.length" class="text-sm" style="color: var(--color-muted)">
-                Página sem blocos. Adicione o primeiro abaixo.
-              </p>
+                  </template>
+                </div>
+              </div>
+            </div>
 
-              <div class="pt-1 flex gap-2">
-                <select v-model="newBlockType" class="input" aria-label="Tipo de bloco">
-                  <optgroup v-for="g in blockGroups" :key="g.grupo" :label="g.grupo">
-                    <option v-for="b in g.itens" :key="b.tipo" :value="b.tipo">{{ b.label }}</option>
-                  </optgroup>
-                </select>
-                <button type="button" class="btn btn-ghost shrink-0" data-testid="bloco-adicionar" @click="addBlock">
-                  <FontAwesomeIcon :icon="faPlus" />
-                </button>
+            <div class="flex flex-col gap-2 mb-2">
+              <div
+                v-for="(b, idx) in pageForm.blocks"
+                :key="`${b.tipo}-${idx}`"
+                class="site-editor-2a__section-card overflow-hidden"
+                :class="{
+                  'is-active': idx === selectedBlock,
+                  'is-dragging': dragFrom === idx,
+                  'is-expanded': idx === selectedBlock,
+                }"
+                :data-testid="`bloco-item-${idx}`"
+                @dragover.prevent
+                @drop.prevent="onDrop(idx)"
+              >
+                <div
+                  class="flex items-center gap-[13px] px-[15px] py-3.5 cursor-pointer"
+                  @click="toggleBlock(idx)"
+                >
+                  <span
+                    class="font-mono text-[13px] cursor-grab select-none shrink-0"
+                    style="color: rgba(42, 20, 24, 0.3)"
+                    draggable="true"
+                    @click.stop
+                    @dragstart="onDragStart(idx)"
+                  >⠿</span>
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2 flex-wrap">
+                      <span class="text-[14px] font-medium" style="color: #2A1418">{{ blockMeta(b.tipo).label }}</span>
+                      <span
+                        v-if="b.visivel === false"
+                        class="text-[10.5px] font-medium tracking-wide uppercase px-[7px] py-[3px] rounded-full"
+                        style="color: #8A2436; background: #F6E9EB"
+                      >rascunho</span>
+                    </div>
+                    <div class="text-[12px] mt-[3px] truncate leading-snug" style="color: rgba(42, 20, 24, 0.62)">
+                      {{ idx === selectedBlock ? `${blockSummary(b)} · editando agora` : blockSummary(b) }}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    class="text-[12.5px] font-medium bg-transparent border-0 cursor-pointer shrink-0"
+                    style="color: #8A2436"
+                    @click.stop="toggleBlock(idx)"
+                  >
+                    {{ idx === selectedBlock ? 'fechar' : 'editar' }}
+                  </button>
+                  <button
+                    type="button"
+                    class="w-[38px] h-[22px] rounded-full flex items-center p-0.5 border-0 cursor-pointer shrink-0"
+                    :style="{
+                      background: b.visivel === false ? 'rgba(42,20,24,0.2)' : '#6B1C2B',
+                      justifyContent: b.visivel === false ? 'flex-start' : 'flex-end',
+                    }"
+                    :aria-label="b.visivel === false ? 'Ativar seção' : 'Desativar seção'"
+                    @click.stop="toggleBlockVisible(idx)"
+                  >
+                    <span class="w-[18px] h-[18px] rounded-full bg-white" />
+                  </button>
+                </div>
+
+                <div
+                  v-if="idx === selectedBlock"
+                  class="px-[15px] pb-4 pt-1"
+                  style="border-top: 1px solid rgba(42, 20, 24, 0.09)"
+                  data-testid="site-editing-panel"
+                  @click.stop
+                >
+                  <div class="flex items-center justify-between gap-2 mb-3">
+                    <span class="text-[12px]" style="color: rgba(42, 20, 24, 0.62)">{{ savedLabel }}</span>
+                  </div>
+                  <SiteBlockEditor
+                    :key="selectedBlock"
+                    :block="b"
+                    :forms="forms"
+                    :comunicados="comunicados"
+                    embedded
+                    @dirty="dirty = true"
+                    @new-comunicado="openNewComFromBlock"
+                    @edit-comunicado="openEditComFromBlock"
+                  />
+                </div>
               </div>
             </div>
           </div>
 
-          <div class="lg:col-span-8 card p-5">
-            <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
-              <div class="inline-flex rounded-lg p-0.5" style="background: var(--color-surface-2)">
+          <!-- Preview sticky -->
+          <aside
+            class="site-editor-2a__preview p-5 flex flex-col gap-3 min-w-0"
+            data-testid="site-editor-preview"
+          >
+            <div class="flex items-center justify-between shrink-0">
+              <span class="text-[11px] font-medium tracking-[0.1em] uppercase" style="color: #B4703F">
+                Pré-visualização
+              </span>
+              <span class="flex gap-[5px]">
                 <button
                   type="button"
-                  class="px-3.5 py-1.5 rounded-md text-xs font-semibold"
-                  :style="pagePane === 'editor'
-                    ? 'background: var(--color-surface); color: var(--color-primary)'
-                    : 'color: var(--color-muted)'"
-                  data-testid="pane-editor"
-                  @click="pagePane = 'editor'"
-                >
-                  Editar bloco
-                </button>
+                  class="text-[11.5px] font-medium px-2.5 py-1 rounded-md"
+                  :style="previewMode === 'desktop'
+                    ? 'color:#4E1220;background:#FFFDFA;border:1px solid rgba(42,20,24,.14)'
+                    : 'color:rgba(42,20,24,.62);border:0;background:transparent'"
+                  data-testid="preview-desktop"
+                  @click="previewMode = 'desktop'"
+                >desktop</button>
                 <button
                   type="button"
-                  class="px-3.5 py-1.5 rounded-md text-xs font-semibold"
-                  :style="pagePane === 'preview'
-                    ? 'background: var(--color-surface); color: var(--color-primary)'
-                    : 'color: var(--color-muted)'"
-                  data-testid="pane-preview"
-                  @click="pagePane = 'preview'"
-                >
-                  Pré-visualizar
-                </button>
-              </div>
-              <p v-if="pagePane === 'editor' && currentBlock" class="text-xs" style="color: var(--color-muted)">
-                Bloco {{ selectedBlock + 1 }} de {{ pageForm.blocks.length }}
-              </p>
+                  class="text-[11.5px] font-medium px-2.5 py-1 rounded-md"
+                  :style="previewMode === 'mobile'
+                    ? 'color:#4E1220;background:#FFFDFA;border:1px solid rgba(42,20,24,.14)'
+                    : 'color:rgba(42,20,24,.62);border:0;background:transparent'"
+                  data-testid="preview-mobile"
+                  @click="previewMode = 'mobile'"
+                >celular</button>
+              </span>
             </div>
-
-            <SitePagePreview
-              v-if="pagePane === 'preview'"
-              :blocks="pageForm.blocks"
-              :settings="settings"
-              :tenant-slug="tenantStore.slug || ''"
-              :page-title="pageForm.titulo"
-            />
-            <SiteBlockEditor
-              v-else-if="currentBlock"
-              :key="selectedBlock"
-              :block="currentBlock"
-              :forms="forms"
-            />
-            <p v-else class="py-12 text-center text-sm" style="color: var(--color-muted)">
-              Selecione ou adicione um bloco para editar.
+            <div
+              class="rounded-[10px] overflow-hidden flex-1 min-h-0 flex flex-col"
+              :class="previewMode === 'mobile' ? 'max-w-[320px] mx-auto w-full' : 'w-full'"
+              style="background: #FFFDFA; border: 1px solid rgba(42, 20, 24, 0.14)"
+            >
+              <div
+                class="h-[26px] shrink-0 flex items-center px-2.5"
+                style="background: #F3EDE6; border-bottom: 1px solid rgba(42, 20, 24, 0.1)"
+              >
+                <span class="font-mono text-[9.5px]" style="color: rgba(42, 20, 24, 0.62)">
+                  eclesias.com.br/site/{{ tenantStore.slug || '…' }}
+                </span>
+              </div>
+              <div class="flex-1 min-h-0 overflow-y-auto overscroll-contain">
+                <SitePagePreview
+                  :blocks="pageForm.blocks"
+                  :settings="settings"
+                  :tenant-slug="tenantStore.slug || ''"
+                  :page-title="pageForm.titulo"
+                  :highlight-index="selectedBlock"
+                  compact
+                  selectable
+                  @select="(i) => selectBlock(i, { fromPreview: true })"
+                />
+              </div>
+            </div>
+            <p class="text-[11.5px] leading-relaxed shrink-0" style="color: rgba(42, 20, 24, 0.62)">
+              Clique em uma seção no preview para editar. Rascunhos só vão ao ar ao publicar.
             </p>
+          </aside>
+        </div>
+
+        <!-- Overlay comunicado (mantém o builder aberto) -->
+        <div
+          v-if="comOverlay && comForm"
+          class="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style="background: rgba(42, 20, 24, 0.45)"
+          data-testid="com-overlay"
+        >
+          <div
+            class="w-full max-w-lg rounded-[11px] p-5 max-h-[90vh] overflow-y-auto"
+            style="background: #FFFDFA; border: 1px solid rgba(42, 20, 24, 0.12)"
+          >
+            <div class="font-serif text-[18px] mb-4" style="color: #2A1418">
+              {{ comForm.id ? 'Editar comunicado' : 'Novo comunicado' }}
+            </div>
+            <div class="space-y-3">
+              <div>
+                <label class="fld">Título</label>
+                <input v-model="comForm.titulo" class="input" required />
+              </div>
+              <div>
+                <label class="fld">Resumo</label>
+                <input v-model="comForm.resumo" class="input" />
+              </div>
+              <div>
+                <label class="fld">Corpo</label>
+                <textarea v-model="comForm.corpo" class="input min-h-28" />
+              </div>
+              <div class="flex flex-wrap gap-4 items-center">
+                <select v-model="comForm.status" class="input max-w-[160px]">
+                  <option value="rascunho">Rascunho</option>
+                  <option value="publicado">Publicado</option>
+                </select>
+                <label class="inline-flex items-center gap-2 text-sm">
+                  <input v-model="comForm.destaque" type="checkbox" />
+                  Destaque
+                </label>
+              </div>
+            </div>
+            <div class="flex gap-2 mt-5">
+              <button type="button" class="btn btn-primary" :disabled="saving" @click="saveCom">
+                {{ saving ? 'Salvando…' : 'Salvar' }}
+              </button>
+              <button type="button" class="btn btn-ghost" @click="closeComOverlay">Cancelar</button>
+            </div>
           </div>
         </div>
       </div>
@@ -1180,6 +1407,7 @@ const setTab = async (t) => {
           </div>
         </div>
       </div>
+    </div>
     </div>
   </div>
 </template>

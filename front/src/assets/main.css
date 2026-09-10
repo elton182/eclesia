@@ -1,31 +1,37 @@
 @import './base.css';
+@import './site-editor.css';
 @import "tailwindcss";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
 @layer base {
   :root {
-    /* Marca Eclésias (logo.png) */
-    --color-primary: #00234E;
-    --color-primary-dark: #001A3A;
-    --color-primary-soft: #0A3A6B;
-    --color-accent: #C5A059;
-    --color-accent-dark: #A8863F;
-    --color-accent-soft: #E8D9B5;
-    --color-bg: #F4F6F9;
-    --color-surface: #FFFFFF;
-    --color-surface-2: #EEF2F7;
-    --color-ink: #1A2332;
-    --color-muted: #6B7A8F;
-    --color-line: #D8DEE8;
-    --color-ok: #3E7C63;
-    --color-danger: #A23A3A;
-    --radius: 16px;
-    --shadow: 0 1px 2px rgba(0, 35, 78, 0.04), 0 8px 24px rgba(0, 35, 78, 0.06);
+    /* Marca vinho litúrgico — ADR-0004 / PLAN-002 */
+    --color-primary: #4E1220;
+    --color-primary-dark: #3A0D18;
+    --color-primary-soft: #6B1C2B;
+    --color-primary-hover: #8A2436;
+    --color-accent: #C88A5E;
+    --color-accent-dark: #B4703F;
+    --color-accent-soft: #F6EDE4;
+    --color-bg: #F7F4EF;
+    --color-bg-deep: #EFEAE3;
+    --color-surface: #FFFDFA;
+    --color-surface-2: #F3EDE6;
+    --color-ink: #2A1418;
+    --color-muted: rgba(42, 20, 24, 0.62);
+    --color-line: rgba(42, 20, 24, 0.12);
+    --color-ok: #2A6B4A;
+    --color-danger: #8A2436;
+    --radius: 12px;
+    --shadow: 0 1px 3px rgba(42, 20, 24, 0.07), 0 4px 16px rgba(42, 20, 24, 0.06);
+    --font-sans: 'Instrument Sans', system-ui, sans-serif;
+    --font-serif: 'Newsreader', Georgia, serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, monospace;
   }
 
   html {
-    font-family: 'Figtree', system-ui, sans-serif;
+    font-family: var(--font-sans);
     scroll-behavior: smooth;
   }
 
@@ -43,13 +49,13 @@
   }
 
   .dark body {
-    background: #0B1220;
-    color: #E8EEF6;
+    background: #1A0C10;
+    color: #F0D8C2;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Fraunces', Georgia, serif;
-    font-weight: 600;
+    font-family: var(--font-serif);
+    font-weight: 500;
   }
 
   button {
@@ -70,18 +76,18 @@
   }
 
   .btn {
-    @apply px-4 py-2.5 font-semibold inline-flex items-center gap-2 transition-all duration-200 focus:outline-none;
-    border-radius: 11px;
+    @apply px-4 py-2.5 font-medium inline-flex items-center gap-2 transition-all duration-200 focus:outline-none;
+    border-radius: 8px;
     font-size: 14px;
   }
 
   .btn-primary {
-    background: var(--color-primary);
-    color: #F7F4EE;
+    background: var(--color-primary-soft);
+    color: #FFFDFA;
   }
 
   .btn-primary:hover {
-    background: var(--color-primary-dark);
+    background: var(--color-primary-hover);
   }
 
   .btn-accent {
@@ -95,13 +101,13 @@
   }
 
   .btn-ghost {
-    background: var(--color-surface-2);
+    background: var(--color-surface);
     color: var(--color-ink);
-    border: 1px solid var(--color-line);
+    border: 1px solid rgba(42, 20, 24, 0.16);
   }
 
   .btn-ghost:hover {
-    background: #e4ebf3;
+    background: var(--color-surface-2);
   }
 
   .btn-danger {
@@ -111,55 +117,67 @@
   .input {
     @apply w-full px-3.5 py-2.5 transition-all duration-200;
     font-size: 14.5px;
-    border: 1px solid var(--color-line);
-    border-radius: 11px;
-    background: var(--color-surface);
+    border: 1px solid rgba(42, 20, 24, 0.16);
+    border-radius: 8px;
+    background: #fff;
     color: var(--color-ink);
   }
 
   .input:focus {
     outline: none;
-    border-color: var(--color-primary);
-    box-shadow: 0 0 0 3px rgba(0, 35, 78, 0.12);
+    border-color: var(--color-primary-soft);
+    box-shadow: 0 0 0 3px rgba(78, 18, 32, 0.12);
   }
 
   .fld {
     display: block;
-    font-size: 12.5px;
-    font-weight: 600;
+    font-size: 11.5px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
     color: var(--color-muted);
-    margin-bottom: 6px;
+    margin-bottom: 7px;
   }
 
   .page-eyebrow {
-    font-size: 12px;
-    letter-spacing: 0.16em;
+    font-size: 11.5px;
+    letter-spacing: 0.1em;
     text-transform: uppercase;
-    color: var(--color-accent);
-    font-weight: 700;
+    color: var(--color-accent-dark);
+    font-weight: 500;
     margin-bottom: 6px;
   }
 
   .badge {
-    @apply px-2 py-1 rounded-full text-xs font-semibold inline-flex items-center gap-1;
+    @apply px-2 py-1 rounded-full text-xs font-medium inline-flex items-center gap-1;
   }
 
   .badge-info {
-    background: rgba(0, 35, 78, 0.08);
-    color: var(--color-primary);
+    background: #F6E9EB;
+    color: var(--color-primary-hover);
   }
 
   .badge-success {
-    @apply bg-green-100 text-green-800;
+    background: #E7F1EA;
+    color: var(--color-ok);
   }
 
   .badge-warning {
-    background: rgba(197, 160, 89, 0.18);
+    background: var(--color-accent-soft);
     color: var(--color-accent-dark);
   }
 
   .badge-danger {
-    @apply bg-red-100 text-red-800;
+    background: #F6E9EB;
+    color: var(--color-danger);
+  }
+
+  .font-serif {
+    font-family: var(--font-serif);
+  }
+
+  .font-mono {
+    font-family: var(--font-mono);
   }
 }
 

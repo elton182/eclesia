@@ -76,6 +76,7 @@ class EccCasalService
                 'email' => $data['email'] ?? null,
                 'telefone' => $data['telefone'] ?? null,
                 'data_nascimento' => $this->parseDate($data['data_nascimento'] ?? null),
+                'sexo' => 'M',
             ]);
 
             $casal->pessoaB->update([
@@ -83,6 +84,7 @@ class EccCasalService
                 'email' => $data['email_conjuge'] ?? null,
                 'telefone' => $data['telefone_conjuge'] ?? null,
                 'data_nascimento' => $this->parseDate($data['data_nascimento_conjuge'] ?? null),
+                'sexo' => 'F',
             ]);
 
             $equipeId = $data['equipe_id'] ?? null;
@@ -104,6 +106,28 @@ class EccCasalService
             $casal->delete();
             $pessoaA->delete();
             $pessoaB->delete();
+        });
+    }
+
+    /**
+     * Troca Ele/Ela (pessoa A ↔ B) e normaliza sexo.
+     */
+    public function swapPessoas(Casal $casal): Casal
+    {
+        return DB::transaction(function () use ($casal) {
+            $aId = $casal->pessoa_a_id;
+            $bId = $casal->pessoa_b_id;
+
+            $casal->update([
+                'pessoa_a_id' => $bId,
+                'pessoa_b_id' => $aId,
+            ]);
+
+            $casal->refresh()->load(['pessoaA', 'pessoaB']);
+            $casal->pessoaA?->update(['sexo' => 'M']);
+            $casal->pessoaB?->update(['sexo' => 'F']);
+
+            return $casal->refresh()->load(['pessoaA', 'pessoaB', 'equipe']);
         });
     }
 
@@ -155,6 +179,7 @@ class EccCasalService
             'email' => $data['email'] ?? null,
             'telefone' => $data['telefone'] ?? null,
             'data_nascimento' => $this->parseDate($data['data_nascimento'] ?? null),
+            'sexo' => 'M',
         ]);
 
         $pessoaB = Pessoa::query()->create([
@@ -163,6 +188,7 @@ class EccCasalService
             'email' => $data['email_conjuge'] ?? null,
             'telefone' => $data['telefone_conjuge'] ?? null,
             'data_nascimento' => $this->parseDate($data['data_nascimento_conjuge'] ?? null),
+            'sexo' => 'F',
         ]);
 
         $equipeId = $data['equipe_id'] ?? null;

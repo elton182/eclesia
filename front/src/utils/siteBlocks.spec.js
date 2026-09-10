@@ -41,6 +41,20 @@ describe('siteBlocks', () => {
     ])
   })
 
+  it('resolveMenuLinks sem menu devolve âncoras do one-pager', () => {
+    const links = resolveMenuLinks([], 'demo')
+    assert.ok(links.some((l) => l.href === '#missas'))
+    assert.ok(links.some((l) => l.label === 'Pastorais'))
+  })
+
+  it('createHomeOnePagerBlocks monta seções na ordem 1g', async () => {
+    const { createHomeOnePagerBlocks, HOME_ONE_PAGER_TYPES } = await import('./siteBlocks.js')
+    const blocks = createHomeOnePagerBlocks()
+    assert.equal(blocks.length, HOME_ONE_PAGER_TYPES.length)
+    assert.equal(blocks[0].tipo, 'hero')
+    assert.equal(blocks[blocks.length - 1].tipo, 'contato_local')
+  })
+
   it('resolveSeo usa fallback', () => {
     assert.deepEqual(resolveSeo(null, 'Paróquia'), {
       title: 'Paróquia',

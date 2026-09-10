@@ -61,6 +61,15 @@ class EccCasalController extends Controller
         return response()->noContent();
     }
 
+    public function swap(string $id): EccCasalResource
+    {
+        abort_unless($this->visibility->userCan('ecc.casais.manage'), 403);
+
+        $casal = $this->casais->find($id);
+
+        return new EccCasalResource($this->casais->swapPessoas($casal));
+    }
+
     public function import(ImportEccCasaisRequest $request): JsonResponse
     {
         $result = $this->casais->import($request->validated('rows'));

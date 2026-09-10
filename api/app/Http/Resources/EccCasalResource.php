@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Resources;
 
+use App\Models\Pessoa;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -17,18 +18,26 @@ class EccCasalResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        [$ele, $ela] = $this->resolveEleEla();
+
         return [
             'id' => $this->id,
             'equipe_id' => $this->ecc_equipe_id,
             'equipe_nome' => $this->equipe?->nome,
+            // Compat: ordem de cadastro (pessoa A / B)
             'nome' => $this->pessoaA?->nome,
             'email' => $this->pessoaA?->email,
             'telefone' => $this->pessoaA?->telefone,
             'data_nascimento' => $this->pessoaA?->data_nascimento?->toDateString(),
+            'sexo' => $this->pessoaA?->sexo,
             'nome_conjuge' => $this->pessoaB?->nome,
             'email_conjuge' => $this->pessoaB?->email,
             'telefone_conjuge' => $this->pessoaB?->telefone,
             'data_nascimento_conjuge' => $this->pessoaB?->data_nascimento?->toDateString(),
+            'sexo_conjuge' => $this->pessoaB?->sexo,
+            // Exibição por papel (Ele / Ela), independente da ordem de cadastro
+            'ele' => $this->personPayload($ele),
+            'ela' => $this->personPayload($ela),
             'endereco' => $this->endereco,
             'bairro' => $this->bairro,
             'cidade' => $this->cidade,
@@ -49,6 +58,45 @@ class EccCasalResource extends JsonResource
             'etapa_3' => $this->etapa_3,
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
+        ];
+    }
+
+    /**
+     * @return array{0: ?Pessoa, 1: ?Pessoa}
+     */
+    private function resolveEleEla(): array
+    {
+        $a = $this->pessoaA;
+        $b = $this->pessoaB;
+        $sexoA = strtoupper((string) ($a?->sexo ?? ''));
+        $sexoB = strtoupper((string) ($b?->sexo ?? ''));
+
+        if ($sexoA === 'M' && $sexoB === 'F') {
+            return [$a, $b];
+        }
+        if ($sexoA === 'F' && $sexoB === 'M') {
+            return [$b, $a];
+        }
+
+        // Sem sexo definido: mantém ordem de cadastro (A = Ele, B = Ela)
+        return [$a, $b];
+    }
+
+    /**
+     * @return array{nome: ?string, email: ?string, telefone: ?string, data_nascimento: ?string, sexo: ?string}|null
+     */
+    private function personPayload(?Pessoa $pessoa): ?array
+    {
+        if ($pessoa === null) {
+            return null;
+        }
+
+        return [
+            'nome' => $pessoa->nome,
+            'email' => $pessoa->email,
+            'telefone' => $pessoa->telefone,
+            'data_nascimento' => $pessoa->data_nascimento?->toDateString(),
+            'sexo' => $pessoa->sexo,
         ];
     }
 }

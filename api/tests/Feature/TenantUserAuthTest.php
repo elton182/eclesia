@@ -96,6 +96,32 @@ class TenantUserAuthTest extends TestCase
         ])->assertForbidden();
     }
 
+    public function test_refresh_renova_access_token(): void
+    {
+        $login = $this->postJson('/api/v1/web/login', [
+            'tenant' => 'paroquia-teste',
+            'email' => 'admin@paroquia-teste.local',
+            'password' => 'password',
+        ])->assertOk();
+
+        $refresh = $login->getCookie('refresh_token', false)?->getValue();
+        $this->assertNotEmpty($refresh);
+
+        $renewed = $this->withHeader('X-Tenant', 'paroquia-teste')
+            ->postJson('/api/v1/web/refresh', ['refresh_token' => $refresh])
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonStructure(['access_token']);
+
+        $this->assertNotSame($login->json('access_token'), $renewed->json('access_token'));
+
+        $this->withHeader('X-Tenant', 'paroquia-teste')
+            ->withHeader('Authorization', 'Bearer '.$renewed->json('access_token'))
+            ->postJson('/api/v1/web/me')
+            ->assertOk()
+            ->assertJsonPath('success', true);
+    }
+
     public function test_login_unknown_tenant(): void
     {
         $this->postJson('/api/v1/web/login', [

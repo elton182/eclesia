@@ -10,6 +10,7 @@ import { innovToast } from '@/plugins/toast'
 import { filterCasais } from '@/utils/eccFilters'
 import { isoToBr } from '@/utils/dateBr'
 import { userHasPermission } from '@/utils/userRoles'
+import { casalEle, casalEla, formFieldsFromEleEla } from '@/utils/casalDisplay'
 import DateInput from '@/components/form/DateInput.vue'
 
 const route = useRoute()
@@ -123,16 +124,37 @@ const openCreate = () => {
 }
 
 const openEdit = (item) => {
+  const pessoas = formFieldsFromEleEla(item)
   form.value = {
     ...emptyForm(),
     ...item,
+    ...pessoas,
     equipe_id: item.equipe_id || '',
-    data_nascimento: isoToBr(item.data_nascimento),
-    data_nascimento_conjuge: isoToBr(item.data_nascimento_conjuge),
+    data_nascimento: isoToBr(pessoas.data_nascimento),
+    data_nascimento_conjuge: isoToBr(pessoas.data_nascimento_conjuge),
     data_casamento: isoToBr(item.data_casamento),
   }
   mode.value = 'form'
 }
+
+const applyEditFromQuery = () => {
+  const editId = route.query.edit ? String(route.query.edit) : ''
+  if (!editId || !casais.value.length) return false
+  const item = casais.value.find((c) => String(c.id) === editId)
+  if (!item) return false
+  openEdit(item)
+  const query = { ...route.query }
+  delete query.edit
+  router.replace({ query })
+  return true
+}
+
+watch(
+  () => [route.query.edit, casais.value.length],
+  () => {
+    applyEditFromQuery()
+  },
+)
 
 const payload = () => ({
   ...form.value,
@@ -161,7 +183,7 @@ const save = async () => {
 }
 
 const remove = async (item) => {
-  if (!confirm(`Remover o casal ${item.nome} & ${item.nome_conjuge}?`)) return
+  if (!confirm(`Remover o casal ${casalEle(item)} & ${casalEla(item)}?`)) return
   try {
     await api.delete(`/ecc/casais/${item.id}`)
     await load()
@@ -205,27 +227,28 @@ const remove = async (item) => {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   applyEquipeFromQuery()
-  load()
+  await load()
+  applyEditFromQuery()
 })
 </script>
 
 <template>
-  <div data-testid="ecc-casais-page">
-    <div class="mb-6">
+  <div class="p-6 md:p-[30px] w-full" data-testid="ecc-casais-page">
+    <div class="mb-6 md:mb-8">
       <p class="page-eyebrow">ECC</p>
-      <h2 class="text-3xl" style="color: var(--color-primary)">Casais</h2>
-      <p class="mt-1 text-[14.5px]" style="color: var(--color-muted)">
+      <h2 class="font-serif text-[27px] leading-tight mt-1" style="color: #2A1418">Casais</h2>
+      <p class="mt-2 text-[13.5px] leading-relaxed" style="color: rgba(42, 20, 24, 0.62)">
         Cadastro de casais e vínculo com equipe. Importe a planilha Excel do modelo atual.
       </p>
     </div>
 
-    <div v-if="mode === 'list'" class="space-y-4">
-      <div class="toolbar flex flex-wrap gap-3 items-center">
+    <div v-if="mode === 'list'" class="space-y-5 w-full">
+      <div class="flex flex-wrap gap-3 items-center w-full">
         <button
           v-if="canManageCasais"
-          class="btn btn-primary"
+          class="btn btn-primary shrink-0"
           data-testid="casais-novo"
           @click="openCreate"
         >
@@ -233,7 +256,7 @@ onMounted(() => {
         </button>
         <button
           v-if="canManageCasais"
-          class="btn btn-accent"
+          class="btn btn-accent shrink-0"
           :disabled="importing"
           data-testid="casais-import-btn"
           @click="fileInput?.click()"
@@ -252,14 +275,14 @@ onMounted(() => {
         <input
           v-model="search"
           type="search"
-          class="input max-w-xs flex-1 min-w-[180px]"
+          class="input flex-1 min-w-[200px]"
           placeholder="Pesquisar nome, equipe, cidade…"
           data-testid="casais-search"
           aria-label="Pesquisar casais"
         />
         <select
           v-model="filterEquipe"
-          class="input max-w-xs"
+          class="input w-full sm:w-auto sm:min-w-[220px] shrink-0"
           data-testid="casais-filtro-equipe"
           aria-label="Filtrar por equipe"
         >
@@ -281,43 +304,48 @@ onMounted(() => {
         </ul>
       </div>
 
-      <div class="card overflow-hidden">
-        <div v-if="loading" class="p-8 text-center" style="color: var(--color-muted)">Carregando…</div>
-        <div v-else-if="!filtered.length" class="p-8 text-center" style="color: var(--color-muted)">
+      <div
+        class="w-full overflow-hidden rounded-[11px]"
+        style="background: #FFFDFA; border: 1px solid rgba(42, 20, 24, 0.1)"
+      >
+        <div v-if="loading" class="p-10 text-center" style="color: rgba(42, 20, 24, 0.5)">Carregando…</div>
+        <div v-else-if="!filtered.length" class="p-10 text-center" style="color: rgba(42, 20, 24, 0.5)">
           {{ search || filterEquipe ? 'Nenhum casal encontrado.' : 'Nenhum casal. Cadastre ou importe a planilha.' }}
         </div>
-        <div v-else class="divide-y" style="border-color: var(--color-line)">
+        <div v-else>
           <div
             v-for="casal in filtered"
             :key="casal.id"
-            class="flex items-center gap-4 px-5 py-4"
+            class="flex items-center gap-5 px-5 md:px-6 py-5 w-full"
+            style="border-top: 1px solid rgba(42, 20, 24, 0.07)"
           >
-            <div class="flex -space-x-2">
+            <div class="flex -space-x-2 shrink-0">
               <div
-                class="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white border-2 border-white"
-                style="background: var(--color-primary)"
+                class="w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold text-white border-2 border-white"
+                style="background: #4E1220"
               >
-                {{ (casal.nome || '?').charAt(0) }}
+                {{ (casalEle(casal) || '?').charAt(0) }}
               </div>
               <div
-                class="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white border-2 border-white"
-                style="background: var(--color-accent)"
+                class="w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold border-2 border-white"
+                style="background: #C88A5E; color: #4E1220"
               >
-                {{ (casal.nome_conjuge || '?').charAt(0) }}
+                {{ (casalEla(casal) || '?').charAt(0) }}
               </div>
             </div>
             <div class="flex-1 min-w-0">
-              <div class="font-semibold truncate" style="color: var(--color-ink)">
-                {{ casal.nome }} & {{ casal.nome_conjuge }}
+              <div class="font-medium text-[15px] truncate" style="color: #2A1418">
+                {{ casalEle(casal) }} & {{ casalEla(casal) }}
               </div>
-              <div class="text-sm" style="color: var(--color-muted)">
+              <div class="text-[13px] mt-1" style="color: rgba(42, 20, 24, 0.62)">
                 {{ casal.equipe_nome || 'Sem equipe' }}
                 <span v-if="casal.cidade"> · {{ casal.cidade }}/{{ casal.uf }}</span>
                 <span v-if="casal.piloto" class="badge badge-warning ml-2">Piloto</span>
-                <span v-if="casal.ecc_origem" class="ml-2">· ECC {{ casal.ecc_origem }}</span>
+                <span v-if="casal.ecc_origem" class="ml-1">· ECC {{ casal.ecc_origem }}</span>
               </div>
             </div>
-            <div v-if="canManageCasais" class="flex gap-2">
+            <div v-if="canManageCasais" class="flex gap-2 shrink-0">
+              <button class="btn btn-ghost" data-testid="casais-abrir" @click="$router.push(`/ecc/casais/${casal.id}`)">Abrir</button>
               <button class="btn btn-ghost" data-testid="casais-editar" @click="openEdit(casal)">Editar</button>
               <button class="btn btn-ghost text-red-700" data-testid="casais-excluir" @click="remove(casal)">Excluir</button>
             </div>
@@ -338,38 +366,38 @@ onMounted(() => {
         </div>
 
         <div>
-          <label class="fld">Nome</label>
+          <label class="fld">Ele (nome)</label>
           <input v-model="form.nome" class="input" required />
         </div>
         <div>
-          <label class="fld">Nome cônjuge</label>
+          <label class="fld">Ela (nome)</label>
           <input v-model="form.nome_conjuge" class="input" required />
         </div>
         <div>
-          <label class="fld">E-mail</label>
+          <label class="fld">E-mail (Ele)</label>
           <input v-model="form.email" type="email" class="input" />
         </div>
         <div>
-          <label class="fld">E-mail cônjuge</label>
+          <label class="fld">E-mail (Ela)</label>
           <input v-model="form.email_conjuge" type="email" class="input" />
         </div>
         <div>
-          <label class="fld">Telefone</label>
+          <label class="fld">Telefone (Ele)</label>
           <input v-model="form.telefone" class="input" />
         </div>
         <div>
-          <label class="fld">Telefone cônjuge</label>
+          <label class="fld">Telefone (Ela)</label>
           <input v-model="form.telefone_conjuge" class="input" />
         </div>
         <DateInput
           v-model="form.data_nascimento"
           name="data_nascimento"
-          label="Nascimento"
+          label="Nascimento (Ele)"
         />
         <DateInput
           v-model="form.data_nascimento_conjuge"
           name="data_nascimento_conjuge"
-          label="Nascimento cônjuge"
+          label="Nascimento (Ela)"
         />
         <div class="md:col-span-2">
           <label class="fld">Endereço</label>

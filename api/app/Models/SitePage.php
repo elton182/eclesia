@@ -25,6 +25,11 @@ class SitePage extends Model
         'pastorais_list',
         'form',
         'html',
+        'missas_horarios',
+        'sobre_paroquia',
+        'agenda_eventos',
+        'equipe_clero',
+        'contato_local',
     ];
 
     protected $table = 'site_pages';

@@ -16,6 +16,8 @@ export function filterCasais({ casais, search, equipeId }) {
     const haystack = [
       c.nome,
       c.nome_conjuge,
+      c.ele?.nome,
+      c.ela?.nome,
       c.equipe_nome,
       c.cidade,
       c.bairro,

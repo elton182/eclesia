@@ -17,7 +17,7 @@ const equipes = ref([])
 const search = ref('')
 const loading = ref(false)
 const mode = ref('list')
-const form = ref({ id: null, nome: '', cor: '#00234E' })
+const form = ref({ id: null, nome: '', cor: '#6B1C2B' })
 const saving = ref(false)
 
 const canManageEquipes = computed(() =>
@@ -51,12 +51,12 @@ const load = async () => {
 }
 
 const openCreate = () => {
-  form.value = { id: null, nome: '', cor: '#00234E' }
+  form.value = { id: null, nome: '', cor: '#6B1C2B' }
   mode.value = 'form'
 }
 
 const openEdit = (item) => {
-  form.value = { id: item.id, nome: item.nome, cor: item.cor || '#00234E' }
+  form.value = { id: item.id, nome: item.nome, cor: item.cor || '#6B1C2B' }
   mode.value = 'form'
 }
 
@@ -102,108 +102,138 @@ onMounted(load)
 </script>
 
 <template>
-  <div data-testid="ecc-equipes-page">
-    <div class="mb-6">
-      <p class="page-eyebrow">ECC</p>
-      <h2 class="text-3xl" style="color: var(--color-primary)">Equipes</h2>
-      <p class="mt-1 text-[14.5px]" style="color: var(--color-muted)">
-        Equipes do movimento (ex.: EQUIPE A) às quais os casais pertencem.
-      </p>
-    </div>
+  <div class="p-6 md:p-[30px]" data-testid="ecc-equipes-page">
+    <div v-if="mode === 'list'">
+      <div class="flex items-end justify-between gap-5 mb-[22px] flex-wrap">
+        <div>
+          <h1 class="font-serif text-[27px] leading-tight" style="color: #2A1418">Equipes</h1>
+          <p class="text-[13.5px] leading-relaxed mt-1" style="color: rgba(42, 20, 24, 0.62)">
+            Grupos aos quais os casais pertencem no movimento.
+          </p>
+        </div>
+        <div class="flex gap-2">
+          <button
+            v-if="canManageEquipes"
+            type="button"
+            class="rounded-lg px-4 py-2.5 text-[13px] font-medium border-0"
+            style="background: #6B1C2B; color: #FFFDFA"
+            data-testid="equipes-nova"
+            @click="openCreate"
+          >
+            Nova equipe
+          </button>
+        </div>
+      </div>
 
-    <div v-if="mode === 'list'" class="space-y-4">
-      <div class="flex flex-wrap gap-3 items-center">
-        <button
-          v-if="canManageEquipes"
-          class="btn btn-primary"
-          data-testid="equipes-nova"
-          @click="openCreate"
-        >
-          Nova equipe
-        </button>
+      <div class="flex gap-2.5 mb-[18px] flex-wrap">
         <input
           v-model="search"
           type="search"
-          class="input max-w-sm"
-          placeholder="Pesquisar equipe…"
+          class="flex-1 min-w-[220px] rounded-lg px-3.5 py-2.5 text-[13.5px] outline-none"
+          style="border: 1px solid rgba(42, 20, 24, 0.14); background: #fff; color: #2A1418"
+          placeholder="Buscar equipe ou casal…"
           data-testid="equipes-search"
           aria-label="Pesquisar equipe"
-        />
+        >
       </div>
 
-      <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <div v-if="loading" class="card p-6" style="color: var(--color-muted)">Carregando…</div>
+      <div
+        class="rounded-[11px] overflow-hidden"
+        style="background: #FFFDFA; border: 1px solid rgba(42, 20, 24, 0.1)"
+      >
+        <div
+          class="hidden md:grid gap-3.5 px-[18px] py-3 text-[11px] font-medium tracking-wide uppercase"
+          style="
+            grid-template-columns: 1.6fr 0.9fr 1.1fr 88px;
+            background: #F3EDE6;
+            color: rgba(42, 20, 24, 0.62);
+          "
+        >
+          <span>Equipe</span>
+          <span>Casais</span>
+          <span>Coordenação</span>
+          <span />
+        </div>
+
+        <div v-if="loading" class="px-[18px] py-8" style="color: rgba(42, 20, 24, 0.5)">Carregando…</div>
         <div
           v-else-if="!filteredEquipes.length"
-          class="card p-6 sm:col-span-2 lg:col-span-3 text-center"
-          style="color: var(--color-muted)"
+          class="px-[18px] py-8 text-center"
+          style="color: rgba(42, 20, 24, 0.5)"
         >
           {{ search ? 'Nenhuma equipe encontrada.' : 'Nenhuma equipe cadastrada.' }}
         </div>
+
         <div
           v-for="equipe in filteredEquipes"
           :key="equipe.id"
-          class="card overflow-hidden"
+          class="grid gap-3.5 px-[18px] py-4 items-center"
+          style="
+            grid-template-columns: 1.6fr 0.9fr 1.1fr 88px;
+            border-top: 1px solid rgba(42, 20, 24, 0.07);
+          "
         >
-          <div class="h-1.5" :style="{ background: equipe.cor || 'var(--color-accent)' }" />
-          <div class="p-5">
-            <h3 class="text-xl" style="color: var(--color-ink)">{{ equipe.nome }}</h3>
-            <button
-              type="button"
-              class="mt-2 text-left text-sm w-full group"
-              style="color: var(--color-muted)"
-              data-testid="equipe-ver-casais-count"
-              :aria-label="`Ver casais da equipe ${equipe.nome}`"
-              @click="verCasais(equipe)"
+          <div class="flex items-center gap-2.5 min-w-0">
+            <div
+              class="w-[30px] h-[30px] rounded-md flex items-center justify-center font-serif text-[13px] font-medium shrink-0"
+              :style="{ background: '#F3EDE6', color: equipe.cor || '#6B1C2B' }"
             >
-              <strong
-                class="text-2xl group-hover:underline"
-                style="color: var(--color-primary); font-family: Fraunces, serif"
-              >
-                {{ equipe.casais_count ?? 0 }}
-              </strong>
-              casais
-            </button>
-            <div class="mt-4 flex flex-wrap gap-2">
-              <button
-                class="btn btn-primary"
-                data-testid="equipe-ver-casais"
-                @click="verCasais(equipe)"
-              >
-                Ver casais
-              </button>
-              <button
-                v-if="canManageEquipes"
-                class="btn btn-ghost"
-                data-testid="equipe-editar"
-                @click="openEdit(equipe)"
-              >
-                Editar
-              </button>
-              <button
-                v-if="canManageEquipes"
-                class="btn btn-ghost text-red-700"
-                data-testid="equipe-excluir"
-                @click="remove(equipe)"
-              >
-                Excluir
-              </button>
+              {{ (equipe.nome || '?')[0] }}
+            </div>
+            <div class="min-w-0">
+              <div class="text-[13.5px] font-medium truncate" style="color: #2A1418">{{ equipe.nome }}</div>
             </div>
           </div>
+          <div class="text-[13px]" style="color: rgba(42, 20, 24, 0.7)">
+            {{ equipe.casais_count ?? 0 }} casais
+          </div>
+          <div class="text-[13px] truncate" style="color: rgba(42, 20, 24, 0.7)">—</div>
+          <div class="flex gap-3 justify-end text-[12.5px] font-medium">
+            <button
+              type="button"
+              class="bg-transparent border-0 cursor-pointer p-0"
+              style="color: #8A2436"
+              data-testid="equipe-ver-casais"
+              @click="verCasais(equipe)"
+            >
+              abrir
+            </button>
+            <button
+              v-if="canManageEquipes"
+              type="button"
+              class="bg-transparent border-0 cursor-pointer p-0"
+              style="color: rgba(42, 20, 24, 0.62)"
+              data-testid="equipe-editar"
+              @click="openEdit(equipe)"
+            >
+              ···
+            </button>
+          </div>
+        </div>
+
+        <div
+          class="flex items-center justify-between px-[18px] py-3 text-[12.5px]"
+          style="border-top: 1px solid rgba(42, 20, 24, 0.07); color: rgba(42, 20, 24, 0.62)"
+        >
+          <span>Mostrando {{ filteredEquipes.length }} de {{ equipes.length }} equipes</span>
         </div>
       </div>
     </div>
 
-    <div v-else class="card p-6 max-w-md">
-      <h3 class="text-xl mb-4">{{ form.id ? 'Editar equipe' : 'Nova equipe' }}</h3>
+    <div
+      v-else
+      class="rounded-[11px] p-6 max-w-md"
+      style="background: #FFFDFA; border: 1px solid rgba(42, 20, 24, 0.1)"
+    >
+      <h3 class="font-serif text-xl mb-4">{{ form.id ? 'Editar equipe' : 'Nova equipe' }}</h3>
       <form class="space-y-4" @submit.prevent="save">
         <div>
           <label class="fld" for="eq-nome">Nome</label>
-          <input id="eq-nome" v-model="form.nome" class="input" required />
+          <input id="eq-nome" v-model="form.nome" class="input" required>
         </div>
         <div>
           <label class="fld" for="eq-cor">Cor</label>
-          <input id="eq-cor" v-model="form.cor" type="color" class="h-10 w-20" />
+          <input id="eq-cor" v-model="form.cor" type="color" class="h-10 w-20">
         </div>
         <div class="flex gap-2">
           <button type="submit" class="btn btn-primary" :disabled="saving">Salvar</button>

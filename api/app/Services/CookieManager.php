@@ -12,8 +12,8 @@ class CookieManager
     public const REFRESH_TOKEN_COOKIE = 'refresh_token';
 
     // Tempos de expiração em minutos
-    public const ACCESS_TOKEN_EXPIRY = 10; // 10 minutos
-    public const REFRESH_TOKEN_EXPIRY = 1440; // 1 dia (24 horas)
+    public const ACCESS_TOKEN_EXPIRY = 480; // 8 horas (SPA guarda Bearer; sem refresh frequente)
+    public const REFRESH_TOKEN_EXPIRY = 10080; // 7 dias
 
     /**
      * Cria um cookie de token com as configurações padrão de segurança

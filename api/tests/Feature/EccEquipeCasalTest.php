@@ -104,11 +104,64 @@ class EccEquipeCasalTest extends TestCase
 
         $this->assertSame('João Silva', $casal['nome']);
         $this->assertSame('Maria Silva', $casal['nome_conjuge']);
+        $this->assertSame('João Silva', $casal['ele']['nome']);
+        $this->assertSame('Maria Silva', $casal['ela']['nome']);
+        $this->assertSame('M', $casal['sexo']);
+        $this->assertSame('F', $casal['sexo_conjuge']);
         $this->assertSame('EQUIPE A', $casal['equipe_nome']);
 
         $this->tenantJson('GET', '/api/v1/ecc/casais')
             ->assertOk()
             ->assertJsonCount(1, 'data');
+    }
+
+    public function test_swap_ele_ela_corrige_ordem_invertida(): void
+    {
+        // Cadastro com esposa no campo Ele (ordem invertida na planilha/formulário)
+        $casal = $this->tenantJson('POST', '/api/v1/ecc/casais', [
+            'nome' => 'Maria Invertida',
+            'email' => 'maria@example.com',
+            'nome_conjuge' => 'João Invertido',
+            'email_conjuge' => 'joao@example.com',
+        ])->assertCreated()->json('data');
+
+        $this->assertSame('Maria Invertida', $casal['ele']['nome']);
+        $this->assertSame('João Invertido', $casal['ela']['nome']);
+
+        $depois = $this->tenantJson('POST', '/api/v1/ecc/casais/'.$casal['id'].'/swap')
+            ->assertOk()
+            ->json('data');
+
+        $this->assertSame('João Invertido', $depois['ele']['nome']);
+        $this->assertSame('Maria Invertida', $depois['ela']['nome']);
+        $this->assertSame('M', $depois['sexo']);
+        $this->assertSame('F', $depois['sexo_conjuge']);
+        $this->assertSame('João Invertido', $depois['nome']);
+        $this->assertSame('Maria Invertida', $depois['nome_conjuge']);
+    }
+
+    public function test_ele_ela_respeitam_sexo_mesmo_com_ordem_a_b_invertida(): void
+    {
+        $casal = $this->tenantJson('POST', '/api/v1/ecc/casais', [
+            'nome' => 'Maria',
+            'nome_conjuge' => 'João',
+        ])->assertCreated()->json('data');
+
+        $this->tenant->run(function () use ($casal): void {
+            $model = Casal::query()->with(['pessoaA', 'pessoaB'])->findOrFail($casal['id']);
+            $model->pessoaA->update(['sexo' => 'F']);
+            $model->pessoaB->update(['sexo' => 'M']);
+        });
+
+        $data = $this->tenantJson('GET', '/api/v1/ecc/casais/'.$casal['id'])
+            ->assertOk()
+            ->json('data');
+
+        $this->assertSame('João', $data['ele']['nome']);
+        $this->assertSame('Maria', $data['ela']['nome']);
+        // Campos legados continuam na ordem A/B de cadastro
+        $this->assertSame('Maria', $data['nome']);
+        $this->assertSame('João', $data['nome_conjuge']);
     }
 
     public function test_import_casais_from_spreadsheet_rows(): void

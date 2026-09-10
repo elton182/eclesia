@@ -180,15 +180,16 @@ Protótipo de referência: `prototipo/ecc-gestao-prototipo.html`.
 
 ## Identidade visual
 
-**Shell / plataforma (logo.png):** marinho `#00234E` + dourado `#C5A059` + fundo `#F4F6F9`. Sidebar marinho, acento dourado, tipografia Figtree + Fraunces.
+**Marca (canvas PLAN-002 / ADR-0004):** bordô profundo `#4E1220` (autoridade), ações `#6B1C2B` / `#8A2436`, cobre `#C88A5E` / `#B4703F` (acentos), superfícies `#F7F4EF` / `#FFFDFA`, ink `#2A1418`. Tipografia: Instrument Sans (UI), Newsreader (títulos), JetBrains Mono (slugs/endereços).
 
-**Módulo ECC (protótipo):** bordô/vinho `#7A2231` + dourado litúrgico `#B0812F` pode coexistir depois como tema do módulo; nesta fase o shell usa as cores da logo.
+**Navegação:** home = launcher de módulos; sidebar só dentro do módulo (ECC, Site). Ver [ADR-0004](../architecture/ADR-0004-shell-launcher-marca-vinho.md).
 
-- Avatar de casal: **dois discos sobrepostos** (marinho + dourado no shell atual).
-- Cartões com sombra suave e cantos arredondados.
+- Avatar: iniciais em círculo cobre/vinho; casal pode usar monograma.
+- Cartões com sombra suave e cantos ~8–12px.
+- Referência visual: `prototipo/eclesias-novo-design.html`.
 - Roadmap: tema por tenant.
 
-Aplicar **dentro** do design system do `front/` existente.
+Aplicar **dentro** do design system do `front/` existente (tokens em `main.css`).
 
 ---
 

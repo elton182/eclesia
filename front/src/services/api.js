@@ -16,6 +16,8 @@ const api = axios.create({
 api.defaults.withCredentials = true
 api.defaults.withXSRFToken = true
 
+let refreshPromise = null
+
 api.interceptors.request.use(
   (config) => {
     let tenantSlug = ''
@@ -39,7 +41,12 @@ api.interceptors.request.use(
       delete config.headers['X-Igreja']
     }
 
-    // Token do tenant tem prioridade quando há X-Tenant (evita Bearer de super-admin)
+    // Refresh não deve reenviar o Bearer expirado
+    if (config.__skipAuth) {
+      delete config.headers.Authorization
+      return config
+    }
+
     const tenantToken = localStorage.getItem(TENANT_TOKEN_KEY)
     const adminToken = localStorage.getItem(ADMIN_TOKEN_KEY)
 
@@ -48,7 +55,6 @@ api.interceptors.request.use(
     } else if (adminToken && !tenantSlug) {
       config.headers.Authorization = `Bearer ${adminToken}`
     } else if (adminToken && !tenantToken) {
-      // ECC ainda usa super-admin + X-Tenant
       config.headers.Authorization = `Bearer ${adminToken}`
     } else {
       delete config.headers.Authorization
@@ -57,6 +63,54 @@ api.interceptors.request.use(
     return config
   },
   (error) => Promise.reject(error),
+)
+
+async function refreshTenantAccessToken() {
+  if (!refreshPromise) {
+    refreshPromise = api
+      .post('/web/refresh', {}, { __skipAuth: true })
+      .then((res) => {
+        const token = res.data?.access_token
+        if (!token) throw new Error('refresh sem token')
+        setTenantToken(token)
+        return token
+      })
+      .finally(() => {
+        refreshPromise = null
+      })
+  }
+  return refreshPromise
+}
+
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const config = error.config
+    const status = error.response?.status
+    const isTenant = !!(config?.headers?.['X-Tenant'] || config?.headers?.['x-tenant'])
+    const hasTenantToken = !!localStorage.getItem(TENANT_TOKEN_KEY)
+
+    if (
+      status === 401 &&
+      config &&
+      !config.__isRetry &&
+      !config.__skipAuth &&
+      isTenant &&
+      hasTenantToken
+    ) {
+      try {
+        const token = await refreshTenantAccessToken()
+        config.__isRetry = true
+        config.headers = config.headers || {}
+        config.headers.Authorization = `Bearer ${token}`
+        return api(config)
+      } catch {
+        clearTenantToken()
+      }
+    }
+
+    return Promise.reject(error)
+  },
 )
 
 export const setAuthToken = (token) => {

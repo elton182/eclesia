@@ -34,7 +34,11 @@ const handleLogin = async () => {
 </script>
 
 <template>
-  <div class="card p-8 space-y-6" data-testid="login-card">
+  <div
+    class="min-h-screen flex items-center justify-center p-4"
+    style="background: var(--color-bg)"
+  >
+  <div class="card p-8 space-y-6 w-full max-w-md" data-testid="login-card">
     <div class="text-center space-y-3">
       <img :src="logoUrl" alt="Eclésia" class="mx-auto h-28 w-auto object-contain" />
       <p class="text-sm" style="color: var(--color-muted)">
@@ -100,5 +104,6 @@ const handleLogin = async () => {
     <p class="text-center text-xs" style="color: var(--color-muted)">
       <router-link to="/entrar" class="underline">Voltar ao login da organização</router-link>
     </p>
+  </div>
   </div>
 </template>

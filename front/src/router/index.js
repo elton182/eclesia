@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { h } from 'vue'
 import { useAuthAdminStore } from '../stores/authAdmin'
 import { useAuthStore } from '../stores/auth'
 import { useTenantStore } from '../stores/tenant'
@@ -11,14 +12,31 @@ import UsersView from '../views/UsersView.vue'
 import IgrejasView from '../views/IgrejasView.vue'
 import EccEquipesView from '../views/EccEquipesView.vue'
 import EccCasaisView from '../views/EccCasaisView.vue'
+import EccCasalDetailView from '../views/EccCasalDetailView.vue'
 import SiteAdminView from '../views/SiteAdminView.vue'
 import PublicSiteView from '../views/site/PublicSiteView.vue'
 import AdminLayout from '../layouts/AdminLayout.vue'
 import AuthLayout from '../layouts/AuthLayout.vue'
 import PublicLayout from '../layouts/PublicLayout.vue'
+import LauncherLayout from '../layouts/LauncherLayout.vue'
+import ModuleLayout from '../layouts/ModuleLayout.vue'
 
 export const LOGIN_TENANT_PATH = '/entrar'
 export const HOME_PATH = '/inicio'
+
+const ModuleLayoutEccWrapper = {
+  name: 'ModuleLayoutEcc',
+  setup() {
+    return () => h(ModuleLayout, { moduleKey: 'ecc' })
+  },
+}
+
+const ModuleLayoutSiteWrapper = {
+  name: 'ModuleLayoutSite',
+  setup() {
+    return () => h(ModuleLayout, { moduleKey: 'site' })
+  },
+}
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -80,7 +98,7 @@ const router = createRouter({
     },
     {
       path: '/',
-      component: AdminLayout,
+      component: LauncherLayout,
       meta: { requiresAuthTenantOrAdmin: true },
       children: [
         {
@@ -88,6 +106,13 @@ const router = createRouter({
           name: 'inicio',
           component: WelcomeView,
         },
+      ],
+    },
+    {
+      path: '/',
+      component: AdminLayout,
+      meta: { requiresAuthTenantOrAdmin: true },
+      children: [
         {
           path: 'igrejas',
           name: 'igrejas',
@@ -98,6 +123,13 @@ const router = createRouter({
           name: 'usuarios',
           component: UsersView,
         },
+      ],
+    },
+    {
+      path: '/',
+      component: ModuleLayoutSiteWrapper,
+      meta: { requiresAuthTenantOrAdmin: true },
+      children: [
         {
           path: 'site',
           name: 'site-admin',
@@ -107,13 +139,18 @@ const router = createRouter({
     },
     {
       path: '/',
-      component: AdminLayout,
+      component: ModuleLayoutEccWrapper,
       meta: { requiresAuthTenantOrAdmin: true },
       children: [
         {
           path: 'ecc/equipes',
           name: 'ecc-equipes',
           component: EccEquipesView,
+        },
+        {
+          path: 'ecc/casais/:id',
+          name: 'ecc-casal-detail',
+          component: EccCasalDetailView,
         },
         {
           path: 'ecc/casais',
@@ -143,7 +180,6 @@ router.beforeEach(async (to, from, next) => {
   }
 
   if (to.matched.some((r) => r.meta.requiresAuthTenantOrAdmin)) {
-    // Preferir sessão de usuário do tenant quando houver token
     const hasTenantSession =
       !!localStorage.getItem('tenant_token') && !!tenantStore.slug
 

@@ -34,6 +34,7 @@ class Pessoa extends Model
         'email',
         'telefone',
         'data_nascimento',
+        'sexo',
     ];
 
     /**

@@ -15,7 +15,11 @@ class WebAuthService
     ) {
     }
 
-    public function generateAccessTokens(User $user, int $accessExpiry = 10, int $refreshExpiry = 1440): array
+    public function generateAccessTokens(
+        User $user,
+        int $accessExpiry = CookieManager::ACCESS_TOKEN_EXPIRY,
+        int $refreshExpiry = CookieManager::REFRESH_TOKEN_EXPIRY
+    ): array
     {
         $this->authTokenService->revokeTokensForLogin($user, AuthTokenService::CHANNEL_WEB);
 

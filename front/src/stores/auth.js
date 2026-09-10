@@ -46,8 +46,11 @@ export const useAuthStore = defineStore('auth', () => {
       }
       clearAuth()
       return false
-    } catch {
-      clearAuth()
+    } catch (e) {
+      // api.js já tenta /web/refresh no 401; se ainda falhar, encerra
+      if (e?.response?.status === 401) {
+        clearAuth()
+      }
       return false
     }
   }

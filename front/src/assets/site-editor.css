@@ -1,0 +1,70 @@
+/* Editor Site 2a — PLAN-002 / canvas eclesias-novo-design */
+
+.site-editor-2a {
+  min-height: 100%;
+  background: #f7f4ef;
+}
+
+.site-editor-2a__top {
+  height: 60px;
+  background: #fffdfa;
+  border-bottom: 1px solid rgba(42, 20, 24, 0.1);
+}
+
+.site-editor-2a__body {
+  display: grid;
+  /* Coluna de seções enxuta; preview ocupa o restante */
+  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+  height: calc(100vh - 60px);
+  max-height: calc(100vh - 60px);
+  min-height: 0;
+  overflow: hidden;
+}
+
+@media (max-width: 767px) {
+  .site-editor-2a__body {
+    grid-template-columns: 1fr;
+  }
+}
+
+.site-editor-2a__preview {
+  background: #efeae3;
+  position: sticky;
+  top: 0;
+  height: calc(100vh - 60px);
+  overflow: hidden;
+  min-height: 0;
+}
+
+@media (max-width: 767px) {
+  .site-editor-2a__preview {
+    position: relative;
+    height: auto;
+    min-height: 50vh;
+  }
+}
+
+.site-editor-2a__section-card {
+  background: #fffdfa;
+  border: 1px solid rgba(42, 20, 24, 0.11);
+  border-radius: 10px;
+  min-height: 44px;
+  transition: border-color 0.15s ease;
+}
+
+.site-editor-2a__section-card:hover {
+  border-color: rgba(42, 20, 24, 0.22);
+}
+
+.site-editor-2a__section-card.is-active {
+  border-color: #8a2436;
+}
+
+.site-editor-2a__section-card.is-expanded {
+  border-color: #8a2436;
+  box-shadow: 0 0 0 1px rgba(138, 36, 54, 0.12);
+}
+
+.site-editor-2a__section-card.is-dragging {
+  opacity: 0.55;
+}

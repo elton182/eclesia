@@ -147,7 +147,7 @@ components:
           type: string
         tipo:
           type: string
-          enum: [hero, banner, richtext, igrejas_list, comunicados_list, pastorais_list, form, html]
+          enum: [hero, banner, richtext, igrejas_list, comunicados_list, pastorais_list, form, html, missas_horarios, sobre_paroquia, agenda_eventos, equipe_clero, contato_local]
         ordem:
           type: integer
         visivel:
@@ -370,6 +370,7 @@ components:
           nullable: true
         nome:
           type: string
+          description: Pessoa A (ordem de cadastro); preferir ele/ela para exibição
         email:
           type: string
           nullable: true
@@ -379,8 +380,13 @@ components:
         data_nascimento:
           type: string
           nullable: true
+        sexo:
+          type: string
+          nullable: true
+          enum: [M, F]
         nome_conjuge:
           type: string
+          description: Pessoa B (ordem de cadastro); preferir ele/ela para exibição
         email_conjuge:
           type: string
           nullable: true
@@ -390,6 +396,50 @@ components:
         data_nascimento_conjuge:
           type: string
           nullable: true
+        sexo_conjuge:
+          type: string
+          nullable: true
+          enum: [M, F]
+        ele:
+          type: object
+          nullable: true
+          description: Cônjuge masculino (por sexo; fallback = pessoa A)
+          properties:
+            nome:
+              type: string
+              nullable: true
+            email:
+              type: string
+              nullable: true
+            telefone:
+              type: string
+              nullable: true
+            data_nascimento:
+              type: string
+              nullable: true
+            sexo:
+              type: string
+              nullable: true
+        ela:
+          type: object
+          nullable: true
+          description: Cônjuge feminino (por sexo; fallback = pessoa B)
+          properties:
+            nome:
+              type: string
+              nullable: true
+            email:
+              type: string
+              nullable: true
+            telefone:
+              type: string
+              nullable: true
+            data_nascimento:
+              type: string
+              nullable: true
+            sexo:
+              type: string
+              nullable: true
         endereco:
           type: string
           nullable: true
@@ -584,6 +634,26 @@ paths:
           description: Organização não encontrada
         '422':
           description: Validação ou nome ambíguo
+  /web/refresh:
+    post:
+      summary: Renovar access token (cookie refresh ou body refresh_token)
+      description: Requer X-Tenant. Usado pelo SPA quando o Bearer expira.
+      security:
+        - tenantHeader: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refresh_token:
+                  type: string
+      responses:
+        '200':
+          description: Novo access_token
+        '401':
+          description: Refresh inválido ou expirado
   /web/me:
     post:
       summary: Usuário autenticado (tenant)
@@ -1159,6 +1229,24 @@ paths:
       responses:
         '204':
           description: Removido
+  /ecc/casais/{id}/swap:
+    post:
+      summary: Trocar Ele/Ela (pessoa A ↔ B) e normalizar sexo
+      description: Requer ecc.casais.manage. Corrige cadastros em que a ordem importada inverteu o marido e a esposa.
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Casal com papéis Ele/Ela corrigidos
+        '403':
+          description: Sem permissão
   /public/site:
     get:
       summary: Site público (settings + home)

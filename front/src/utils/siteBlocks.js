@@ -1,33 +1,140 @@
 /**
  * Utilitários do CMS de blocos do site público.
+ * Catálogo alinhado ao one-pager 1g (PLAN-002).
  */
 
-/**
- * Catálogo de blocos disponíveis no construtor.
- * `payload` descreve os campos padrão de cada tipo.
- */
 export const BLOCK_LIBRARY = [
   {
     tipo: 'hero',
-    label: 'Destaque',
-    descricao: 'Imagem de fundo com título, texto e botão de ação.',
-    grupo: 'Estrutura',
+    label: 'Hero — boas-vindas',
+    descricao: 'Eyebrow, título, texto, foto e CTAs.',
+    grupo: 'One page',
     icone: 'fa-star',
-    payload: { headline: '', texto: '', banner_url: '', cta_label: '', cta_href: '' },
+    payload: {
+      eyebrow: 'Bem-vindo à nossa casa',
+      headline: '',
+      texto: '',
+      banner_url: '',
+      cta_label: 'Horários das missas',
+      cta_href: '#missas',
+      cta2_label: 'Conheça as pastorais',
+      cta2_href: '#pastorais',
+    },
+  },
+  {
+    tipo: 'missas_horarios',
+    label: 'Horários das missas',
+    descricao: 'Grade de horários da semana.',
+    grupo: 'One page',
+    icone: 'fa-clock',
+    payload: {
+      eyebrow: 'Missas',
+      titulo: 'Horários da semana',
+      texto: 'Confissões meia hora antes de cada celebração.',
+      items: [
+        { dia: 'Sábado', hora: '19h00', local: 'Igreja Matriz' },
+        { dia: 'Domingo', hora: '08h00', local: 'Igreja Matriz' },
+        { dia: 'Domingo', hora: '10h30', local: 'Comunidade' },
+      ],
+    },
+  },
+  {
+    tipo: 'sobre_paroquia',
+    label: 'Sobre a paróquia',
+    descricao: 'História, foto e números.',
+    grupo: 'One page',
+    icone: 'fa-book-open',
+    payload: {
+      eyebrow: 'Sobre nós',
+      titulo: '',
+      texto: '',
+      image_url: '',
+      stats: [
+        { valor: '3', rotulo: 'comunidades' },
+        { valor: '12', rotulo: 'pastorais' },
+        { valor: '1968', rotulo: 'fundação' },
+      ],
+    },
+  },
+  {
+    tipo: 'pastorais_list',
+    label: 'Pastorais e movimentos',
+    descricao: 'Lista as pastorais publicadas no site.',
+    grupo: 'One page',
+    icone: 'fa-hands-praying',
+    payload: { eyebrow: 'Pastorais e movimentos', titulo: 'Onde servir' },
+  },
+  {
+    tipo: 'comunicados_list',
+    label: 'Comunicados',
+    descricao: 'Avisos publicados da paróquia.',
+    grupo: 'One page',
+    icone: 'fa-bullhorn',
+    payload: {
+      eyebrow: 'Comunicados',
+      titulo: 'Avisos da paróquia',
+      mostrar_nas_pastorais: true,
+    },
+  },
+  {
+    tipo: 'agenda_eventos',
+    label: 'Agenda de eventos',
+    descricao: 'Próximos eventos da paróquia.',
+    grupo: 'One page',
+    icone: 'fa-calendar',
+    payload: {
+      eyebrow: 'Agenda',
+      titulo: 'Próximos eventos',
+      items: [
+        { dia: '14', mes: 'set', titulo: 'Festa patronal', info: 'A partir das 11h' },
+      ],
+    },
+  },
+  {
+    tipo: 'equipe_clero',
+    label: 'Clero e equipe',
+    descricao: 'Retratos da equipe pastoral.',
+    grupo: 'One page',
+    icone: 'fa-users',
+    payload: {
+      eyebrow: 'Clero e equipe',
+      titulo: 'Quem caminha com você',
+      items: [
+        { nome: '', papel: '', foto_url: '' },
+      ],
+    },
+  },
+  {
+    tipo: 'contato_local',
+    label: 'Localização e contato',
+    descricao: 'Endereço, mapa e formulário.',
+    grupo: 'One page',
+    icone: 'fa-location-dot',
+    payload: {
+      eyebrow: 'Onde estamos',
+      titulo: '',
+      endereco: '',
+      horario_secretaria: '',
+      telefone: '',
+      email: '',
+      form_titulo: 'Fale conosco',
+      form_texto: 'Pedidos de missa, batizados, casamentos ou uma conversa.',
+      form_slug: '',
+    },
   },
   {
     tipo: 'banner',
     label: 'Banner',
     descricao: 'Imagem larga entre seções.',
-    grupo: 'Estrutura',
+    grupo: 'Extras',
     icone: 'fa-image',
     payload: { image_url: '', alt: '' },
   },
   {
     tipo: 'richtext',
     label: 'Texto',
-    descricao: 'Parágrafos, títulos e links da página.',
-    grupo: 'Conteúdo',
+    descricao: 'Parágrafos, títulos e links.',
+    grupo: 'Extras',
     icone: 'fa-align-left',
     payload: { html: '' },
   },
@@ -35,39 +142,23 @@ export const BLOCK_LIBRARY = [
     tipo: 'igrejas_list',
     label: 'Igrejas',
     descricao: 'Lista as igrejas publicadas no site.',
-    grupo: 'Listagens',
+    grupo: 'Extras',
     icone: 'fa-church',
     payload: { titulo: 'Nossas igrejas' },
   },
   {
-    tipo: 'comunicados_list',
-    label: 'Comunicados',
-    descricao: 'Lista os comunicados publicados.',
-    grupo: 'Listagens',
-    icone: 'fa-bullhorn',
-    payload: { titulo: 'Comunicados' },
-  },
-  {
-    tipo: 'pastorais_list',
-    label: 'Pastorais',
-    descricao: 'Lista as pastorais publicadas no site.',
-    grupo: 'Listagens',
-    icone: 'fa-hands-praying',
-    payload: { titulo: 'Pastorais' },
-  },
-  {
     tipo: 'form',
     label: 'Formulário',
-    descricao: 'Incorpora um formulário criado na aba Formulários.',
-    grupo: 'Interação',
+    descricao: 'Incorpora um formulário do CMS.',
+    grupo: 'Extras',
     icone: 'fa-envelope-open-text',
     payload: { form_slug: '', titulo: 'Fale conosco' },
   },
   {
     tipo: 'html',
     label: 'HTML avançado',
-    descricao: 'Trecho de HTML para casos não cobertos pelos demais blocos.',
-    grupo: 'Avançado',
+    descricao: 'Trecho de HTML livre.',
+    grupo: 'Extras',
     icone: 'fa-code',
     payload: { html: '' },
   },
@@ -75,12 +166,20 @@ export const BLOCK_LIBRARY = [
 
 export const BLOCK_TYPES = BLOCK_LIBRARY.map((b) => b.tipo)
 
+/** Ordem padrão do one-pager 1g. */
+export const HOME_ONE_PAGER_TYPES = [
+  'hero',
+  'missas_horarios',
+  'sobre_paroquia',
+  'pastorais_list',
+  'comunicados_list',
+  'agenda_eventos',
+  'equipe_clero',
+  'contato_local',
+]
+
 const BLOCK_SUMMARY_LIMIT = 60
 
-/**
- * @param {string} tipo
- * @returns {{ tipo: string, label: string, descricao: string, grupo: string, icone: string, payload: Record<string, unknown> }}
- */
 export function blockMeta(tipo) {
   const found = BLOCK_LIBRARY.find((b) => b.tipo === tipo)
   if (found) return found
@@ -94,17 +193,20 @@ export function blockMeta(tipo) {
   }
 }
 
-/**
- * @param {string} tipo
- * @param {number} ordem
- */
 export function createBlock(tipo, ordem = 0) {
   return {
     tipo,
     ordem: Number(ordem) || 0,
     visivel: true,
-    payload: { ...blockMeta(tipo).payload },
+    payload: structuredClone
+      ? structuredClone(blockMeta(tipo).payload)
+      : JSON.parse(JSON.stringify(blockMeta(tipo).payload)),
   }
+}
+
+/** Blocos iniciais da home one-pager (1g). */
+export function createHomeOnePagerBlocks() {
+  return HOME_ONE_PAGER_TYPES.map((tipo, index) => createBlock(tipo, index))
 }
 
 function stripHtml(value) {
@@ -122,18 +224,22 @@ function truncate(value) {
     : text
 }
 
-/**
- * Texto curto exibido na lista de blocos do construtor.
- * @param {{ tipo?: string, payload?: Record<string, unknown> }} block
- */
 export function blockSummary(block) {
   const payload = block?.payload || {}
   const candidates = {
-    hero: [payload.headline, payload.texto],
+    hero: [payload.headline, payload.texto, payload.eyebrow],
     banner: [payload.alt, payload.image_url],
     richtext: [payload.html, payload.texto],
     html: [payload.html],
     form: [payload.form_slug ? `/${payload.form_slug}` : '', payload.titulo],
+    missas_horarios: [payload.titulo, `${(payload.items || []).length} horários`],
+    sobre_paroquia: [payload.titulo, payload.texto],
+    agenda_eventos: [payload.titulo, `${(payload.items || []).length} eventos`],
+    equipe_clero: [payload.titulo, `${(payload.items || []).length} pessoas`],
+    contato_local: [payload.titulo, payload.endereco],
+    pastorais_list: [payload.titulo],
+    comunicados_list: [payload.titulo],
+    igrejas_list: [payload.titulo],
   }[block?.tipo] || [payload.titulo]
 
   for (const candidate of candidates) {
@@ -143,19 +249,11 @@ export function blockSummary(block) {
   return 'Sem conteúdo'
 }
 
-/**
- * Reaplica `ordem` conforme a posição na lista.
- * @param {Array<Record<string, unknown>>} blocks
- */
 export function reindexBlocks(blocks) {
   if (!Array.isArray(blocks)) return []
   return blocks.map((block, index) => ({ ...block, ordem: index }))
 }
 
-/**
- * @param {unknown} blocks
- * @returns {Array<{ tipo: string, ordem: number, visivel: boolean, payload: Record<string, unknown> }>}
- */
 export function normalizeBlocks(blocks) {
   if (!Array.isArray(blocks)) return []
   return blocks
@@ -164,17 +262,10 @@ export function normalizeBlocks(blocks) {
     .sort((a, b) => (Number(a.ordem) || 0) - (Number(b.ordem) || 0))
 }
 
-/**
- * Item vazio do editor visual de menu.
- */
 export function createMenuItem() {
   return { label: '', tipo: 'pagina', slug: '', href: '' }
 }
 
-/**
- * Converte o menu salvo (`slug` ou `href`) para o formato do editor visual.
- * @param {unknown} menu
- */
 export function normalizeMenuItems(menu) {
   if (!Array.isArray(menu)) return []
   return menu
@@ -190,10 +281,6 @@ export function normalizeMenuItems(menu) {
     })
 }
 
-/**
- * Converte itens do editor visual para o formato salvo em `site_settings.menu`.
- * @param {Array<{ label?: string, tipo?: string, slug?: string, href?: string }>} items
- */
 export function menuItemsToPayload(items) {
   if (!Array.isArray(items)) return []
   return items
@@ -210,15 +297,16 @@ export function menuItemsToPayload(items) {
     .filter((item) => item !== null)
 }
 
-/**
- * Monta menu a partir de settings.menu ou páginas com mostrar_no_menu.
- * @param {Array<{ label?: string, slug?: string, href?: string }>|null|undefined} menu
- * @param {string} tenantSlug
- */
 export function resolveMenuLinks(menu, tenantSlug) {
   const base = `/site/${tenantSlug}`
   if (!Array.isArray(menu) || menu.length === 0) {
-    return [{ label: 'Início', href: base }]
+    return [
+      { label: 'Missas', href: '#missas' },
+      { label: 'Sobre', href: '#sobre' },
+      { label: 'Pastorais', href: '#pastorais' },
+      { label: 'Comunicados', href: '#comunicados' },
+      { label: 'Agenda', href: '#agenda' },
+    ]
   }
   return menu.map((item) => {
     if (item.href) return { label: item.label || item.href, href: item.href }
@@ -230,14 +318,24 @@ export function resolveMenuLinks(menu, tenantSlug) {
   })
 }
 
-/**
- * @param {Record<string, unknown>|null|undefined} seo
- * @param {string} fallbackTitle
- */
 export function resolveSeo(seo, fallbackTitle) {
   const s = seo && typeof seo === 'object' ? seo : {}
   return {
     title: String(s.title || s.titulo || fallbackTitle || 'Site'),
     description: String(s.description || s.descricao || ''),
   }
+}
+
+/** Âncora de seção no one-pager. */
+export function blockAnchor(tipo) {
+  const map = {
+    missas_horarios: 'missas',
+    sobre_paroquia: 'sobre',
+    pastorais_list: 'pastorais',
+    comunicados_list: 'comunicados',
+    agenda_eventos: 'agenda',
+    equipe_clero: 'equipe',
+    contato_local: 'contato',
+  }
+  return map[tipo] || null
 }
