@@ -1,13 +1,37 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
+import { library } from '@fortawesome/fontawesome-svg-core'
+import {
+  faArrowUpRightFromSquare,
+  faCircleInfo,
+  faPlus,
+  faTrash,
+} from '@fortawesome/free-solid-svg-icons'
 import api from '@/services/api'
 import { useTenantStore } from '@/stores/tenant'
 import { useAuthStore } from '@/stores/auth'
 import { useAuthAdminStore } from '@/stores/authAdmin'
 import { innovToast } from '@/plugins/toast'
 import { userHasPermission } from '@/utils/userRoles'
-import { BLOCK_TYPES } from '@/utils/siteBlocks'
+import {
+  BLOCK_LIBRARY,
+  blockMeta,
+  blockSummary,
+  createBlock,
+  menuItemsToPayload,
+  normalizeMenuItems,
+  reindexBlocks,
+} from '@/utils/siteBlocks'
+import { normalizeFields, validateFields } from '@/utils/siteForms'
+import SiteBlockEditor from '@/components/site/admin/SiteBlockEditor.vue'
+import SiteBlockIcon from '@/components/site/admin/SiteBlockIcon.vue'
+import SiteFormFieldsEditor from '@/components/site/admin/SiteFormFieldsEditor.vue'
+import SiteMenuEditor from '@/components/site/admin/SiteMenuEditor.vue'
+import SitePagePreview from '@/components/site/admin/SitePagePreview.vue'
+
+library.add(faArrowUpRightFromSquare, faCircleInfo, faPlus, faTrash)
 
 const router = useRouter()
 const tenantStore = useTenantStore()
@@ -27,16 +51,23 @@ const settings = ref({
   cores: {},
   contato: {},
 })
+const menuItems = ref([])
 
 const pages = ref([])
 const pageForm = ref(null)
+const selectedBlock = ref(0)
+const newBlockType = ref('richtext')
+const pagePane = ref('editor')
+
 const comunicados = ref([])
 const comForm = ref(null)
 const pastorais = ref([])
 const pastForm = ref(null)
 const forms = ref([])
 const formForm = ref(null)
+const formErrors = ref([])
 const submissions = ref([])
+const submissionsForm = ref(null)
 const igrejas = ref([])
 
 const isPlatformAdmin = computed(
@@ -51,9 +82,36 @@ const canCom = computed(() => can('site.comunicados.view') || can('site.comunica
 const canPast = computed(() => can('site.pastorais.view') || can('site.pastorais.manage'))
 const canForms = computed(() => can('site.forms.view') || can('site.forms.manage'))
 
-const publicUrl = computed(() =>
-  tenantStore.slug ? `/site/${tenantStore.slug}` : '#',
+const tabs = computed(() =>
+  [
+    { id: 'settings', label: 'Configurações', visible: canSettings.value },
+    { id: 'pages', label: 'Páginas', visible: canPages.value },
+    { id: 'comunicados', label: 'Comunicados', visible: canCom.value },
+    { id: 'pastorais', label: 'Pastorais', visible: canPast.value },
+    { id: 'forms', label: 'Formulários', visible: canForms.value },
+  ].filter((t) => t.visible),
 )
+
+const publicUrl = computed(() => (tenantStore.slug ? `/site/${tenantStore.slug}` : '#'))
+
+const blockGroups = computed(() => {
+  const groups = new Map()
+  for (const block of BLOCK_LIBRARY) {
+    if (!groups.has(block.grupo)) groups.set(block.grupo, [])
+    groups.get(block.grupo).push(block)
+  }
+  return [...groups.entries()].map(([grupo, itens]) => ({ grupo, itens }))
+})
+
+const currentBlock = computed(() => pageForm.value?.blocks?.[selectedBlock.value] || null)
+
+const submissionColumns = computed(() => {
+  const keys = new Set()
+  for (const item of submissions.value) {
+    for (const key of Object.keys(item.values || {})) keys.add(key)
+  }
+  return [...keys]
+})
 
 const ensureTenant = () => {
   if (!tenantStore.slug) {
@@ -64,9 +122,20 @@ const ensureTenant = () => {
   return true
 }
 
+/** A API devolve `[]` para os JSONs vazios; o editor precisa de objetos. */
+const asObject = (value) => (value && !Array.isArray(value) && typeof value === 'object' ? value : {})
+
 const loadSettings = async () => {
   const { data } = await api.get('/site/settings')
-  settings.value = { ...settings.value, ...(data.data || data) }
+  const loaded = data.data || data || {}
+  settings.value = {
+    ...settings.value,
+    ...loaded,
+    seo: asObject(loaded.seo),
+    cores: asObject(loaded.cores),
+    contato: asObject(loaded.contato),
+  }
+  menuItems.value = normalizeMenuItems(settings.value.menu)
 }
 
 const loadPages = async () => {
@@ -94,15 +163,28 @@ const loadIgrejas = async () => {
   igrejas.value = data.data || data || []
 }
 
+/** Carregamentos auxiliares (selects, prévia) não devem quebrar a aba. */
+const loadOptional = (tasks) => Promise.allSettled(tasks.map((task) => task()))
+
 const loadTab = async () => {
   if (!ensureTenant()) return
   loading.value = true
   try {
-    if (tab.value === 'settings' && canSettings.value) await loadSettings()
-    if (tab.value === 'pages' && canPages.value) await loadPages()
-    if (tab.value === 'comunicados' && canCom.value) await loadComunicados()
+    if (tab.value === 'settings' && canSettings.value) {
+      await loadSettings()
+      await loadOptional([loadPages])
+    }
+    if (tab.value === 'pages' && canPages.value) {
+      await loadPages()
+      await loadOptional([loadForms])
+    }
+    if (tab.value === 'comunicados' && canCom.value) {
+      await loadComunicados()
+      await loadOptional([loadIgrejas])
+    }
     if (tab.value === 'pastorais' && canPast.value) {
-      await Promise.all([loadPastorais(), loadIgrejas()])
+      await loadPastorais()
+      await loadOptional([loadIgrejas])
     }
     if (tab.value === 'forms' && canForms.value) await loadForms()
   } catch (e) {
@@ -119,13 +201,21 @@ const saveSettings = async () => {
       publicado: settings.value.publicado,
       titulo: settings.value.titulo,
       subtitulo: settings.value.subtitulo,
-      menu: settings.value.menu,
+      menu: menuItemsToPayload(menuItems.value),
       seo: settings.value.seo,
       cores: settings.value.cores,
       contato: settings.value.contato,
     })
-    settings.value = { ...settings.value, ...(data.data || data) }
-    innovToast('success', 'OK', 'Configurações salvas')
+    const saved = data.data || data || {}
+    settings.value = {
+      ...settings.value,
+      ...saved,
+      seo: asObject(saved.seo),
+      cores: asObject(saved.cores),
+      contato: asObject(saved.contato),
+    }
+    menuItems.value = normalizeMenuItems(settings.value.menu)
+    innovToast('success', 'Site', 'Configurações salvas')
   } catch (e) {
     innovToast('error', 'Erro', e.response?.data?.message || 'Falha ao salvar')
   } finally {
@@ -141,20 +231,45 @@ const openNewPage = () => {
     status: 'rascunho',
     is_home: false,
     mostrar_no_menu: true,
-    blocks: [{ tipo: 'hero', ordem: 0, visivel: true, payload: { headline: '', texto: '' } }],
+    blocks: [createBlock('hero', 0)],
   }
+  selectedBlock.value = 0
+  pagePane.value = 'editor'
 }
 
 const openEditPage = (p) => {
   pageForm.value = {
     ...p,
-    blocks: (p.blocks || []).map((b) => ({
-      tipo: b.tipo,
-      ordem: b.ordem,
-      visivel: b.visivel !== false,
-      payload: { ...(b.payload || {}) },
-    })),
+    blocks: reindexBlocks(
+      [...(p.blocks || [])]
+        .sort((a, b) => (Number(a.ordem) || 0) - (Number(b.ordem) || 0))
+        .map((b) => ({
+          tipo: b.tipo,
+          visivel: b.visivel !== false,
+          payload: { ...blockMeta(b.tipo).payload, ...(b.payload || {}) },
+        })),
+    ),
   }
+  selectedBlock.value = 0
+  pagePane.value = 'editor'
+}
+
+const selectBlock = (index) => {
+  selectedBlock.value = index
+  pagePane.value = 'editor'
+}
+
+const addBlock = () => {
+  pageForm.value.blocks.push(createBlock(newBlockType.value, pageForm.value.blocks.length))
+  selectedBlock.value = pageForm.value.blocks.length - 1
+  pagePane.value = 'editor'
+}
+
+const removeBlock = (index) => {
+  pageForm.value.blocks = reindexBlocks(
+    pageForm.value.blocks.filter((_, i) => i !== index),
+  )
+  selectedBlock.value = Math.max(0, Math.min(selectedBlock.value, pageForm.value.blocks.length - 1))
 }
 
 const savePage = async () => {
@@ -166,14 +281,14 @@ const savePage = async () => {
       status: pageForm.value.status,
       is_home: pageForm.value.is_home,
       mostrar_no_menu: pageForm.value.mostrar_no_menu,
-      blocks: pageForm.value.blocks,
+      blocks: reindexBlocks(pageForm.value.blocks),
     }
     if (pageForm.value.id) {
       await api.put(`/site/pages/${pageForm.value.id}`, body)
     } else {
       await api.post('/site/pages', body)
     }
-    innovToast('success', 'OK', 'Página salva')
+    innovToast('success', 'Site', 'Página salva')
     pageForm.value = null
     await loadPages()
   } catch (e) {
@@ -187,15 +302,6 @@ const removePage = async (p) => {
   if (!confirm(`Remover a página "${p.titulo}"?`)) return
   await api.delete(`/site/pages/${p.id}`)
   await loadPages()
-}
-
-const addBlock = () => {
-  pageForm.value.blocks.push({
-    tipo: 'richtext',
-    ordem: pageForm.value.blocks.length,
-    visivel: true,
-    payload: { html: '' },
-  })
 }
 
 const openNewCom = () => {
@@ -213,14 +319,20 @@ const openNewCom = () => {
 const saveCom = async () => {
   saving.value = true
   try {
-    const body = { ...comForm.value }
-    delete body.id
+    const body = {
+      titulo: comForm.value.titulo,
+      resumo: comForm.value.resumo || null,
+      corpo: comForm.value.corpo,
+      status: comForm.value.status,
+      destaque: !!comForm.value.destaque,
+      igreja_id: comForm.value.igreja_id || null,
+    }
     if (comForm.value.id) {
       await api.put(`/site/comunicados/${comForm.value.id}`, body)
     } else {
       await api.post('/site/comunicados', body)
     }
-    innovToast('success', 'OK', 'Comunicado salvo')
+    innovToast('success', 'Site', 'Comunicado salvo')
     comForm.value = null
     await loadComunicados()
   } catch (e) {
@@ -259,7 +371,7 @@ const savePast = async () => {
     } else {
       await api.post('/site/pastorais', body)
     }
-    innovToast('success', 'OK', 'Pastoral salva')
+    innovToast('success', 'Site', 'Pastoral salva')
     pastForm.value = null
     await loadPastorais()
   } catch (e) {
@@ -276,6 +388,7 @@ const removePast = async (item) => {
 }
 
 const openNewForm = () => {
+  formErrors.value = []
   formForm.value = {
     id: null,
     nome: '',
@@ -283,31 +396,40 @@ const openNewForm = () => {
     descricao: '',
     ativo: true,
     sucesso_mensagem: 'Obrigado pelo contato!',
-    fields: [
-      { nome: 'nome', label: 'Nome', tipo: 'text', obrigatorio: true },
-      { nome: 'email', label: 'E-mail', tipo: 'email', obrigatorio: true },
-      { nome: 'mensagem', label: 'Mensagem', tipo: 'textarea', obrigatorio: true },
-    ],
+    fields: normalizeFields([
+      { label: 'Nome', tipo: 'text', obrigatorio: true },
+      { label: 'E-mail', tipo: 'email', obrigatorio: true },
+      { label: 'Mensagem', tipo: 'textarea', obrigatorio: true },
+    ]),
   }
 }
 
+const openEditForm = (f) => {
+  formErrors.value = []
+  formForm.value = { ...f, fields: normalizeFields(f.fields || []) }
+}
+
 const saveFormDef = async () => {
+  const fields = normalizeFields(formForm.value.fields)
+  formErrors.value = validateFields(fields)
+  if (formErrors.value.length) return
+
   saving.value = true
   try {
     const body = {
       nome: formForm.value.nome,
       slug: formForm.value.slug,
-      descricao: formForm.value.descricao,
+      descricao: formForm.value.descricao || null,
       ativo: formForm.value.ativo,
       sucesso_mensagem: formForm.value.sucesso_mensagem,
-      fields: formForm.value.fields,
+      fields,
     }
     if (formForm.value.id) {
       await api.put(`/site/forms/${formForm.value.id}`, body)
     } else {
       await api.post('/site/forms', body)
     }
-    innovToast('success', 'OK', 'Formulário salvo')
+    innovToast('success', 'Site', 'Formulário salvo')
     formForm.value = null
     await loadForms()
   } catch (e) {
@@ -317,28 +439,42 @@ const saveFormDef = async () => {
   }
 }
 
-const loadSubmissions = async (formId) => {
-  const { data } = await api.get(`/site/forms/${formId}/submissions`)
+const loadSubmissions = async (form) => {
+  submissionsForm.value = form
+  const { data } = await api.get(`/site/forms/${form.id}/submissions`)
   submissions.value = data.data || data || []
 }
 
-const menuJson = computed({
-  get: () => JSON.stringify(settings.value.menu || [], null, 2),
-  set: (v) => {
-    try {
-      settings.value.menu = JSON.parse(v)
-    } catch {
-      /* ignore while typing */
+const closeSubmissions = () => {
+  submissionsForm.value = null
+  submissions.value = []
+}
+
+const formatDate = (value) => {
+  if (!value) return '—'
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString('pt-BR')
+}
+
+watch(
+  () => formForm.value?.nome,
+  (nome) => {
+    if (!formForm.value || formForm.value.id || !nome) return
+    if (!formForm.value.slug) {
+      formForm.value.slug = nome
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
     }
   },
-})
+)
 
 onMounted(async () => {
-  if (canSettings.value) tab.value = 'settings'
-  else if (canPages.value) tab.value = 'pages'
-  else if (canCom.value) tab.value = 'comunicados'
-  else if (canPast.value) tab.value = 'pastorais'
-  else if (canForms.value) tab.value = 'forms'
+  tab.value = tabs.value[0]?.id || 'settings'
+  // O selo de publicação e a prévia dependem das configurações em qualquer aba.
+  if (canSettings.value) await loadOptional([loadSettings])
   await loadTab()
 })
 
@@ -348,332 +484,700 @@ const setTab = async (t) => {
   comForm.value = null
   pastForm.value = null
   formForm.value = null
+  formErrors.value = []
   submissions.value = []
+  submissionsForm.value = null
   await loadTab()
 }
 </script>
 
 <template>
-  <div class="space-y-6" data-testid="site-admin">
-    <div class="flex flex-wrap items-center justify-between gap-3">
+  <div data-testid="site-admin">
+    <div class="mb-6 flex flex-wrap items-end justify-between gap-4">
       <div>
-        <h1 class="text-2xl font-semibold" style="font-family: Fraunces, serif">Site público</h1>
-        <p class="text-sm text-black/60 mt-1">
-          Configure a vitrine da organização.
-          <a :href="publicUrl" target="_blank" class="underline ml-1">Abrir site</a>
+        <p class="page-eyebrow">Presença digital</p>
+        <h2 class="text-3xl" style="color: var(--color-primary)">Site público</h2>
+        <p class="mt-1 text-[14.5px]" style="color: var(--color-muted)">
+          Monte as páginas, o conteúdo e os formulários da vitrine da organização.
         </p>
       </div>
-    </div>
-
-    <div class="flex flex-wrap gap-2 border-b border-black/10 pb-2">
-      <button
-        v-if="canSettings"
-        type="button"
-        class="px-3 py-1.5 text-sm rounded"
-        :class="tab === 'settings' ? 'bg-[var(--color-primary)] text-white' : 'bg-black/5'"
-        @click="setTab('settings')"
-      >
-        Configurações
-      </button>
-      <button
-        v-if="canPages"
-        type="button"
-        class="px-3 py-1.5 text-sm rounded"
-        :class="tab === 'pages' ? 'bg-[var(--color-primary)] text-white' : 'bg-black/5'"
-        @click="setTab('pages')"
-      >
-        Páginas
-      </button>
-      <button
-        v-if="canCom"
-        type="button"
-        class="px-3 py-1.5 text-sm rounded"
-        :class="tab === 'comunicados' ? 'bg-[var(--color-primary)] text-white' : 'bg-black/5'"
-        @click="setTab('comunicados')"
-      >
-        Comunicados
-      </button>
-      <button
-        v-if="canPast"
-        type="button"
-        class="px-3 py-1.5 text-sm rounded"
-        :class="tab === 'pastorais' ? 'bg-[var(--color-primary)] text-white' : 'bg-black/5'"
-        @click="setTab('pastorais')"
-      >
-        Pastorais
-      </button>
-      <button
-        v-if="canForms"
-        type="button"
-        class="px-3 py-1.5 text-sm rounded"
-        :class="tab === 'forms' ? 'bg-[var(--color-primary)] text-white' : 'bg-black/5'"
-        @click="setTab('forms')"
-      >
-        Formulários
-      </button>
-    </div>
-
-    <p v-if="loading" class="text-black/50">Carregando…</p>
-
-    <!-- Settings -->
-    <div v-else-if="tab === 'settings'" class="space-y-4 max-w-2xl">
-      <label class="flex items-center gap-2 text-sm">
-        <input v-model="settings.publicado" type="checkbox" />
-        Site publicado
-      </label>
-      <div>
-        <label class="block text-sm mb-1">Título</label>
-        <input v-model="settings.titulo" class="w-full border px-3 py-2 rounded" />
-      </div>
-      <div>
-        <label class="block text-sm mb-1">Subtítulo</label>
-        <input v-model="settings.subtitulo" class="w-full border px-3 py-2 rounded" />
-      </div>
-      <div>
-        <label class="block text-sm mb-1">Menu (JSON)</label>
-        <textarea v-model="menuJson" class="w-full border px-3 py-2 rounded font-mono text-xs" rows="5" />
-        <p class="text-xs text-black/50 mt-1">Ex.: [{"label":"Início","slug":"home"},{"label":"Sobre","slug":"sobre"}]</p>
-      </div>
-      <button
-        type="button"
-        class="px-4 py-2 bg-[var(--color-primary)] text-white rounded disabled:opacity-50"
-        :disabled="saving || !can('site.settings.update')"
-        @click="saveSettings"
-      >
-        Salvar
-      </button>
-    </div>
-
-    <!-- Pages -->
-    <div v-else-if="tab === 'pages'" class="space-y-4">
-      <div v-if="!pageForm" class="space-y-3">
-        <button
-          v-if="can('site.pages.manage')"
-          type="button"
-          class="px-3 py-1.5 text-sm bg-[var(--color-primary)] text-white rounded"
-          @click="openNewPage"
+      <div class="flex flex-wrap items-center gap-3">
+        <span
+          class="badge"
+          :class="settings.publicado ? 'badge-success' : 'badge-warning'"
+          data-testid="site-status"
         >
-          Nova página
-        </button>
-        <ul class="divide-y border rounded bg-white">
-          <li v-for="p in pages" :key="p.id" class="px-4 py-3 flex justify-between gap-3 items-center">
-            <div>
-              <div class="font-medium">{{ p.titulo }} <span class="text-xs text-black/50">/{{ p.slug }}</span></div>
-              <div class="text-xs text-black/50">{{ p.status }} <span v-if="p.is_home">· home</span></div>
-            </div>
-            <div class="flex gap-2 text-sm">
-              <button type="button" class="underline" @click="openEditPage(p)">Editar</button>
-              <button
-                v-if="can('site.pages.manage')"
-                type="button"
-                class="text-red-700 underline"
-                @click="removePage(p)"
-              >
-                Remover
-              </button>
-            </div>
-          </li>
-        </ul>
+          {{ settings.publicado ? 'Publicado' : 'Rascunho' }}
+        </span>
+        <a :href="publicUrl" target="_blank" rel="noopener" class="btn btn-ghost">
+          <FontAwesomeIcon :icon="faArrowUpRightFromSquare" />
+          Abrir site
+        </a>
       </div>
-      <div v-else class="space-y-3 max-w-3xl">
-        <div class="grid md:grid-cols-2 gap-3">
+    </div>
+
+    <div class="card p-1.5 inline-flex flex-wrap gap-1 mb-6">
+      <button
+        v-for="t in tabs"
+        :key="t.id"
+        type="button"
+        class="px-4 py-2 rounded-[11px] text-sm font-semibold transition-colors"
+        :style="tab === t.id
+          ? 'background: var(--color-primary); color: #F7F4EE'
+          : 'color: var(--color-muted)'"
+        :data-testid="`site-tab-${t.id}`"
+        @click="setTab(t.id)"
+      >
+        {{ t.label }}
+      </button>
+    </div>
+
+    <div v-if="loading" class="card p-8 text-center" style="color: var(--color-muted)">
+      Carregando…
+    </div>
+
+    <!-- Configurações -->
+    <div v-else-if="tab === 'settings'" class="space-y-5">
+      <div class="card p-6">
+        <div class="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <label class="block text-sm mb-1">Título</label>
-            <input v-model="pageForm.titulo" class="w-full border px-3 py-2 rounded" />
+            <h3 class="text-xl">Publicação</h3>
+            <p class="mt-1 text-sm" style="color: var(--color-muted)">
+              Enquanto estiver em rascunho, o endereço público responde como indisponível.
+            </p>
           </div>
-          <div>
-            <label class="block text-sm mb-1">Slug</label>
-            <input v-model="pageForm.slug" class="w-full border px-3 py-2 rounded" />
-          </div>
-          <div>
-            <label class="block text-sm mb-1">Status</label>
-            <select v-model="pageForm.status" class="w-full border px-3 py-2 rounded">
-              <option value="rascunho">Rascunho</option>
-              <option value="publicado">Publicado</option>
-            </select>
-          </div>
-          <label class="flex items-center gap-2 text-sm mt-6">
-            <input v-model="pageForm.is_home" type="checkbox" />
-            Página inicial
+          <label class="flex items-center gap-2.5 text-sm font-semibold">
+            <input v-model="settings.publicado" type="checkbox" data-testid="site-publicado" />
+            Site publicado
           </label>
         </div>
-        <div class="space-y-3">
-          <div class="flex justify-between items-center">
-            <h3 class="font-medium">Blocos</h3>
-            <button type="button" class="text-sm underline" @click="addBlock">+ bloco</button>
+        <p class="mt-4 text-sm font-mono rounded-xl px-3.5 py-2.5" style="background: var(--color-surface-2); color: var(--color-muted)">
+          {{ publicUrl }}
+        </p>
+      </div>
+
+      <div class="card p-6 space-y-4">
+        <h3 class="text-xl">Identidade</h3>
+        <div class="grid gap-4 md:grid-cols-2">
+          <div>
+            <label class="fld" for="st-titulo">Título do site</label>
+            <input id="st-titulo" v-model="settings.titulo" class="input" data-testid="site-titulo" />
           </div>
-          <div
-            v-for="(b, idx) in pageForm.blocks"
-            :key="idx"
-            class="border rounded p-3 space-y-2 bg-white"
-          >
-            <div class="flex gap-2 items-center">
-              <select v-model="b.tipo" class="border px-2 py-1 rounded text-sm">
-                <option v-for="t in BLOCK_TYPES" :key="t" :value="t">{{ t }}</option>
-              </select>
-              <button type="button" class="text-xs text-red-700" @click="pageForm.blocks.splice(idx, 1)">
-                remover
-              </button>
+          <div>
+            <label class="fld" for="st-subtitulo">Subtítulo</label>
+            <input id="st-subtitulo" v-model="settings.subtitulo" class="input" />
+          </div>
+          <div>
+            <label class="fld" for="st-cor">Cor principal</label>
+            <div class="flex items-center gap-3">
+              <input
+                id="st-cor"
+                v-model="settings.cores.primary"
+                type="color"
+                class="h-11 w-14 rounded-[11px] cursor-pointer"
+                style="border: 1px solid var(--color-line)"
+              />
+              <input v-model="settings.cores.primary" class="input" placeholder="#00234E" />
             </div>
-            <template v-if="b.tipo === 'hero'">
-              <input v-model="b.payload.headline" placeholder="Headline" class="w-full border px-2 py-1 rounded text-sm" />
-              <input v-model="b.payload.texto" placeholder="Texto" class="w-full border px-2 py-1 rounded text-sm" />
-              <input v-model="b.payload.banner_url" placeholder="URL do banner" class="w-full border px-2 py-1 rounded text-sm" />
-              <input v-model="b.payload.cta_label" placeholder="CTA label" class="w-full border px-2 py-1 rounded text-sm" />
-              <input v-model="b.payload.cta_href" placeholder="CTA href" class="w-full border px-2 py-1 rounded text-sm" />
-            </template>
-            <template v-else-if="b.tipo === 'banner'">
-              <input v-model="b.payload.image_url" placeholder="URL da imagem" class="w-full border px-2 py-1 rounded text-sm" />
-            </template>
-            <template v-else-if="b.tipo === 'richtext' || b.tipo === 'html'">
-              <textarea v-model="b.payload.html" rows="4" class="w-full border px-2 py-1 rounded text-sm font-mono" />
-            </template>
-            <template v-else-if="b.tipo === 'form'">
-              <input v-model="b.payload.form_slug" placeholder="Slug do formulário" class="w-full border px-2 py-1 rounded text-sm" />
-              <input v-model="b.payload.titulo" placeholder="Título" class="w-full border px-2 py-1 rounded text-sm" />
-            </template>
-            <template v-else>
-              <input v-model="b.payload.titulo" placeholder="Título da seção" class="w-full border px-2 py-1 rounded text-sm" />
-            </template>
           </div>
         </div>
-        <div class="flex gap-2">
-          <button type="button" class="px-4 py-2 bg-[var(--color-primary)] text-white rounded" :disabled="saving" @click="savePage">
-            Salvar página
+      </div>
+
+      <div class="card p-6 space-y-4">
+        <div>
+          <h3 class="text-xl">Menu de navegação</h3>
+          <p class="mt-1 text-sm" style="color: var(--color-muted)">
+            Itens exibidos no topo do site, na ordem definida abaixo.
+          </p>
+        </div>
+        <SiteMenuEditor v-model="menuItems" :pages="pages" />
+      </div>
+
+      <div class="card p-6 space-y-4">
+        <h3 class="text-xl">Busca e contato</h3>
+        <div class="grid gap-4 md:grid-cols-2">
+          <div>
+            <label class="fld" for="st-seo-title">Título para buscadores</label>
+            <input id="st-seo-title" v-model="settings.seo.title" class="input" />
+          </div>
+          <div>
+            <label class="fld" for="st-seo-desc">Descrição para buscadores</label>
+            <input id="st-seo-desc" v-model="settings.seo.description" class="input" />
+          </div>
+          <div>
+            <label class="fld" for="st-contato-email">E-mail de contato</label>
+            <input id="st-contato-email" v-model="settings.contato.email" type="email" class="input" />
+          </div>
+          <div>
+            <label class="fld" for="st-contato-tel">Telefone</label>
+            <input id="st-contato-tel" v-model="settings.contato.telefone" class="input" />
+          </div>
+        </div>
+      </div>
+
+      <div class="flex justify-end">
+        <button
+          type="button"
+          class="btn btn-primary disabled:opacity-50"
+          :disabled="saving || !can('site.settings.update')"
+          data-testid="site-salvar-settings"
+          @click="saveSettings"
+        >
+          {{ saving ? 'Salvando…' : 'Salvar configurações' }}
+        </button>
+      </div>
+    </div>
+
+    <!-- Páginas -->
+    <div v-else-if="tab === 'pages'">
+      <div v-if="!pageForm" class="space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <p class="text-sm" style="color: var(--color-muted)">
+            {{ pages.length }} página(s) no site.
+          </p>
+          <button
+            v-if="can('site.pages.manage')"
+            type="button"
+            class="btn btn-primary"
+            data-testid="site-nova-pagina"
+            @click="openNewPage"
+          >
+            <FontAwesomeIcon :icon="faPlus" />
+            Nova página
           </button>
-          <button type="button" class="px-4 py-2 border rounded" @click="pageForm = null">Cancelar</button>
+        </div>
+
+        <div class="grid gap-4 sm:grid-cols-2">
+          <div
+            v-if="!pages.length"
+            class="card p-8 sm:col-span-2 text-center"
+            style="color: var(--color-muted)"
+          >
+            Nenhuma página criada. Comece pela página inicial.
+          </div>
+          <div v-for="p in pages" :key="p.id" class="card p-5">
+            <div class="flex items-start justify-between gap-3">
+              <div>
+                <h3 class="text-lg leading-tight">{{ p.titulo }}</h3>
+                <p class="text-xs font-mono mt-1" style="color: var(--color-muted)">/{{ p.slug }}</p>
+              </div>
+              <span class="badge" :class="p.status === 'publicado' ? 'badge-success' : 'badge-warning'">
+                {{ p.status === 'publicado' ? 'Publicada' : 'Rascunho' }}
+              </span>
+            </div>
+            <p class="mt-3 text-sm" style="color: var(--color-muted)">
+              {{ (p.blocks || []).length }} bloco(s)
+              <span v-if="p.is_home"> · página inicial</span>
+            </p>
+            <div class="mt-4 flex flex-wrap gap-2">
+              <button class="btn btn-ghost" data-testid="pagina-editar" @click="openEditPage(p)">
+                Editar
+              </button>
+              <button
+                v-if="can('site.pages.manage')"
+                class="btn btn-ghost"
+                style="color: var(--color-danger)"
+                @click="removePage(p)"
+              >
+                Excluir
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div v-else class="space-y-4" data-testid="site-page-builder">
+        <div class="card px-5 py-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p class="text-xs font-bold uppercase tracking-wider" style="color: var(--color-muted)">
+              Construtor de página
+            </p>
+            <h3 class="text-lg leading-tight">
+              {{ pageForm.titulo || (pageForm.id ? 'Página sem título' : 'Nova página') }}
+            </h3>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <button type="button" class="btn btn-ghost" @click="pageForm = null">Cancelar</button>
+            <button
+              type="button"
+              class="btn btn-primary disabled:opacity-50"
+              :disabled="saving"
+              data-testid="pagina-salvar"
+              @click="savePage"
+            >
+              {{ saving ? 'Salvando…' : 'Salvar página' }}
+            </button>
+          </div>
+        </div>
+
+        <div class="grid gap-4 lg:grid-cols-12 items-start">
+          <div class="lg:col-span-4 space-y-4">
+            <div class="card p-5 space-y-4">
+              <h4 class="text-base">Dados da página</h4>
+              <div>
+                <label class="fld" for="pg-titulo">Título</label>
+                <input id="pg-titulo" v-model="pageForm.titulo" class="input" data-testid="pagina-titulo" />
+              </div>
+              <div>
+                <label class="fld" for="pg-slug">Endereço (slug)</label>
+                <input id="pg-slug" v-model="pageForm.slug" class="input" placeholder="sobre" />
+              </div>
+              <div>
+                <label class="fld" for="pg-status">Situação</label>
+                <select id="pg-status" v-model="pageForm.status" class="input">
+                  <option value="rascunho">Rascunho</option>
+                  <option value="publicado">Publicada</option>
+                </select>
+              </div>
+              <label class="flex items-center gap-2 text-sm">
+                <input v-model="pageForm.is_home" type="checkbox" />
+                Usar como página inicial
+              </label>
+              <label class="flex items-center gap-2 text-sm">
+                <input v-model="pageForm.mostrar_no_menu" type="checkbox" />
+                Sugerir no menu
+              </label>
+            </div>
+
+            <div class="card p-5 space-y-3">
+              <h4 class="text-base">Blocos</h4>
+              <ul class="space-y-2">
+                <li v-for="(b, idx) in pageForm.blocks" :key="idx">
+                  <div
+                    class="rounded-xl p-3 flex items-start gap-3 cursor-pointer transition-colors"
+                    :style="idx === selectedBlock
+                      ? 'background: rgba(0,35,78,0.07); border: 1px solid var(--color-primary)'
+                      : 'background: var(--color-surface-2); border: 1px solid transparent'"
+                    :data-testid="`bloco-item-${idx}`"
+                    @click="selectBlock(idx)"
+                  >
+                    <span class="mt-0.5" style="color: var(--color-primary)">
+                      <SiteBlockIcon :tipo="b.tipo" />
+                    </span>
+                    <div class="min-w-0 flex-1">
+                      <p class="text-sm font-semibold leading-tight">{{ blockMeta(b.tipo).label }}</p>
+                      <p class="text-xs truncate mt-0.5" style="color: var(--color-muted)">
+                        {{ blockSummary(b) }}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      class="text-xs shrink-0 h-7 w-7 rounded-lg hover:bg-red-50"
+                      style="color: var(--color-danger)"
+                      aria-label="Remover bloco"
+                      :data-testid="`bloco-remover-${idx}`"
+                      @click.stop="removeBlock(idx)"
+                    >
+                      <FontAwesomeIcon :icon="faTrash" />
+                    </button>
+                  </div>
+                </li>
+              </ul>
+              <p v-if="!pageForm.blocks.length" class="text-sm" style="color: var(--color-muted)">
+                Página sem blocos. Adicione o primeiro abaixo.
+              </p>
+
+              <div class="pt-1 flex gap-2">
+                <select v-model="newBlockType" class="input" aria-label="Tipo de bloco">
+                  <optgroup v-for="g in blockGroups" :key="g.grupo" :label="g.grupo">
+                    <option v-for="b in g.itens" :key="b.tipo" :value="b.tipo">{{ b.label }}</option>
+                  </optgroup>
+                </select>
+                <button type="button" class="btn btn-ghost shrink-0" data-testid="bloco-adicionar" @click="addBlock">
+                  <FontAwesomeIcon :icon="faPlus" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="lg:col-span-8 card p-5">
+            <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+              <div class="inline-flex rounded-lg p-0.5" style="background: var(--color-surface-2)">
+                <button
+                  type="button"
+                  class="px-3.5 py-1.5 rounded-md text-xs font-semibold"
+                  :style="pagePane === 'editor'
+                    ? 'background: var(--color-surface); color: var(--color-primary)'
+                    : 'color: var(--color-muted)'"
+                  data-testid="pane-editor"
+                  @click="pagePane = 'editor'"
+                >
+                  Editar bloco
+                </button>
+                <button
+                  type="button"
+                  class="px-3.5 py-1.5 rounded-md text-xs font-semibold"
+                  :style="pagePane === 'preview'
+                    ? 'background: var(--color-surface); color: var(--color-primary)'
+                    : 'color: var(--color-muted)'"
+                  data-testid="pane-preview"
+                  @click="pagePane = 'preview'"
+                >
+                  Pré-visualizar
+                </button>
+              </div>
+              <p v-if="pagePane === 'editor' && currentBlock" class="text-xs" style="color: var(--color-muted)">
+                Bloco {{ selectedBlock + 1 }} de {{ pageForm.blocks.length }}
+              </p>
+            </div>
+
+            <SitePagePreview
+              v-if="pagePane === 'preview'"
+              :blocks="pageForm.blocks"
+              :settings="settings"
+              :tenant-slug="tenantStore.slug || ''"
+              :page-title="pageForm.titulo"
+            />
+            <SiteBlockEditor
+              v-else-if="currentBlock"
+              :key="selectedBlock"
+              :block="currentBlock"
+              :forms="forms"
+            />
+            <p v-else class="py-12 text-center text-sm" style="color: var(--color-muted)">
+              Selecione ou adicione um bloco para editar.
+            </p>
+          </div>
         </div>
       </div>
     </div>
 
     <!-- Comunicados -->
     <div v-else-if="tab === 'comunicados'" class="space-y-4">
-      <div v-if="!comForm">
-        <button
-          v-if="can('site.comunicados.manage')"
-          type="button"
-          class="px-3 py-1.5 text-sm bg-[var(--color-primary)] text-white rounded mb-3"
-          @click="openNewCom"
+      <div v-if="!comForm" class="space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <p class="text-sm" style="color: var(--color-muted)">
+            {{ comunicados.length }} comunicado(s).
+          </p>
+          <button
+            v-if="can('site.comunicados.manage')"
+            type="button"
+            class="btn btn-primary"
+            data-testid="site-novo-comunicado"
+            @click="openNewCom"
+          >
+            <FontAwesomeIcon :icon="faPlus" />
+            Novo comunicado
+          </button>
+        </div>
+        <div
+          v-if="!comunicados.length"
+          class="card p-8 text-center"
+          style="color: var(--color-muted)"
         >
-          Novo comunicado
-        </button>
-        <ul class="divide-y border rounded bg-white">
-          <li v-for="c in comunicados" :key="c.id" class="px-4 py-3 flex justify-between">
-            <div>
-              <div class="font-medium">{{ c.titulo }}</div>
-              <div class="text-xs text-black/50">{{ c.status }}</div>
+          Nenhum comunicado cadastrado.
+        </div>
+        <div v-else class="card divide-y" style="border-color: var(--color-line)">
+          <div
+            v-for="c in comunicados"
+            :key="c.id"
+            class="px-5 py-4 flex flex-wrap items-center justify-between gap-3"
+          >
+            <div class="min-w-0">
+              <div class="flex items-center gap-2">
+                <h3 class="text-base leading-tight">{{ c.titulo }}</h3>
+                <span class="badge" :class="c.status === 'publicado' ? 'badge-success' : 'badge-warning'">
+                  {{ c.status === 'publicado' ? 'Publicado' : 'Rascunho' }}
+                </span>
+              </div>
+              <p v-if="c.resumo" class="text-sm mt-1 truncate" style="color: var(--color-muted)">
+                {{ c.resumo }}
+              </p>
             </div>
-            <div class="flex gap-2 text-sm">
-              <button type="button" class="underline" @click="comForm = { ...c }">Editar</button>
-              <button type="button" class="text-red-700 underline" @click="removeCom(c)">Remover</button>
+            <div class="flex gap-2">
+              <button class="btn btn-ghost" @click="comForm = { ...c }">Editar</button>
+              <button class="btn btn-ghost" style="color: var(--color-danger)" @click="removeCom(c)">
+                Excluir
+              </button>
             </div>
-          </li>
-        </ul>
+          </div>
+        </div>
       </div>
-      <div v-else class="space-y-3 max-w-2xl">
-        <input v-model="comForm.titulo" placeholder="Título" class="w-full border px-3 py-2 rounded" />
-        <input v-model="comForm.resumo" placeholder="Resumo" class="w-full border px-3 py-2 rounded" />
-        <textarea v-model="comForm.corpo" rows="6" placeholder="Corpo" class="w-full border px-3 py-2 rounded" />
-        <select v-model="comForm.status" class="border px-3 py-2 rounded">
-          <option value="rascunho">Rascunho</option>
-          <option value="publicado">Publicado</option>
-        </select>
+
+      <div v-else class="card p-6 max-w-2xl space-y-4">
+        <h3 class="text-xl">{{ comForm.id ? 'Editar comunicado' : 'Novo comunicado' }}</h3>
+        <div>
+          <label class="fld" for="com-titulo">Título</label>
+          <input id="com-titulo" v-model="comForm.titulo" class="input" data-testid="comunicado-titulo" />
+        </div>
+        <div>
+          <label class="fld" for="com-resumo">Resumo</label>
+          <input id="com-resumo" v-model="comForm.resumo" class="input" />
+        </div>
+        <div>
+          <label class="fld" for="com-corpo">Conteúdo</label>
+          <textarea id="com-corpo" v-model="comForm.corpo" rows="8" class="input" />
+        </div>
+        <div class="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label class="fld" for="com-status">Situação</label>
+            <select id="com-status" v-model="comForm.status" class="input">
+              <option value="rascunho">Rascunho</option>
+              <option value="publicado">Publicado</option>
+            </select>
+          </div>
+          <div>
+            <label class="fld" for="com-igreja">Igreja (opcional)</label>
+            <select id="com-igreja" v-model="comForm.igreja_id" class="input">
+              <option :value="null">Toda a organização</option>
+              <option v-for="i in igrejas" :key="i.id" :value="i.id">{{ i.nome }}</option>
+            </select>
+          </div>
+        </div>
+        <label class="flex items-center gap-2 text-sm">
+          <input v-model="comForm.destaque" type="checkbox" />
+          Marcar como destaque
+        </label>
         <div class="flex gap-2">
-          <button type="button" class="px-4 py-2 bg-[var(--color-primary)] text-white rounded" @click="saveCom">Salvar</button>
-          <button type="button" class="px-4 py-2 border rounded" @click="comForm = null">Cancelar</button>
+          <button type="button" class="btn btn-primary" :disabled="saving" @click="saveCom">
+            {{ saving ? 'Salvando…' : 'Salvar' }}
+          </button>
+          <button type="button" class="btn btn-ghost" @click="comForm = null">Cancelar</button>
         </div>
       </div>
     </div>
 
     <!-- Pastorais -->
     <div v-else-if="tab === 'pastorais'" class="space-y-4">
-      <div v-if="!pastForm">
-        <button
-          v-if="can('site.pastorais.manage')"
-          type="button"
-          class="px-3 py-1.5 text-sm bg-[var(--color-primary)] text-white rounded mb-3"
-          @click="openNewPast"
+      <div v-if="!pastForm" class="space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <p class="text-sm" style="color: var(--color-muted)">
+            {{ pastorais.length }} pastoral(is).
+          </p>
+          <button
+            v-if="can('site.pastorais.manage')"
+            type="button"
+            class="btn btn-primary"
+            data-testid="site-nova-pastoral"
+            @click="openNewPast"
+          >
+            <FontAwesomeIcon :icon="faPlus" />
+            Nova pastoral
+          </button>
+        </div>
+        <div
+          v-if="!pastorais.length"
+          class="card p-8 text-center"
+          style="color: var(--color-muted)"
         >
-          Nova pastoral
-        </button>
-        <ul class="divide-y border rounded bg-white">
-          <li v-for="p in pastorais" :key="p.id" class="px-4 py-3 flex justify-between">
-            <div>
-              <div class="font-medium">{{ p.nome }}</div>
-              <div class="text-xs text-black/50">{{ p.igreja_nome || p.igreja_id }}</div>
+          Nenhuma pastoral cadastrada.
+        </div>
+        <div v-else class="grid gap-4 sm:grid-cols-2">
+          <div v-for="p in pastorais" :key="p.id" class="card p-5">
+            <div class="flex items-start justify-between gap-3">
+              <h3 class="text-lg leading-tight">{{ p.nome }}</h3>
+              <span class="badge" :class="p.publicado_no_site ? 'badge-success' : 'badge-info'">
+                {{ p.publicado_no_site ? 'No site' : 'Interna' }}
+              </span>
             </div>
-            <div class="flex gap-2 text-sm">
-              <button type="button" class="underline" @click="pastForm = { ...p }">Editar</button>
-              <button type="button" class="text-red-700 underline" @click="removePast(p)">Remover</button>
+            <p class="text-sm mt-1" style="color: var(--color-muted)">
+              {{ p.igreja_nome || igrejas.find((i) => i.id === p.igreja_id)?.nome || '—' }}
+            </p>
+            <div class="mt-4 flex gap-2">
+              <button class="btn btn-ghost" @click="pastForm = { ...p }">Editar</button>
+              <button class="btn btn-ghost" style="color: var(--color-danger)" @click="removePast(p)">
+                Excluir
+              </button>
             </div>
-          </li>
-        </ul>
+          </div>
+        </div>
       </div>
-      <div v-else class="space-y-3 max-w-2xl">
-        <select v-model="pastForm.igreja_id" class="w-full border px-3 py-2 rounded">
-          <option v-for="i in igrejas" :key="i.id" :value="i.id">{{ i.nome }}</option>
-        </select>
-        <input v-model="pastForm.nome" placeholder="Nome" class="w-full border px-3 py-2 rounded" />
-        <textarea v-model="pastForm.descricao_publica" rows="3" placeholder="Descrição pública" class="w-full border px-3 py-2 rounded" />
-        <input v-model="pastForm.contato_publico" placeholder="Contato público" class="w-full border px-3 py-2 rounded" />
-        <label class="flex items-center gap-2 text-sm">
-          <input v-model="pastForm.publicado_no_site" type="checkbox" />
-          Publicar no site
-        </label>
+
+      <div v-else class="card p-6 max-w-2xl space-y-4">
+        <h3 class="text-xl">{{ pastForm.id ? 'Editar pastoral' : 'Nova pastoral' }}</h3>
+        <div>
+          <label class="fld" for="past-igreja">Igreja</label>
+          <select id="past-igreja" v-model="pastForm.igreja_id" class="input">
+            <option v-for="i in igrejas" :key="i.id" :value="i.id">{{ i.nome }}</option>
+          </select>
+        </div>
+        <div>
+          <label class="fld" for="past-nome">Nome</label>
+          <input id="past-nome" v-model="pastForm.nome" class="input" data-testid="pastoral-nome" />
+        </div>
+        <div>
+          <label class="fld" for="past-desc">Descrição pública</label>
+          <textarea id="past-desc" v-model="pastForm.descricao_publica" rows="4" class="input" />
+        </div>
+        <div>
+          <label class="fld" for="past-contato">Contato público</label>
+          <input id="past-contato" v-model="pastForm.contato_publico" class="input" />
+        </div>
+        <div class="flex flex-wrap gap-5">
+          <label class="flex items-center gap-2 text-sm">
+            <input v-model="pastForm.publicado_no_site" type="checkbox" />
+            Exibir no site
+          </label>
+          <label class="flex items-center gap-2 text-sm">
+            <input v-model="pastForm.ativa" type="checkbox" />
+            Pastoral ativa
+          </label>
+        </div>
         <div class="flex gap-2">
-          <button type="button" class="px-4 py-2 bg-[var(--color-primary)] text-white rounded" @click="savePast">Salvar</button>
-          <button type="button" class="px-4 py-2 border rounded" @click="pastForm = null">Cancelar</button>
+          <button type="button" class="btn btn-primary" :disabled="saving" @click="savePast">
+            {{ saving ? 'Salvando…' : 'Salvar' }}
+          </button>
+          <button type="button" class="btn btn-ghost" @click="pastForm = null">Cancelar</button>
         </div>
       </div>
     </div>
 
-    <!-- Forms -->
+    <!-- Formulários -->
     <div v-else-if="tab === 'forms'" class="space-y-4">
-      <div v-if="!formForm">
-        <button
-          v-if="can('site.forms.manage')"
-          type="button"
-          class="px-3 py-1.5 text-sm bg-[var(--color-primary)] text-white rounded mb-3"
-          @click="openNewForm"
-        >
-          Novo formulário
-        </button>
-        <ul class="divide-y border rounded bg-white">
-          <li v-for="f in forms" :key="f.id" class="px-4 py-3 flex justify-between">
+      <div v-if="!formForm" class="space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <p class="text-sm" style="color: var(--color-muted)">
+            {{ forms.length }} formulário(s).
+          </p>
+          <button
+            v-if="can('site.forms.manage')"
+            type="button"
+            class="btn btn-primary"
+            data-testid="site-novo-formulario"
+            @click="openNewForm"
+          >
+            <FontAwesomeIcon :icon="faPlus" />
+            Novo formulário
+          </button>
+        </div>
+
+        <div v-if="!forms.length" class="card p-8 text-center" style="color: var(--color-muted)">
+          Nenhum formulário criado.
+        </div>
+        <div v-else class="card divide-y" style="border-color: var(--color-line)">
+          <div
+            v-for="f in forms"
+            :key="f.id"
+            class="px-5 py-4 flex flex-wrap items-center justify-between gap-3"
+          >
             <div>
-              <div class="font-medium">{{ f.nome }} <span class="text-xs text-black/50">/{{ f.slug }}</span></div>
+              <div class="flex items-center gap-2">
+                <h3 class="text-base leading-tight">{{ f.nome }}</h3>
+                <span class="badge" :class="f.ativo ? 'badge-success' : 'badge-warning'">
+                  {{ f.ativo ? 'Ativo' : 'Inativo' }}
+                </span>
+              </div>
+              <p class="text-xs font-mono mt-1" style="color: var(--color-muted)">/{{ f.slug }}</p>
             </div>
-            <div class="flex gap-2 text-sm">
-              <button type="button" class="underline" @click="formForm = { ...f, fields: f.fields || [] }">Editar</button>
+            <div class="flex gap-2">
+              <button class="btn btn-ghost" data-testid="formulario-editar" @click="openEditForm(f)">
+                Editar
+              </button>
               <button
                 v-if="can('site.forms.submissions.view')"
-                type="button"
-                class="underline"
-                @click="loadSubmissions(f.id)"
+                class="btn btn-ghost"
+                @click="loadSubmissions(f)"
               >
                 Respostas
               </button>
             </div>
-          </li>
-        </ul>
-        <div v-if="submissions.length" class="mt-4 border rounded bg-white p-4">
-          <h3 class="font-medium mb-2">Respostas</h3>
-          <pre class="text-xs overflow-auto">{{ submissions }}</pre>
+          </div>
+        </div>
+
+        <div v-if="submissionsForm" class="card p-5" data-testid="site-submissions">
+          <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <h3 class="text-lg">Respostas · {{ submissionsForm.nome }}</h3>
+            <button class="btn btn-ghost" @click="closeSubmissions">Fechar</button>
+          </div>
+          <p v-if="!submissions.length" class="text-sm" style="color: var(--color-muted)">
+            Nenhuma resposta recebida.
+          </p>
+          <div v-else class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="text-left" style="color: var(--color-muted)">
+                  <th class="py-2 pr-4 font-semibold whitespace-nowrap">Recebida em</th>
+                  <th
+                    v-for="col in submissionColumns"
+                    :key="col"
+                    class="py-2 pr-4 font-semibold whitespace-nowrap"
+                  >
+                    {{ col }}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="s in submissions"
+                  :key="s.id"
+                  class="border-t"
+                  style="border-color: var(--color-line)"
+                >
+                  <td class="py-2.5 pr-4 whitespace-nowrap">{{ formatDate(s.created_at) }}</td>
+                  <td v-for="col in submissionColumns" :key="col" class="py-2.5 pr-4">
+                    {{ s.values?.[col] ?? '—' }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
-      <div v-else class="space-y-3 max-w-2xl">
-        <input v-model="formForm.nome" placeholder="Nome" class="w-full border px-3 py-2 rounded" />
-        <input v-model="formForm.slug" placeholder="Slug" class="w-full border px-3 py-2 rounded" />
-        <textarea v-model="formForm.descricao" rows="2" placeholder="Descrição" class="w-full border px-3 py-2 rounded" />
-        <input v-model="formForm.sucesso_mensagem" placeholder="Mensagem de sucesso" class="w-full border px-3 py-2 rounded" />
-        <label class="flex items-center gap-2 text-sm">
-          <input v-model="formForm.ativo" type="checkbox" />
-          Ativo
-        </label>
-        <p class="text-sm text-black/60">Campos: {{ formForm.fields?.length || 0 }} (edição avançada via JSON na API nesta versão)</p>
-        <div class="flex gap-2">
-          <button type="button" class="px-4 py-2 bg-[var(--color-primary)] text-white rounded" @click="saveFormDef">Salvar</button>
-          <button type="button" class="px-4 py-2 border rounded" @click="formForm = null">Cancelar</button>
+
+      <div v-else class="grid gap-4 lg:grid-cols-12 items-start">
+        <div class="lg:col-span-5 card p-5 space-y-4">
+          <h3 class="text-xl">{{ formForm.id ? 'Editar formulário' : 'Novo formulário' }}</h3>
+          <div>
+            <label class="fld" for="fm-nome">Nome</label>
+            <input id="fm-nome" v-model="formForm.nome" class="input" data-testid="formulario-nome" />
+          </div>
+          <div>
+            <label class="fld" for="fm-slug">Endereço (slug)</label>
+            <input id="fm-slug" v-model="formForm.slug" class="input" placeholder="contato" />
+          </div>
+          <div>
+            <label class="fld" for="fm-desc">Descrição</label>
+            <textarea id="fm-desc" v-model="formForm.descricao" rows="3" class="input" />
+          </div>
+          <div>
+            <label class="fld" for="fm-sucesso">Mensagem após o envio</label>
+            <input id="fm-sucesso" v-model="formForm.sucesso_mensagem" class="input" />
+          </div>
+          <label class="flex items-center gap-2 text-sm">
+            <input v-model="formForm.ativo" type="checkbox" />
+            Formulário ativo
+          </label>
+          <p
+            class="text-[13px] rounded-xl px-3.5 py-3 flex gap-2"
+            style="background: var(--color-surface-2); color: var(--color-muted)"
+          >
+            <FontAwesomeIcon :icon="faCircleInfo" class="mt-0.5 shrink-0" />
+            As respostas são armazenadas criptografadas e só aparecem para quem tem permissão de
+            visualizá-las.
+          </p>
+        </div>
+
+        <div class="lg:col-span-7 card p-5 space-y-4">
+          <div>
+            <h3 class="text-xl">Campos</h3>
+            <p class="mt-1 text-sm" style="color: var(--color-muted)">
+              Definem o que o visitante preenche no site.
+            </p>
+          </div>
+
+          <ul
+            v-if="formErrors.length"
+            class="rounded-xl px-4 py-3 text-sm space-y-1"
+            style="background: rgba(162, 58, 58, 0.08); color: var(--color-danger)"
+            data-testid="formulario-erros"
+          >
+            <li v-for="(err, i) in formErrors" :key="i">{{ err }}</li>
+          </ul>
+
+          <SiteFormFieldsEditor v-model="formForm.fields" />
+
+          <div class="flex gap-2 pt-2">
+            <button
+              type="button"
+              class="btn btn-primary"
+              :disabled="saving"
+              data-testid="formulario-salvar"
+              @click="saveFormDef"
+            >
+              {{ saving ? 'Salvando…' : 'Salvar formulário' }}
+            </button>
+            <button type="button" class="btn btn-ghost" @click="formForm = null">Cancelar</button>
+          </div>
         </div>
       </div>
     </div>
