@@ -35,6 +35,7 @@ return [
         'zip_code',
         'birth_date',
         'document_number',
+        'payload', // site_form_submissions (JSON criptografado)
     ],
 
     /*

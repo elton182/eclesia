@@ -20,6 +20,7 @@ class IgrejaResource extends JsonResource
         return [
             'id' => $this->id,
             'nome' => $this->nome,
+            'slug' => $this->slug,
             'tipo' => $this->tipo,
             'endereco' => $this->endereco,
             'bairro' => $this->bairro,
@@ -28,6 +29,10 @@ class IgrejaResource extends JsonResource
             'cep' => $this->cep,
             'telefone' => $this->telefone,
             'email' => $this->email,
+            'publicado_no_site' => (bool) $this->publicado_no_site,
+            'descricao_publica' => $this->descricao_publica,
+            'horario_missas' => $this->horario_missas,
+            'banner_media_id' => $this->banner_media_id,
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
         ];

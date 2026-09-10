@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Eclesia API
-  version: 0.5.0
+  version: 0.6.0
   description: |
     API multi-tenant do Eclesia (gestão eclesial).
     Contexto central (landlord): `/admin/*`.
@@ -9,6 +9,7 @@ info:
     Igreja atual: header `X-Igreja` (ULID) validado contra o acesso do ator → IgrejaContext.
     Login web resolve tenant por slug|apelido|nome no body (sem X-Tenant obrigatório).
     Dados pessoais criptografados em repouso (LGPD).
+    Site público do tenant: `/public/site*` (X-Tenant, sem auth) — SPEC-005 / ADR-0003.
 servers:
   - url: http://localhost:8000/api/v1
     description: Local
@@ -62,12 +63,206 @@ components:
           type: string
           format: email
           nullable: true
+        slug:
+          type: string
+          nullable: true
+        publicado_no_site:
+          type: boolean
+        descricao_publica:
+          type: string
+          nullable: true
+        horario_missas:
+          type: string
+          nullable: true
+        banner_media_id:
+          type: string
+          nullable: true
+          description: ULID de site_media
         created_at:
           type: string
           format: date-time
         updated_at:
           type: string
           format: date-time
+    SiteSettings:
+      type: object
+      properties:
+        publicado:
+          type: boolean
+        titulo:
+          type: string
+        subtitulo:
+          type: string
+          nullable: true
+        logo_path:
+          type: string
+          nullable: true
+        favicon_path:
+          type: string
+          nullable: true
+        cores:
+          type: object
+          additionalProperties: true
+        seo:
+          type: object
+          additionalProperties: true
+        contato:
+          type: object
+          additionalProperties: true
+        menu:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+    SitePage:
+      type: object
+      properties:
+        id:
+          type: string
+        slug:
+          type: string
+        titulo:
+          type: string
+        status:
+          type: string
+          enum: [rascunho, publicado]
+        is_home:
+          type: boolean
+        ordem:
+          type: integer
+        mostrar_no_menu:
+          type: boolean
+        seo:
+          type: object
+          nullable: true
+          additionalProperties: true
+        blocks:
+          type: array
+          items:
+            $ref: '#/components/schemas/SiteBlock'
+    SiteBlock:
+      type: object
+      properties:
+        id:
+          type: string
+        tipo:
+          type: string
+          enum: [hero, banner, richtext, igrejas_list, comunicados_list, pastorais_list, form, html]
+        ordem:
+          type: integer
+        visivel:
+          type: boolean
+        payload:
+          type: object
+          additionalProperties: true
+    SiteComunicado:
+      type: object
+      properties:
+        id:
+          type: string
+        titulo:
+          type: string
+        resumo:
+          type: string
+          nullable: true
+        corpo:
+          type: string
+        capa_media_id:
+          type: string
+          nullable: true
+        publicado_em:
+          type: string
+          format: date-time
+          nullable: true
+        status:
+          type: string
+          enum: [rascunho, publicado]
+        destaque:
+          type: boolean
+        igreja_id:
+          type: string
+          nullable: true
+    Pastoral:
+      type: object
+      properties:
+        id:
+          type: string
+        igreja_id:
+          type: string
+        nome:
+          type: string
+        descricao_publica:
+          type: string
+          nullable: true
+        contato_publico:
+          type: string
+          nullable: true
+        ordem:
+          type: integer
+        publicado_no_site:
+          type: boolean
+        ativa:
+          type: boolean
+    SiteForm:
+      type: object
+      properties:
+        id:
+          type: string
+        nome:
+          type: string
+        slug:
+          type: string
+        descricao:
+          type: string
+          nullable: true
+        ativo:
+          type: boolean
+        destino_email:
+          type: string
+          nullable: true
+        sucesso_mensagem:
+          type: string
+          nullable: true
+        fields:
+          type: array
+          items:
+            $ref: '#/components/schemas/SiteFormField'
+    SiteFormField:
+      type: object
+      properties:
+        id:
+          type: integer
+        nome:
+          type: string
+        label:
+          type: string
+        tipo:
+          type: string
+          enum: [text, email, tel, textarea, select, checkbox]
+        obrigatorio:
+          type: boolean
+        opcoes:
+          type: array
+          items:
+            type: string
+        ordem:
+          type: integer
+    SiteMedia:
+      type: object
+      properties:
+        id:
+          type: string
+        path:
+          type: string
+        alt:
+          type: string
+          nullable: true
+        mime:
+          type: string
+          nullable: true
+        url:
+          type: string
+          nullable: true
     Tenant:
       type: object
       properties:
@@ -951,3 +1146,430 @@ paths:
       responses:
         '204':
           description: Removido
+  /public/site:
+    get:
+      summary: Site público (settings + home)
+      description: Requer X-Tenant. 404 se site não publicado.
+      security:
+        - tenantHeader: []
+      responses:
+        '200':
+          description: Site publicado
+        '404':
+          description: Site não publicado ou tenant inexistente
+  /public/site/pages/{slug}:
+    get:
+      summary: Página pública por slug
+      security:
+        - tenantHeader: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Página publicada
+        '404':
+          description: Não encontrada / site off
+  /public/site/comunicados:
+    get:
+      summary: Listar comunicados públicos
+      security:
+        - tenantHeader: []
+      responses:
+        '200':
+          description: Lista
+  /public/site/comunicados/{id}:
+    get:
+      summary: Detalhe comunicado público
+      security:
+        - tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Comunicado
+        '404':
+          description: Não encontrado
+  /public/site/pastorais:
+    get:
+      summary: Listar pastorais públicas
+      security:
+        - tenantHeader: []
+      parameters:
+        - name: igreja
+          in: query
+          schema:
+            type: string
+          description: ULID ou slug da igreja
+      responses:
+        '200':
+          description: Lista
+  /public/site/igrejas:
+    get:
+      summary: Listar igrejas publicadas no site
+      security:
+        - tenantHeader: []
+      responses:
+        '200':
+          description: Lista
+  /public/site/igrejas/{slug}:
+    get:
+      summary: Detalhe igreja pública
+      security:
+        - tenantHeader: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Igreja
+        '404':
+          description: Não encontrada
+  /public/site/forms/{slug}:
+    get:
+      summary: Schema do formulário público (sem destino_email)
+      security:
+        - tenantHeader: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Formulário ativo
+        '404':
+          description: Não encontrado / site off
+  /public/site/forms/{slug}/submissions:
+    post:
+      summary: Enviar formulário público
+      security:
+        - tenantHeader: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                values:
+                  type: object
+                  additionalProperties: true
+                website:
+                  type: string
+                  description: Honeypot — deve ficar vazio
+      responses:
+        '201':
+          description: Enviado
+        '422':
+          description: Validação
+        '429':
+          description: Rate limit
+  /site/settings:
+    get:
+      summary: Obter settings do site (admin)
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      responses:
+        '200':
+          description: Settings
+    put:
+      summary: Atualizar settings do site
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      responses:
+        '200':
+          description: Atualizado
+  /site/pages:
+    get:
+      summary: Listar páginas (admin)
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      responses:
+        '200':
+          description: Lista
+    post:
+      summary: Criar página
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      responses:
+        '201':
+          description: Criada
+  /site/pages/{id}:
+    get:
+      summary: Detalhe página
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Página
+    put:
+      summary: Atualizar página (+ blocos opcionais)
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Atualizada
+    delete:
+      summary: Remover página
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Removida
+  /site/media:
+    get:
+      summary: Listar mídias
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      responses:
+        '200':
+          description: Lista
+    post:
+      summary: Upload de mídia
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      responses:
+        '201':
+          description: Criada
+  /site/comunicados:
+    get:
+      summary: Listar comunicados (admin)
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      responses:
+        '200':
+          description: Lista
+    post:
+      summary: Criar comunicado
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      responses:
+        '201':
+          description: Criado
+  /site/comunicados/{id}:
+    get:
+      summary: Detalhe comunicado
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Comunicado
+    put:
+      summary: Atualizar comunicado
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Atualizado
+    delete:
+      summary: Remover comunicado
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Removido
+  /site/pastorais:
+    get:
+      summary: Listar pastorais (admin)
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      responses:
+        '200':
+          description: Lista
+    post:
+      summary: Criar pastoral
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      responses:
+        '201':
+          description: Criada
+  /site/pastorais/{id}:
+    get:
+      summary: Detalhe pastoral
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Pastoral
+    put:
+      summary: Atualizar pastoral
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Atualizada
+    delete:
+      summary: Remover pastoral
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Removida
+  /site/forms:
+    get:
+      summary: Listar formulários (admin)
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      responses:
+        '200':
+          description: Lista
+    post:
+      summary: Criar formulário
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      responses:
+        '201':
+          description: Criado
+  /site/forms/{id}:
+    get:
+      summary: Detalhe formulário
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Form
+    put:
+      summary: Atualizar formulário (+ fields)
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Atualizado
+    delete:
+      summary: Remover formulário
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Removido
+  /site/forms/{id}/submissions:
+    get:
+      summary: Listar submissions (PII)
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Lista
+        '403':
+          description: Sem permissão

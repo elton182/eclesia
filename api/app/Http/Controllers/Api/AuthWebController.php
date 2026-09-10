@@ -100,6 +100,9 @@ class AuthWebController extends Controller
         setPermissionsTeamId(null);
         if ($user->hasRole('admin-tenant')) {
             $permissions = Permission::query()->where('guard_name', 'web')->pluck('name')->values()->all();
+        } elseif ($user->hasRole('gestor-site')) {
+            $orgPermissions = $user->getAllPermissions()->pluck('name')->values()->all();
+            $permissions = array_values(array_unique([...$permissions, ...$orgPermissions]));
         }
 
         return response()->json([

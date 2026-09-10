@@ -1,0 +1,146 @@
+<?php
+
+declare(strict_types=1);
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::table('igrejas', function (Blueprint $table) {
+            $table->string('slug')->nullable()->unique()->after('nome');
+            $table->boolean('publicado_no_site')->default(false)->after('email');
+            $table->text('descricao_publica')->nullable()->after('publicado_no_site');
+            $table->text('horario_missas')->nullable()->after('descricao_publica');
+            $table->ulid('banner_media_id')->nullable()->after('horario_missas');
+        });
+
+        Schema::create('site_settings', function (Blueprint $table) {
+            $table->id();
+            $table->boolean('publicado')->default(false);
+            $table->string('titulo')->default('Site');
+            $table->string('subtitulo')->nullable();
+            $table->string('logo_path')->nullable();
+            $table->string('favicon_path')->nullable();
+            $table->json('cores')->nullable();
+            $table->json('seo')->nullable();
+            $table->json('contato')->nullable();
+            $table->json('menu')->nullable();
+            $table->timestamps();
+        });
+
+        Schema::create('site_media', function (Blueprint $table) {
+            $table->ulid('id')->primary();
+            $table->string('path');
+            $table->string('alt')->nullable();
+            $table->string('mime')->nullable();
+            $table->foreignUlid('uploaded_by')->nullable()->constrained('users')->nullOnDelete();
+            $table->timestamps();
+        });
+
+        Schema::create('site_pages', function (Blueprint $table) {
+            $table->ulid('id')->primary();
+            $table->string('slug')->unique();
+            $table->string('titulo');
+            $table->string('status', 32)->default('rascunho');
+            $table->boolean('is_home')->default(false);
+            $table->unsignedInteger('ordem')->default(0);
+            $table->boolean('mostrar_no_menu')->default(true);
+            $table->json('seo')->nullable();
+            $table->timestamps();
+        });
+
+        Schema::create('site_blocks', function (Blueprint $table) {
+            $table->ulid('id')->primary();
+            $table->foreignUlid('site_page_id')->constrained('site_pages')->cascadeOnDelete();
+            $table->string('tipo', 64);
+            $table->unsignedInteger('ordem')->default(0);
+            $table->boolean('visivel')->default(true);
+            $table->json('payload')->nullable();
+            $table->timestamps();
+        });
+
+        Schema::create('site_comunicados', function (Blueprint $table) {
+            $table->ulid('id')->primary();
+            $table->string('titulo');
+            $table->text('resumo')->nullable();
+            $table->longText('corpo');
+            $table->foreignUlid('capa_media_id')->nullable()->constrained('site_media')->nullOnDelete();
+            $table->timestamp('publicado_em')->nullable();
+            $table->string('status', 32)->default('rascunho');
+            $table->boolean('destaque')->default(false);
+            $table->foreignUlid('igreja_id')->nullable()->constrained('igrejas')->nullOnDelete();
+            $table->timestamps();
+        });
+
+        Schema::create('pastorais', function (Blueprint $table) {
+            $table->ulid('id')->primary();
+            $table->foreignUlid('igreja_id')->constrained('igrejas')->cascadeOnDelete();
+            $table->string('nome');
+            $table->text('descricao_publica')->nullable();
+            $table->text('contato_publico')->nullable();
+            $table->unsignedInteger('ordem')->default(0);
+            $table->boolean('publicado_no_site')->default(false);
+            $table->boolean('ativa')->default(true);
+            $table->timestamps();
+        });
+
+        Schema::create('site_forms', function (Blueprint $table) {
+            $table->ulid('id')->primary();
+            $table->string('nome');
+            $table->string('slug')->unique();
+            $table->text('descricao')->nullable();
+            $table->boolean('ativo')->default(true);
+            $table->string('destino_email')->nullable();
+            $table->string('sucesso_mensagem')->nullable();
+            $table->timestamps();
+        });
+
+        Schema::create('site_form_fields', function (Blueprint $table) {
+            $table->id();
+            $table->foreignUlid('site_form_id')->constrained('site_forms')->cascadeOnDelete();
+            $table->string('nome');
+            $table->string('label');
+            $table->string('tipo', 32)->default('text');
+            $table->boolean('obrigatorio')->default(false);
+            $table->json('opcoes')->nullable();
+            $table->unsignedInteger('ordem')->default(0);
+            $table->timestamps();
+        });
+
+        Schema::create('site_form_submissions', function (Blueprint $table) {
+            $table->ulid('id')->primary();
+            $table->foreignUlid('site_form_id')->constrained('site_forms')->cascadeOnDelete();
+            $table->text('payload');
+            $table->string('ip', 45)->nullable();
+            $table->text('user_agent')->nullable();
+            $table->timestamps();
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('site_form_submissions');
+        Schema::dropIfExists('site_form_fields');
+        Schema::dropIfExists('site_forms');
+        Schema::dropIfExists('pastorais');
+        Schema::dropIfExists('site_comunicados');
+        Schema::dropIfExists('site_blocks');
+        Schema::dropIfExists('site_pages');
+        Schema::dropIfExists('site_media');
+        Schema::dropIfExists('site_settings');
+
+        Schema::table('igrejas', function (Blueprint $table) {
+            $table->dropColumn([
+                'slug',
+                'publicado_no_site',
+                'descricao_publica',
+                'horario_missas',
+                'banner_media_id',
+            ]);
+        });
+    }
+};

@@ -23,6 +23,7 @@ class StoreIgrejaRequest extends FormRequest
         return [
             'nome' => ['required', 'string', 'max:255'],
             'tipo' => ['required', 'string', Rule::in(Igreja::TIPOS)],
+            'slug' => ['nullable', 'string', 'max:120', 'alpha_dash', 'unique:igrejas,slug'],
             'endereco' => ['nullable', 'string', 'max:500'],
             'bairro' => ['nullable', 'string', 'max:255'],
             'cidade' => ['nullable', 'string', 'max:255'],
@@ -30,6 +31,10 @@ class StoreIgrejaRequest extends FormRequest
             'cep' => ['nullable', 'string', 'max:20'],
             'telefone' => ['nullable', 'string', 'max:40'],
             'email' => ['nullable', 'email', 'max:255'],
+            'publicado_no_site' => ['sometimes', 'boolean'],
+            'descricao_publica' => ['nullable', 'string'],
+            'horario_missas' => ['nullable', 'string'],
+            'banner_media_id' => ['nullable', 'string', 'exists:site_media,id'],
         ];
     }
 }

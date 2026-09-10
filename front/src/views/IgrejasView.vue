@@ -26,6 +26,7 @@ function emptyForm() {
     id: null,
     nome: '',
     tipo: 'paroquia',
+    slug: '',
     endereco: '',
     bairro: '',
     cidade: '',
@@ -33,6 +34,9 @@ function emptyForm() {
     cep: '',
     telefone: '',
     email: '',
+    publicado_no_site: false,
+    descricao_publica: '',
+    horario_missas: '',
   }
 }
 
@@ -86,6 +90,7 @@ const openEdit = (item) => {
     id: item.id,
     nome: item.nome || '',
     tipo: item.tipo || 'paroquia',
+    slug: item.slug || '',
     endereco: item.endereco || '',
     bairro: item.bairro || '',
     cidade: item.cidade || '',
@@ -93,6 +98,9 @@ const openEdit = (item) => {
     cep: item.cep || '',
     telefone: item.telefone || '',
     email: item.email || '',
+    publicado_no_site: !!item.publicado_no_site,
+    descricao_publica: item.descricao_publica || '',
+    horario_missas: item.horario_missas || '',
   }
   mode.value = 'form'
 }
@@ -110,6 +118,7 @@ const save = async () => {
     const payload = {
       nome: form.value.nome,
       tipo: form.value.tipo,
+      slug: form.value.slug || null,
       endereco: form.value.endereco || null,
       bairro: form.value.bairro || null,
       cidade: form.value.cidade || null,
@@ -117,6 +126,9 @@ const save = async () => {
       cep: form.value.cep || null,
       telefone: form.value.telefone || null,
       email: form.value.email || null,
+      publicado_no_site: !!form.value.publicado_no_site,
+      descricao_publica: form.value.descricao_publica || null,
+      horario_missas: form.value.horario_missas || null,
     }
     if (form.value.id) {
       await api.put(`/igrejas/${form.value.id}`, payload)
@@ -275,6 +287,22 @@ onMounted(load)
             <label class="fld" for="ig-email">E-mail</label>
             <input id="ig-email" v-model="form.email" type="email" class="input" />
           </div>
+        </div>
+        <div>
+          <label class="fld" for="ig-slug">Slug público</label>
+          <input id="ig-slug" v-model="form.slug" class="input" placeholder="ex.: matriz" />
+        </div>
+        <label class="flex items-center gap-2 text-sm">
+          <input v-model="form.publicado_no_site" type="checkbox" />
+          Publicar no site da organização
+        </label>
+        <div>
+          <label class="fld" for="ig-desc">Descrição pública</label>
+          <textarea id="ig-desc" v-model="form.descricao_publica" class="input" rows="3" />
+        </div>
+        <div>
+          <label class="fld" for="ig-missas">Horário de missas</label>
+          <textarea id="ig-missas" v-model="form.horario_missas" class="input" rows="2" />
         </div>
         <div class="flex gap-2">
           <button type="submit" class="btn btn-primary" :disabled="saving" data-testid="igreja-salvar">

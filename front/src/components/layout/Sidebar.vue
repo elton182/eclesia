@@ -9,6 +9,7 @@ import {
   faUserShield,
   faHouse,
   faChurch,
+  faGlobe,
 } from '@fortawesome/free-solid-svg-icons'
 import { library } from '@fortawesome/fontawesome-svg-core'
 import { useTenantStore } from '@/stores/tenant'
@@ -17,7 +18,7 @@ import { useAuthStore } from '@/stores/auth'
 import { userHasPermission } from '@/utils/userRoles'
 import logoUrl from '@/assets/logo-icon.png'
 
-library.add(faBuilding, faUsers, faHeart, faUserShield, faHouse, faChurch)
+library.add(faBuilding, faUsers, faHeart, faUserShield, faHouse, faChurch, faGlobe)
 
 defineProps({
   isOpen: { type: Boolean, default: true },
@@ -54,6 +55,9 @@ const tenantItems = computed(() => {
   }
   if (can('telas.usuarios') || (authAdmin.isAuthenticated && !authTenant.isAuthenticated)) {
     items.push({ label: 'Usuários', icon: faUserShield, path: '/usuarios' })
+  }
+  if (can('telas.site') || (authAdmin.isAuthenticated && !authTenant.isAuthenticated)) {
+    items.push({ label: 'Site', icon: faGlobe, path: '/site' })
   }
   return items
 })

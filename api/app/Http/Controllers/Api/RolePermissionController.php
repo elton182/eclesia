@@ -22,7 +22,10 @@ class RolePermissionController extends Controller
 
         $allowed = $request->user() instanceof SuperAdmin
             ? RolesAndPermissionsSeeder::ROLES
-            : RolesAndPermissionsSeeder::ROLES_TENANT_UI;
+            : array_values(array_unique([
+                ...RolesAndPermissionsSeeder::ROLES_TENANT_UI,
+                ...RolesAndPermissionsSeeder::ROLES_TENANT_ORG,
+            ]));
 
         $roles = Role::query()
             ->where('guard_name', 'web')

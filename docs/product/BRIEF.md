@@ -126,6 +126,7 @@ Implementar **apenas o ECC** na primeira fase; os demais são visão de futuro.
 | Dízimo | Dizimistas, contribuições, carnês, recibos |
 | Financeiro | Contas, receitas/despesas, caixa geral |
 | Pastorais | Pastorais/movimentos, membros, reuniões |
+| Site | Site público por tenant (CMS, comunicados, pastorais na vitrine, formulários) — ver SPEC-005 / ADR-0003 |
 | Gestão | Tenant, igrejas, usuários, papéis, parâmetros, comunicação |
 
 ---
