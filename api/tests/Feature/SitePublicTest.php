@@ -249,4 +249,23 @@ class SitePublicTest extends TestCase
             ->getJson('/api/v1/site/settings')
             ->assertUnauthorized();
     }
+
+    public function test_super_admin_can_list_comunicados_and_settings(): void
+    {
+        Sanctum::actingAs($this->platform);
+
+        $this->withHeader('X-Tenant', 'org-site')
+            ->getJson('/api/v1/site/settings')
+            ->assertOk();
+
+        $this->withHeader('X-Tenant', 'org-site')
+            ->getJson('/api/v1/site/comunicados')
+            ->assertOk()
+            ->assertJsonPath('data', []);
+
+        $this->withHeader('X-Tenant', 'org-site')
+            ->getJson('/api/v1/site/pastorais')
+            ->assertOk()
+            ->assertJsonPath('data', []);
+    }
 }
