@@ -16,6 +16,7 @@ class EccCasalService
     public function __construct(
         private readonly IgrejaContext $igrejaContext,
         private readonly EccEquipeService $equipes,
+        private readonly EccVisibilityScope $visibility,
     ) {}
 
     /**
@@ -23,19 +24,37 @@ class EccCasalService
      */
     public function list(): Collection
     {
-        return Casal::query()
+        $query = Casal::query()
             ->where('igreja_id', $this->igrejaContext->current()->id)
-            ->with(['pessoaA', 'pessoaB', 'equipe'])
-            ->orderByDesc('created_at')
-            ->get();
+            ->with(['pessoaA', 'pessoaB', 'equipe']);
+
+        $this->applyEquipeScope($query);
+
+        return $query->orderByDesc('created_at')->get();
     }
 
     public function find(string $id): Casal
     {
-        return Casal::query()
+        $query = Casal::query()
             ->where('igreja_id', $this->igrejaContext->current()->id)
-            ->with(['pessoaA', 'pessoaB', 'equipe'])
-            ->findOrFail($id);
+            ->with(['pessoaA', 'pessoaB', 'equipe']);
+
+        $this->applyEquipeScope($query);
+
+        return $query->findOrFail($id);
+    }
+
+    /**
+     * @param  \Illuminate\Database\Eloquent\Builder<Casal>  $query
+     */
+    private function applyEquipeScope($query): void
+    {
+        $equipeIds = $this->visibility->restrictedEquipeIds();
+        if ($equipeIds === null) {
+            return;
+        }
+
+        $query->whereIn('ecc_equipe_id', $equipeIds);
     }
 
     /**

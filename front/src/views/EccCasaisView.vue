@@ -4,14 +4,25 @@ import { useRoute, useRouter } from 'vue-router'
 import * as XLSX from 'xlsx'
 import api from '@/services/api'
 import { useTenantStore } from '@/stores/tenant'
+import { useAuthStore } from '@/stores/auth'
+import { useAuthAdminStore } from '@/stores/authAdmin'
 import { innovToast } from '@/plugins/toast'
 import { filterCasais } from '@/utils/eccFilters'
 import { isoToBr } from '@/utils/dateBr'
+import { userHasPermission } from '@/utils/userRoles'
 import DateInput from '@/components/form/DateInput.vue'
 
 const route = useRoute()
 const router = useRouter()
 const tenantStore = useTenantStore()
+const authStore = useAuthStore()
+const authAdminStore = useAuthAdminStore()
+
+const canManageCasais = computed(() =>
+  userHasPermission(authStore.user, 'ecc.casais.manage', {
+    isSuperAdmin: authAdminStore.isAuthenticated,
+  }),
+)
 
 const casais = ref([])
 const equipes = ref([])
@@ -212,11 +223,25 @@ onMounted(() => {
 
     <div v-if="mode === 'list'" class="space-y-4">
       <div class="toolbar flex flex-wrap gap-3 items-center">
-        <button class="btn btn-primary" @click="openCreate">Novo casal</button>
-        <button class="btn btn-accent" :disabled="importing" @click="fileInput?.click()">
+        <button
+          v-if="canManageCasais"
+          class="btn btn-primary"
+          data-testid="casais-novo"
+          @click="openCreate"
+        >
+          Novo casal
+        </button>
+        <button
+          v-if="canManageCasais"
+          class="btn btn-accent"
+          :disabled="importing"
+          data-testid="casais-import-btn"
+          @click="fileInput?.click()"
+        >
           {{ importing ? 'Importando…' : 'Importar Excel' }}
         </button>
         <input
+          v-if="canManageCasais"
           ref="fileInput"
           type="file"
           accept=".xlsx,.xls,.csv"
@@ -232,7 +257,12 @@ onMounted(() => {
           data-testid="casais-search"
           aria-label="Pesquisar casais"
         />
-        <select v-model="filterEquipe" class="input max-w-xs" aria-label="Filtrar por equipe">
+        <select
+          v-model="filterEquipe"
+          class="input max-w-xs"
+          data-testid="casais-filtro-equipe"
+          aria-label="Filtrar por equipe"
+        >
           <option value="">Todas as equipes</option>
           <option v-for="eq in equipes" :key="eq.id" :value="eq.id">{{ eq.nome }}</option>
         </select>
@@ -287,9 +317,9 @@ onMounted(() => {
                 <span v-if="casal.ecc_origem" class="ml-2">· ECC {{ casal.ecc_origem }}</span>
               </div>
             </div>
-            <div class="flex gap-2">
-              <button class="btn btn-ghost" @click="openEdit(casal)">Editar</button>
-              <button class="btn btn-ghost text-red-700" @click="remove(casal)">Excluir</button>
+            <div v-if="canManageCasais" class="flex gap-2">
+              <button class="btn btn-ghost" data-testid="casais-editar" @click="openEdit(casal)">Editar</button>
+              <button class="btn btn-ghost text-red-700" data-testid="casais-excluir" @click="remove(casal)">Excluir</button>
             </div>
           </div>
         </div>

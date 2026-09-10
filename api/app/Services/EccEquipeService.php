@@ -10,18 +10,40 @@ use Illuminate\Support\Str;
 
 class EccEquipeService
 {
-    public function __construct(private readonly IgrejaContext $igrejaContext) {}
+    public function __construct(
+        private readonly IgrejaContext $igrejaContext,
+        private readonly EccVisibilityScope $visibility,
+    ) {}
 
     /**
      * @return Collection<int, EccEquipe>
      */
     public function list(): Collection
     {
-        return EccEquipe::query()
+        $query = EccEquipe::query()
             ->where('igreja_id', $this->igrejaContext->current()->id)
-            ->withCount('casais')
-            ->orderBy('nome')
-            ->get();
+            ->withCount('casais');
+
+        $equipeIds = $this->visibility->restrictedEquipeIds();
+        if ($equipeIds !== null) {
+            $query->whereIn('id', $equipeIds);
+        }
+
+        return $query->orderBy('nome')->get();
+    }
+
+    public function find(string $id): EccEquipe
+    {
+        $query = EccEquipe::query()
+            ->where('igreja_id', $this->igrejaContext->current()->id)
+            ->withCount('casais');
+
+        $equipeIds = $this->visibility->restrictedEquipeIds();
+        if ($equipeIds !== null) {
+            $query->whereIn('id', $equipeIds);
+        }
+
+        return $query->findOrFail($id);
     }
 
     /**

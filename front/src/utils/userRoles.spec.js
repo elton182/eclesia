@@ -1,6 +1,12 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { buildSyncRolesPayload, roleLabel, userHasPermission } from './userRoles.js'
+import {
+  buildSyncRolesPayload,
+  roleLabel,
+  userHasPermission,
+  isLiderEquipeScoped,
+  equipesLideradasIds,
+} from './userRoles.js'
 
 describe('userRoles', () => {
   it('roleLabel usa nomes amigáveis por tela', () => {
@@ -83,5 +89,23 @@ describe('userRoles', () => {
       userHasPermission({ roles: [{ name: 'admin-igreja' }] }, 'site.settings.update'),
       false,
     )
+  })
+
+  it('líder de equipe não tem manage e fica com escopo de equipe', () => {
+    const lider = {
+      roles: [{ name: 'lider-equipe' }],
+      permissions: ['telas.casais', 'telas.equipes', 'ecc.casais.view', 'ecc.equipes.view'],
+      equipes_lideradas: [{ id: 'eq1', nome: 'A' }],
+    }
+    assert.equal(userHasPermission(lider, 'ecc.casais.view'), true)
+    assert.equal(userHasPermission(lider, 'ecc.casais.manage'), false)
+    assert.equal(isLiderEquipeScoped(lider), true)
+    assert.deepEqual(equipesLideradasIds(lider), ['eq1'])
+  })
+
+  it('cadastros-casais não é escopo de líder', () => {
+    const user = { roles: [{ name: 'cadastros-casais' }] }
+    assert.equal(userHasPermission(user, 'ecc.casais.manage'), true)
+    assert.equal(isLiderEquipeScoped(user), false)
   })
 })

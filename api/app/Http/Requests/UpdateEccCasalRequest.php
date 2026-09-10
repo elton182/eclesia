@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace App\Http\Requests;
 
+use App\Services\EccVisibilityScope;
 use Illuminate\Foundation\Http\FormRequest;
 
 class UpdateEccCasalRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true;
+        return app(EccVisibilityScope::class)->userCan('ecc.casais.manage');
     }
 
     /**
