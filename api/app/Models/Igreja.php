@@ -35,6 +35,7 @@ class Igreja extends Model
      */
     protected $fillable = [
         'nome',
+        'slug',
         'tipo',
         'endereco',
         'bairro',
@@ -43,7 +44,21 @@ class Igreja extends Model
         'cep',
         'telefone',
         'email',
+        'publicado_no_site',
+        'descricao_publica',
+        'horario_missas',
+        'banner_media_id',
     ];
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'publicado_no_site' => 'boolean',
+        ];
+    }
 
     public function pessoas(): HasMany
     {
@@ -58,5 +73,10 @@ class Igreja extends Model
     public function casais(): HasMany
     {
         return $this->hasMany(Casal::class);
+    }
+
+    public function pastorais(): HasMany
+    {
+        return $this->hasMany(Pastoral::class);
     }
 }

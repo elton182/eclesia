@@ -16,6 +16,7 @@ class RolesAndPermissionsSeeder extends Seeder
     /** @var list<string> */
     public const ROLES = [
         'admin-tenant',
+        'gestor-site',
         'admin-igreja',
         'cadastros-usuarios',
         'cadastros-equipes',
@@ -31,6 +32,12 @@ class RolesAndPermissionsSeeder extends Seeder
         'cadastros-equipes',
         'cadastros-casais',
         'lider-equipe',
+    ];
+
+    /** Papéis de organização (team_id null), atribuíveis por admin-tenant. */
+    /** @var list<string> */
+    public const ROLES_TENANT_ORG = [
+        'gestor-site',
     ];
 
     /** @var list<string> */
@@ -50,6 +57,7 @@ class RolesAndPermissionsSeeder extends Seeder
         'telas.equipes',
         'telas.casais',
         'telas.igrejas',
+        'telas.site',
     ];
 
     /** @var list<string> */
@@ -69,6 +77,22 @@ class RolesAndPermissionsSeeder extends Seeder
         'ecc.escala.editar',
     ];
 
+    /** @var list<string> */
+    public const SITE_PERMISSIONS = [
+        'site.settings.view',
+        'site.settings.update',
+        'site.pages.view',
+        'site.pages.manage',
+        'site.comunicados.view',
+        'site.comunicados.manage',
+        'site.pastorais.view',
+        'site.pastorais.manage',
+        'site.forms.view',
+        'site.forms.manage',
+        'site.forms.submissions.view',
+        'site.igrejas.publish',
+    ];
+
     public function run(): void
     {
         app()[PermissionRegistrar::class]->forgetCachedPermissions();
@@ -80,6 +104,7 @@ class RolesAndPermissionsSeeder extends Seeder
             ...self::SCREEN_PERMISSIONS,
             ...self::IGREJA_PERMISSIONS,
             ...self::ECC_STUB_PERMISSIONS,
+            ...self::SITE_PERMISSIONS,
         ] as $name) {
             Permission::findOrCreate($name, self::GUARD);
         }
@@ -91,6 +116,11 @@ class RolesAndPermissionsSeeder extends Seeder
         $adminTenant = Role::findByName('admin-tenant', self::GUARD);
         $adminTenant->syncPermissions(Permission::where('guard_name', self::GUARD)->get());
 
+        Role::findByName('gestor-site', self::GUARD)->syncPermissions([
+            'telas.site',
+            ...self::SITE_PERMISSIONS,
+        ]);
+
         $adminIgreja = Role::findByName('admin-igreja', self::GUARD);
         $adminIgreja->syncPermissions([
             ...self::MANAGEMENT_PERMISSIONS,
@@ -98,6 +128,11 @@ class RolesAndPermissionsSeeder extends Seeder
             ...self::ECC_STUB_PERMISSIONS,
             'igrejas.view',
             'igrejas.update',
+            'telas.site',
+            'site.comunicados.view',
+            'site.comunicados.manage',
+            'site.pastorais.view',
+            'site.pastorais.manage',
         ]);
 
         Role::findByName('cadastros-usuarios', self::GUARD)->syncPermissions([

@@ -11,6 +11,8 @@ import UsersView from '../views/UsersView.vue'
 import IgrejasView from '../views/IgrejasView.vue'
 import EccEquipesView from '../views/EccEquipesView.vue'
 import EccCasaisView from '../views/EccCasaisView.vue'
+import SiteAdminView from '../views/SiteAdminView.vue'
+import PublicSiteView from '../views/site/PublicSiteView.vue'
 import AdminLayout from '../layouts/AdminLayout.vue'
 import AuthLayout from '../layouts/AuthLayout.vue'
 import PublicLayout from '../layouts/PublicLayout.vue'
@@ -31,6 +33,18 @@ const router = createRouter({
           component: LandingView,
         },
       ],
+    },
+    {
+      path: '/site/:tenantSlug',
+      name: 'public-site',
+      component: PublicSiteView,
+      meta: { publicSite: true },
+    },
+    {
+      path: '/site/:tenantSlug/:pageSlug',
+      name: 'public-site-page',
+      component: PublicSiteView,
+      meta: { publicSite: true },
     },
     {
       path: '/',
@@ -83,6 +97,11 @@ const router = createRouter({
           path: 'usuarios',
           name: 'usuarios',
           component: UsersView,
+        },
+        {
+          path: 'site',
+          name: 'site-admin',
+          component: SiteAdminView,
         },
       ],
     },

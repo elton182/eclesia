@@ -134,6 +134,7 @@ class UserService
         }
 
         $churchRoles = array_values(array_intersect($names, RolesAndPermissionsSeeder::ROLES_TENANT_UI));
+        $orgRoles = array_values(array_intersect($names, RolesAndPermissionsSeeder::ROLES_TENANT_ORG));
         $wantsAdminTenant = in_array('admin-tenant', $names, true);
 
         if ($churchRoles !== [] && ($igrejaId === null || $igrejaId === '')) {
@@ -161,12 +162,22 @@ class UserService
             } else {
                 $user->equipesLideradas()->detach();
             }
+        } elseif ($churchRoles === []) {
+            // sem papéis de igreja neste sync: não altera teams de igreja
         }
 
+        setPermissionsTeamId(null);
+        $user->unsetRelation('roles');
+        $hadAdminTenant = $user->hasRole('admin-tenant');
+        $finalOrg = $orgRoles;
         if ($actorIsSuperAdmin) {
-            setPermissionsTeamId(null);
-            $user->syncRoles($wantsAdminTenant ? ['admin-tenant'] : []);
+            if ($wantsAdminTenant) {
+                $finalOrg[] = 'admin-tenant';
+            }
+        } elseif ($hadAdminTenant) {
+            $finalOrg[] = 'admin-tenant';
         }
+        $user->syncRoles(array_values(array_unique($finalOrg)));
 
         setPermissionsTeamId(null);
 
@@ -193,6 +204,14 @@ class UserService
             }
             setPermissionsTeamId(null);
             $user->assignRole($roleName);
+
+            return $user->refresh();
+        }
+
+        if (in_array($roleName, RolesAndPermissionsSeeder::ROLES_TENANT_ORG, true)) {
+            setPermissionsTeamId(null);
+            $user->assignRole($roleName);
+            setPermissionsTeamId(null);
 
             return $user->refresh();
         }
@@ -242,6 +261,14 @@ class UserService
             }
             setPermissionsTeamId(null);
             $user->removeRole($roleName);
+
+            return $user->refresh();
+        }
+
+        if (in_array($roleName, RolesAndPermissionsSeeder::ROLES_TENANT_ORG, true)) {
+            setPermissionsTeamId(null);
+            $user->removeRole($roleName);
+            setPermissionsTeamId(null);
 
             return $user->refresh();
         }

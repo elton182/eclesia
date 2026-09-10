@@ -4,6 +4,7 @@
  */
 export const ROLE_LABELS = {
   'admin-tenant': 'Admin Organização',
+  'gestor-site': 'Gestor do Site',
   'admin-igreja': 'Admin Igreja',
   'cadastros-usuarios': 'Cadastros · Usuários',
   'cadastros-equipes': 'Cadastros · Equipes',
@@ -32,8 +33,16 @@ export function userHasPermission(user, permission, opts = {}) {
   }
   // Fallback por papel (login ainda sem lista de permissions)
   const roleNames = (user.roles || []).map((r) => r.name)
-  if (roleNames.includes('admin-tenant') || roleNames.includes('admin-igreja')) {
+  if (roleNames.includes('admin-tenant')) {
     return true
+  }
+  if (roleNames.includes('gestor-site') && (permission === 'telas.site' || permission.startsWith('site.'))) {
+    return true
+  }
+  if (roleNames.includes('admin-igreja')) {
+    if (permission === 'telas.site') return true
+    if (permission.startsWith('site.comunicados.') || permission.startsWith('site.pastorais.')) return true
+    if (!permission.startsWith('site.')) return true
   }
   if (permission === 'telas.usuarios' && roleNames.includes('cadastros-usuarios')) return true
   if (permission === 'telas.igrejas' && roleNames.includes('admin-igreja')) return true
@@ -92,6 +101,7 @@ export function isLiderEquipeScoped(user, opts = {}) {
  */
 export function buildSyncRolesPayload({ igrejaId, toggles, equipeIds }) {
   const roles = []
+  const orgRoles = new Set(['admin-tenant', 'gestor-site'])
 
   for (const [name, enabled] of Object.entries(toggles)) {
     if (!enabled) continue
@@ -103,7 +113,7 @@ export function buildSyncRolesPayload({ igrejaId, toggles, equipeIds }) {
     }
   }
 
-  const hasChurchRole = roles.some((r) => r.name !== 'admin-tenant')
+  const hasChurchRole = roles.some((r) => !orgRoles.has(r.name))
 
   return {
     igreja_id: hasChurchRole ? igrejaId || null : null,

@@ -89,6 +89,13 @@ class IgrejaService
             $data['tipo'] = strtolower($data['tipo']);
         }
 
+        if (isset($data['slug']) && is_string($data['slug'])) {
+            $data['slug'] = strtolower(trim($data['slug']));
+            if ($data['slug'] === '') {
+                $data['slug'] = null;
+            }
+        }
+
         return $data;
     }
 }

@@ -1,6 +1,12 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { buildSyncRolesPayload, roleLabel, userHasPermission, isLiderEquipeScoped, equipesLideradasIds } from './userRoles.js'
+import {
+  buildSyncRolesPayload,
+  roleLabel,
+  userHasPermission,
+  isLiderEquipeScoped,
+  equipesLideradasIds,
+} from './userRoles.js'
 
 describe('userRoles', () => {
   it('roleLabel usa nomes amigáveis por tela', () => {
@@ -64,6 +70,25 @@ describe('userRoles', () => {
     assert.equal(userHasPermission(user, 'telas.casais'), true)
     assert.equal(userHasPermission(user, 'telas.usuarios'), false)
     assert.equal(userHasPermission(user, 'telas.equipes', { isSuperAdmin: true }), true)
+  })
+
+  it('userHasPermission reconhece gestor-site e limita admin-igreja no CMS global', () => {
+    assert.equal(
+      userHasPermission({ roles: [{ name: 'gestor-site' }] }, 'telas.site'),
+      true,
+    )
+    assert.equal(
+      userHasPermission({ roles: [{ name: 'gestor-site' }] }, 'site.settings.update'),
+      true,
+    )
+    assert.equal(
+      userHasPermission({ roles: [{ name: 'admin-igreja' }] }, 'site.comunicados.manage'),
+      true,
+    )
+    assert.equal(
+      userHasPermission({ roles: [{ name: 'admin-igreja' }] }, 'site.settings.update'),
+      false,
+    )
   })
 
   it('líder de equipe não tem manage e fica com escopo de equipe', () => {
