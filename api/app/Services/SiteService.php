@@ -29,7 +29,6 @@ class SiteService
             'publicado' => false,
             'titulo' => 'Site',
             'menu' => [],
-            'cores' => [],
             'seo' => [],
             'contato' => [],
         ]);

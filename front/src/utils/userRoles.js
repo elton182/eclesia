@@ -65,6 +65,18 @@ export function userHasPermission(user, permission, opts = {}) {
 }
 
 /**
+ * Nav unificada ECC: tela Casais (inclui gestão secundária de equipes).
+ * @param {{ permissions?: string[], roles?: Array<{ name: string }> }|null|undefined} user
+ * @param {{ isSuperAdmin?: boolean }} [opts]
+ */
+export function canSeeEccCasaisNav(user, opts = {}) {
+  return (
+    userHasPermission(user, 'telas.casais', opts) ||
+    userHasPermission(user, 'telas.equipes', opts)
+  )
+}
+
+/**
  * IDs das equipes lideradas pelo usuário (vazio = sem vínculo de líder).
  * @param {{ equipes_lideradas?: Array<{ id: string }> }|null|undefined} user
  * @returns {string[]}

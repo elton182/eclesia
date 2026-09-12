@@ -1,11 +1,47 @@
-import { describe, it } from 'node:test'
+import { describe, it, beforeEach } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   buildTenantLoginPayload,
   validateTenantLoginForm,
   parseTenantAliases,
   extractApiError,
+  persistLoginCredentials,
+  loadLoginCredentials,
+  LOGIN_TENANT_STORAGE_KEY,
+  LOGIN_EMAIL_STORAGE_KEY,
 } from './tenantAuth.js'
+
+const memory = new Map()
+globalThis.localStorage = {
+  getItem: (k) => (memory.has(k) ? memory.get(k) : null),
+  setItem: (k, v) => memory.set(k, String(v)),
+  removeItem: (k) => memory.delete(k),
+  clear: () => memory.clear(),
+}
+
+describe('persistLoginCredentials / loadLoginCredentials', () => {
+  beforeEach(() => {
+    localStorage.clear()
+  })
+
+  it('grava tenant e e-mail no localStorage', () => {
+    persistLoginCredentials({ tenant: '  paroquia  ', email: ' a@b.com ' })
+    assert.equal(localStorage.getItem(LOGIN_TENANT_STORAGE_KEY), 'paroquia')
+    assert.equal(localStorage.getItem(LOGIN_EMAIL_STORAGE_KEY), 'a@b.com')
+    assert.deepEqual(loadLoginCredentials(), {
+      tenant: 'paroquia',
+      email: 'a@b.com',
+    })
+  })
+
+  it('limpa chaves quando valores vazios', () => {
+    persistLoginCredentials({ tenant: 'x', email: 'y@z.com' })
+    persistLoginCredentials({ tenant: '', email: '' })
+    assert.equal(localStorage.getItem(LOGIN_TENANT_STORAGE_KEY), null)
+    assert.equal(localStorage.getItem(LOGIN_EMAIL_STORAGE_KEY), null)
+    assert.deepEqual(loadLoginCredentials(), { tenant: '', email: '' })
+  })
+})
 
 describe('buildTenantLoginPayload', () => {
   it('monta payload com tenant e-mail e senha', () => {

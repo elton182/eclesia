@@ -256,7 +256,8 @@ class SitePublicTest extends TestCase
 
         $this->withHeader('X-Tenant', 'org-site')
             ->getJson('/api/v1/site/settings')
-            ->assertOk();
+            ->assertOk()
+            ->assertJsonMissingPath('data.cores');
 
         $this->withHeader('X-Tenant', 'org-site')
             ->getJson('/api/v1/site/comunicados')
@@ -267,5 +268,16 @@ class SitePublicTest extends TestCase
             ->getJson('/api/v1/site/pastorais')
             ->assertOk()
             ->assertJsonPath('data', []);
+    }
+
+    public function test_settings_update_ignores_cores(): void
+    {
+        $this->asAdminTenant('PUT', '/api/v1/site/settings', [
+            'publicado' => false,
+            'titulo' => 'Sem cores',
+            'cores' => ['primary' => '#ff0000'],
+        ])->assertOk()
+            ->assertJsonPath('data.titulo', 'Sem cores')
+            ->assertJsonMissingPath('data.cores');
     }
 }

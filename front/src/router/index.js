@@ -10,7 +10,6 @@ import WelcomeView from '../views/WelcomeView.vue'
 import TenantsView from '../views/TenantsView.vue'
 import UsersView from '../views/UsersView.vue'
 import IgrejasView from '../views/IgrejasView.vue'
-import EccEquipesView from '../views/EccEquipesView.vue'
 import EccCasaisView from '../views/EccCasaisView.vue'
 import EccCasalDetailView from '../views/EccCasalDetailView.vue'
 import SiteAdminView from '../views/SiteAdminView.vue'
@@ -144,8 +143,7 @@ const router = createRouter({
       children: [
         {
           path: 'ecc/equipes',
-          name: 'ecc-equipes',
-          component: EccEquipesView,
+          redirect: { name: 'ecc-casais' },
         },
         {
           path: 'ecc/casais/:id',

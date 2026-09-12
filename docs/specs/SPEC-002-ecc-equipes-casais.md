@@ -16,7 +16,7 @@ No banco do tenant, escopado por `igreja_id`:
 1. CRUD de **equipes** (ex.: EQUIPE A).
 2. CRUD de **casais** vinculados a uma equipe, com os campos do modelo Excel.
 3. Endpoint de **importação** em lote (JSON das linhas da planilha).
-4. Telas no front para listar/criar/editar e importar.
+4. Telas no front para listar/criar/editar casais (com gestão secundária de equipes) e importar.
 
 ## Modelo de importação (colunas)
 
@@ -63,7 +63,7 @@ No banco do tenant, escopado por `igreja_id`:
 - [ ] CRUD equipes e casais sob `/api/v1/ecc/...` com `X-Tenant`.
 - [ ] Importação: cria/reusa equipe pelo nome; cria 2 pessoas + casal; retorna contagem e erros por linha.
 - [ ] 401 sem auth; isolamento por tenant (outro slug não vê dados).
-- [ ] Front: páginas Equipes e Casais + ação Importar (parse Excel/CSV no browser → API).
+- [ ] Front: página **Casais** (`/ecc/casais`) com gestão secundária de equipes, import Excel/CSV e ficha `/ecc/casais/:id`. `/ecc/equipes` redireciona para Casais.
 
 ## Fora de escopo
 

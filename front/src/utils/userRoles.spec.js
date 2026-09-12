@@ -6,6 +6,7 @@ import {
   userHasPermission,
   isLiderEquipeScoped,
   equipesLideradasIds,
+  canSeeEccCasaisNav,
 } from './userRoles.js'
 
 describe('userRoles', () => {
@@ -107,5 +108,25 @@ describe('userRoles', () => {
     const user = { roles: [{ name: 'cadastros-casais' }] }
     assert.equal(userHasPermission(user, 'ecc.casais.manage'), true)
     assert.equal(isLiderEquipeScoped(user), false)
+  })
+
+  it('canSeeEccCasaisNav com telas.casais ou telas.equipes', () => {
+    assert.equal(
+      canSeeEccCasaisNav({ roles: [{ name: 'cadastros-casais' }] }),
+      true,
+    )
+    assert.equal(
+      canSeeEccCasaisNav({ roles: [{ name: 'cadastros-equipes' }] }),
+      true,
+    )
+    assert.equal(
+      canSeeEccCasaisNav({ roles: [{ name: 'lider-equipe' }] }),
+      true,
+    )
+    assert.equal(
+      canSeeEccCasaisNav({ roles: [{ name: 'gestor-site' }] }),
+      false,
+    )
+    assert.equal(canSeeEccCasaisNav(null, { isSuperAdmin: true }), true)
   })
 })

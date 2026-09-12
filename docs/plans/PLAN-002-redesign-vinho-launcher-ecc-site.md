@@ -61,9 +61,9 @@ flowchart TB
   launcher --> ecc["/ecc/* ModuleLayout ECC"]
   launcher --> site["/site ModuleLayout Site"]
   launcher --> adminOrg["/igrejas /usuarios Admin org"]
-  ecc --> equipes["/ecc/equipes 1e"]
-  ecc --> casais["/ecc/casais lista"]
+  ecc --> casais["/ecc/casais lista + equipes"]
   casais --> ficha["/ecc/casais/:id 1f"]
+  casaisOld["/ecc/equipes"] -.->|redirect| casais
   site --> editor["Editor seções 2a"]
   site --> public["/site/:slug público 1g"]
 ```
@@ -144,16 +144,15 @@ flowchart TB
 
 ### 4.1 Module sidebar ECC
 
-Itens: Equipes, Casais, Encontros (placeholder), Relatórios (placeholder).  
+Itens: **Casais** (lista + gestão secundária de equipes), Encontros (placeholder), Relatórios (placeholder).  
 Rodapé: texto de coordenação se houver dado; senão omitir.
 
-### 4.2 Equipes (1e) — redesenhar `EccEquipesView.vue`
+### 4.2 Casais + equipes — `EccCasaisView.vue`
 
-- Título Newsreader + subtítulo + ações Exportar / Nova equipe.
-- Filtros: busca, encontro, situação.
-- Tabela densa (não só cards Innov): colunas Equipe, Casais, Coordenação, Encontro, ações.
-- Paginação no rodapé da tabela.
-- Manter CRUD atual; exportar pode ser CSV simples ou “em breve” se não houver endpoint.
+- Tela única em `/ecc/casais`: lista de casais, filtro por equipe, import, CRUD de casal.
+- **Gerenciar equipes** (secundário, `ecc.equipes.manage`): painel full-width com listar/criar/editar equipe; “Ver casais” aplica o filtro e volta à lista.
+- `/ecc/equipes` redireciona para `/ecc/casais`.
+- Layout responsivo: toolbar e ações empilhadas no mobile.
 
 ### 4.3 Ficha do casal (1f) — nova rota
 
@@ -279,5 +278,5 @@ Reaproveitar ordenação/publish da API atual por baixo; a UI é nova e fiel ao 
 - [ ] Tokens e fontes do canvas no app autenticado e no site público.
 - [ ] Login 1a no desktop; usable no mobile.
 - [ ] Módulos abrem ModuleLayout com “Todos os módulos”.
-- [ ] `/ecc/equipes` alinhado a 1e; `/ecc/casais/:id` alinhado a 1f (dados disponíveis).
+- [ ] `/ecc/casais` (lista + gerenciar equipes) alinhado a 1e/comunidade; `/ecc/casais/:id` alinhado a 1f (dados disponíveis). `/ecc/equipes` redireciona.
 - [ ] BRIEF + ADR + protótipo versionados; testes nos lados alterados.

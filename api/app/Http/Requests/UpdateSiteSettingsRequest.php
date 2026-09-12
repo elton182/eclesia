@@ -24,7 +24,6 @@ class UpdateSiteSettingsRequest extends FormRequest
             'subtitulo' => ['nullable', 'string', 'max:255'],
             'logo_path' => ['nullable', 'string', 'max:500'],
             'favicon_path' => ['nullable', 'string', 'max:500'],
-            'cores' => ['nullable', 'array'],
             'seo' => ['nullable', 'array'],
             'contato' => ['nullable', 'array'],
             'menu' => ['nullable', 'array'],

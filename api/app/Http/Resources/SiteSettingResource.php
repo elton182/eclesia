@@ -23,7 +23,6 @@ class SiteSettingResource extends JsonResource
             'subtitulo' => $this->subtitulo,
             'logo_path' => $this->logo_path,
             'favicon_path' => $this->favicon_path,
-            'cores' => $this->cores ?? [],
             'seo' => $this->seo ?? [],
             'contato' => $this->contato ?? [],
             'menu' => $this->menu ?? [],

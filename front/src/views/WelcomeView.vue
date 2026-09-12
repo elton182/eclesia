@@ -5,7 +5,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useAuthAdminStore } from '@/stores/authAdmin'
 import { useTenantStore } from '@/stores/tenant'
 import { useIgrejaStore } from '@/stores/igreja'
-import { userHasPermission } from '@/utils/userRoles'
+import { userHasPermission, canSeeEccCasaisNav } from '@/utils/userRoles'
 import api from '@/services/api'
 
 const router = useRouter()
@@ -80,7 +80,7 @@ const comunidadeLabel = computed(() => {
 
 const moduleAccessCount = computed(() => {
   let n = 0
-  if (can('telas.equipes') || can('telas.casais') || isPlatformAdmin.value) n++
+  if (canSeeEccCasaisNav(authTenant.user, { isSuperAdmin: isPlatformAdmin.value })) n++
   if (can('telas.site') || isPlatformAdmin.value) n++
   return n
 })
@@ -102,8 +102,8 @@ const siteMeta = computed(() => {
   return `/site/${orgSlug.value}`
 })
 
-const showEcc = computed(
-  () => can('telas.equipes') || can('telas.casais') || isPlatformAdmin.value,
+const showEcc = computed(() =>
+  canSeeEccCasaisNav(authTenant.user, { isSuperAdmin: isPlatformAdmin.value }),
 )
 const showSite = computed(() => can('telas.site') || isPlatformAdmin.value)
 const showIgrejas = computed(() => can('telas.igrejas') || isPlatformAdmin.value)
@@ -282,7 +282,7 @@ function go(path) {
           class="text-left rounded-xl p-[22px] flex flex-col gap-3 cursor-pointer transition-shadow"
           style="background: #FFFDFA; border: 1px solid rgba(42, 20, 24, 0.11)"
           data-testid="launcher-card-ecc"
-          @click="go('/ecc/equipes')"
+          @click="go('/ecc/casais')"
           @mouseenter="($event.currentTarget.style.borderColor = '#8A2436')"
           @mouseleave="($event.currentTarget.style.borderColor = 'rgba(42, 20, 24, 0.11)')"
         >
@@ -472,7 +472,7 @@ function go(path) {
         type="button"
         class="flex items-center gap-3.5 rounded-[11px] p-[15px] min-h-11 text-left"
         style="background: #FFFDFA; border: 1px solid rgba(42, 20, 24, 0.11)"
-        @click="go('/ecc/equipes')"
+        @click="go('/ecc/casais')"
       >
         <div
           class="w-9 h-9 rounded-lg flex items-center justify-center font-serif text-[16px] font-medium shrink-0"

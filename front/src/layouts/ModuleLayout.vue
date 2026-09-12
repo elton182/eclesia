@@ -5,7 +5,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useAuthAdminStore } from '@/stores/authAdmin'
 import { useTenantStore } from '@/stores/tenant'
 import { useIgrejaStore } from '@/stores/igreja'
-import { userHasPermission } from '@/utils/userRoles'
+import { userHasPermission, canSeeEccCasaisNav } from '@/utils/userRoles'
 
 const props = defineProps({
   moduleKey: {
@@ -73,10 +73,7 @@ const navItems = computed(() => {
     ]
   }
   const items = []
-  if (can('telas.equipes') || isPlatformAdmin.value) {
-    items.push({ label: 'Equipes', path: '/ecc/equipes' })
-  }
-  if (can('telas.casais') || isPlatformAdmin.value) {
+  if (canSeeEccCasaisNav(authTenant.user, { isSuperAdmin: isPlatformAdmin.value })) {
     items.push({ label: 'Casais', path: '/ecc/casais' })
   }
   items.push({ label: 'Encontros', path: '/ecc/encontros', stub: true })

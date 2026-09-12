@@ -19,7 +19,6 @@ class SiteSetting extends Model
         'subtitulo',
         'logo_path',
         'favicon_path',
-        'cores',
         'seo',
         'contato',
         'menu',
@@ -32,7 +31,6 @@ class SiteSetting extends Model
     {
         return [
             'publicado' => 'boolean',
-            'cores' => 'array',
             'seo' => 'array',
             'contato' => 'array',
             'menu' => 'array',

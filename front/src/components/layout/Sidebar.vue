@@ -4,7 +4,6 @@ import { useRoute } from 'vue-router'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import {
   faBuilding,
-  faUsers,
   faHeart,
   faUserShield,
   faHouse,
@@ -15,10 +14,10 @@ import { library } from '@fortawesome/fontawesome-svg-core'
 import { useTenantStore } from '@/stores/tenant'
 import { useAuthAdminStore } from '@/stores/authAdmin'
 import { useAuthStore } from '@/stores/auth'
-import { userHasPermission } from '@/utils/userRoles'
+import { userHasPermission, canSeeEccCasaisNav } from '@/utils/userRoles'
 import logoUrl from '@/assets/logo-icon.png'
 
-library.add(faBuilding, faUsers, faHeart, faUserShield, faHouse, faChurch, faGlobe)
+library.add(faBuilding, faHeart, faUserShield, faHouse, faChurch, faGlobe)
 
 defineProps({
   isOpen: { type: Boolean, default: true },
@@ -67,10 +66,7 @@ const eccItems = computed(() => {
 
   const isPlatformAdmin = authAdmin.isAuthenticated && !authTenant.isAuthenticated
   const items = []
-  if (can('telas.equipes') || isPlatformAdmin) {
-    items.push({ label: 'Equipes', icon: faUsers, path: '/ecc/equipes' })
-  }
-  if (can('telas.casais') || isPlatformAdmin) {
+  if (canSeeEccCasaisNav(authTenant.user, { isSuperAdmin: isPlatformAdmin })) {
     items.push({ label: 'Casais', icon: faHeart, path: '/ecc/casais' })
   }
   return items

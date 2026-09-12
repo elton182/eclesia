@@ -2,12 +2,17 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
-import { validateTenantLoginForm } from '../utils/tenantAuth'
+import {
+  validateTenantLoginForm,
+  loadLoginCredentials,
+  persistLoginCredentials,
+} from '../utils/tenantAuth'
 
 const router = useRouter()
 const authStore = useAuthStore()
-const tenant = ref('')
-const email = ref('')
+const remembered = loadLoginCredentials()
+const tenant = ref(remembered.tenant)
+const email = ref(remembered.email)
 const password = ref('')
 const showPassword = ref(false)
 const isLoading = ref(false)
@@ -35,6 +40,7 @@ const handleLogin = async () => {
   const result = await authStore.login(tenant.value, email.value, password.value)
 
   if (result.success) {
+    persistLoginCredentials({ tenant: tenant.value, email: email.value })
     router.push('/inicio')
   } else {
     errorMessage.value = result.error

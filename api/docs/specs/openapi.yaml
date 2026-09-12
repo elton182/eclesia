@@ -100,9 +100,6 @@ components:
         favicon_path:
           type: string
           nullable: true
-        cores:
-          type: object
-          additionalProperties: true
         seo:
           type: object
           additionalProperties: true

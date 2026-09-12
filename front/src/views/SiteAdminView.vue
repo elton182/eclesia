@@ -55,7 +55,6 @@ const settings = ref({
   subtitulo: '',
   menu: [],
   seo: {},
-  cores: {},
   contato: {},
 })
 const menuItems = ref([])
@@ -139,7 +138,6 @@ const loadSettings = async () => {
     ...settings.value,
     ...loaded,
     seo: asObject(loaded.seo),
-    cores: asObject(loaded.cores),
     contato: asObject(loaded.contato),
   }
   menuItems.value = normalizeMenuItems(settings.value.menu)
@@ -210,7 +208,6 @@ const saveSettings = async () => {
       subtitulo: settings.value.subtitulo,
       menu: menuItemsToPayload(menuItems.value),
       seo: settings.value.seo,
-      cores: settings.value.cores,
       contato: settings.value.contato,
     })
     const saved = data.data || data || {}
@@ -218,7 +215,6 @@ const saveSettings = async () => {
       ...settings.value,
       ...saved,
       seo: asObject(saved.seo),
-      cores: asObject(saved.cores),
       contato: asObject(saved.contato),
     }
     menuItems.value = normalizeMenuItems(settings.value.menu)
@@ -358,7 +354,6 @@ const publishPage = async () => {
         subtitulo: settings.value.subtitulo,
         menu: menuItemsToPayload(menuItems.value),
         seo: settings.value.seo,
-        cores: settings.value.cores,
         contato: settings.value.contato,
       })
       settings.value.publicado = true
@@ -709,19 +704,6 @@ const showLegacyChrome = computed(() => tab.value !== 'pages')
           <div>
             <label class="fld" for="st-subtitulo">Subtítulo</label>
             <input id="st-subtitulo" v-model="settings.subtitulo" class="input" />
-          </div>
-          <div>
-            <label class="fld" for="st-cor">Cor principal</label>
-            <div class="flex items-center gap-3">
-              <input
-                id="st-cor"
-                v-model="settings.cores.primary"
-                type="color"
-                class="h-11 w-14 rounded-[11px] cursor-pointer"
-                style="border: 1px solid var(--color-line)"
-              />
-              <input v-model="settings.cores.primary" class="input" placeholder="#00234E" />
-            </div>
           </div>
         </div>
       </div>
