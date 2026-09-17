@@ -338,7 +338,7 @@ const onImportFile = async (event) => {
 }
 
 onMounted(async () => {
-  applyEquipeFromQuery()
+  applyFiltersFromQuery()
   await load()
   applyEditFromQuery()
 })

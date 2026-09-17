@@ -88,10 +88,10 @@ Route::middleware([
     Route::delete('users/{user}/roles', [UserController::class, 'removeRole']);
     Route::apiResource('users', UserController::class);
 
-    Route::apiResource('ecc/equipes', EccEquipeController::class);
+    Route::apiResource('ecc/equipes', EccEquipeController::class)->names('ecc.equipes');
     Route::post('ecc/casais/import', [EccCasalController::class, 'import']);
     Route::post('ecc/casais/{id}/swap', [EccCasalController::class, 'swap']);
-    Route::apiResource('ecc/casais', EccCasalController::class);
+    Route::apiResource('ecc/casais', EccCasalController::class)->names('ecc.casais');
 
     Route::post('ecc/eventos/{id}/participantes', [EccEventoController::class, 'addParticipante']);
     Route::put('ecc/eventos/{id}/participantes', [EccEventoController::class, 'updateParticipante']);
@@ -104,7 +104,8 @@ Route::middleware([
     Route::delete('ecc/eventos/{id}/itens-compra/{itemId}', [EccEventoController::class, 'destroyItem']);
     Route::get('ecc/eventos/{id}/caixa', [EccEventoController::class, 'caixa']);
     Route::post('ecc/eventos/{id}/caixa/doacoes', [EccEventoController::class, 'doarDinheiro']);
-    Route::apiResource('ecc/eventos', EccEventoController::class);
+    // Prefixo URI "ecc/" não entra no nome — sem ->names(), colide com apiResource('eventos').
+    Route::apiResource('ecc/eventos', EccEventoController::class)->names('ecc.eventos');
 
     Route::get('eventos/tipos', [EventoTipoController::class, 'index']);
     Route::post('eventos/tipos', [EventoTipoController::class, 'store']);
@@ -121,7 +122,7 @@ Route::middleware([
     Route::delete('eventos/{id}/itens-compra/{itemId}', [EccEventoController::class, 'destroyItem']);
     Route::get('eventos/{id}/caixa', [EccEventoController::class, 'caixa']);
     Route::post('eventos/{id}/caixa/doacoes', [EccEventoController::class, 'doarDinheiro']);
-    Route::apiResource('eventos', EccEventoController::class);
+    Route::apiResource('eventos', EccEventoController::class)->names('eventos');
 
     Route::get('escalas/agenda', [EscalaController::class, 'agenda']);
     Route::get('escalas/candidatos', [EscalaController::class, 'candidatos']);
@@ -163,7 +164,9 @@ Route::middleware([
     Route::get('site/forms/{form}/submissions', [SiteAdminController::class, 'submissions']);
 
     Route::apiResource('site/comunicados', SiteComunicadoController::class)
-        ->parameters(['comunicados' => 'comunicado']);
+        ->parameters(['comunicados' => 'comunicado'])
+        ->names('site.comunicados');
     Route::apiResource('site/pastorais', PastoralController::class)
-        ->parameters(['pastorais' => 'pastoral']);
+        ->parameters(['pastorais' => 'pastoral'])
+        ->names('site.pastorais');
 });
