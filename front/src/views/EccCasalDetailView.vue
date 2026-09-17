@@ -8,6 +8,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useAuthAdminStore } from '@/stores/authAdmin'
 import { userHasPermission } from '@/utils/userRoles'
 import PessoaFotoField from '@/components/ecc/PessoaFotoField.vue'
+import { casaisListQueryFromRoute } from '@/utils/eccFilters'
 
 const route = useRoute()
 const router = useRouter()
@@ -16,6 +17,20 @@ const authAdminStore = useAuthAdminStore()
 const loading = ref(true)
 const swapping = ref(false)
 const casal = ref(null)
+
+const listQuery = () => casaisListQueryFromRoute(route.query)
+
+const goBackToList = () => {
+  router.push({ name: 'ecc-casais', query: listQuery() })
+}
+
+const goEdit = () => {
+  if (!casal.value) return
+  router.push({
+    name: 'ecc-casais',
+    query: { ...listQuery(), edit: casal.value.id },
+  })
+}
 
 const canManage = computed(() =>
   userHasPermission(authStore.user, 'ecc.casais.manage', {
@@ -75,7 +90,7 @@ async function load() {
     casal.value = data.data || data
   } catch (e) {
     innovToast('error', 'Erro', e.response?.data?.message || 'Casal não encontrado')
-    router.push('/ecc/casais')
+    goBackToList()
   } finally {
     loading.value = false
   }
@@ -126,9 +141,9 @@ onMounted(load)
           type="button"
           class="bg-transparent border-0 p-0 text-[12.5px] cursor-pointer mb-4"
           style="color: rgba(255, 253, 250, 0.65)"
-          @click="router.push(casal.equipe_id ? `/ecc/casais?equipe=${casal.equipe_id}` : '/ecc/casais')"
+          @click="goBackToList"
         >
-          ← {{ casal.equipe_nome ? `Equipe ${casal.equipe_nome}` : 'Casais' }}
+          ← Casais
         </button>
         <div class="flex flex-wrap items-center gap-4">
           <div
@@ -185,7 +200,7 @@ onMounted(load)
               type="button"
               class="rounded-lg px-3.5 py-2.5 text-[12.5px] font-medium"
               style="border: 1px solid rgba(255,253,250,0.3); background: transparent; color: #FFFDFA"
-              @click="router.push(`/ecc/casais?edit=${casal.id}`)"
+              @click="goEdit"
             >
               Editar
             </button>

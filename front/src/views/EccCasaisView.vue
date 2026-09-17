@@ -7,7 +7,7 @@ import { useTenantStore } from '@/stores/tenant'
 import { useAuthStore } from '@/stores/auth'
 import { useAuthAdminStore } from '@/stores/authAdmin'
 import { innovToast } from '@/plugins/toast'
-import { filterCasais } from '@/utils/eccFilters'
+import { casaisListQuery, casaisListQueryFromRoute, filterCasais } from '@/utils/eccFilters'
 import { isoToBr } from '@/utils/dateBr'
 import { userHasPermission } from '@/utils/userRoles'
 import { casalEle, casalEla, formFieldsFromEleEla } from '@/utils/casalDisplay'
@@ -47,21 +47,36 @@ const fileInput = ref(null)
 const importErrors = ref([])
 const equipeForm = ref({ id: null, nome: '', cor: '#6B1C2B' })
 
-const applyEquipeFromQuery = () => {
-  const q = route.query.equipe
-  filterEquipe.value = q ? String(q) : ''
+const applyFiltersFromQuery = () => {
+  filterEquipe.value = route.query.equipe ? String(route.query.equipe) : ''
+  search.value = route.query.q ? String(route.query.q) : ''
 }
 
-watch(() => route.query.equipe, applyEquipeFromQuery)
-
-watch(filterEquipe, (id) => {
-  const current = route.query.equipe ? String(route.query.equipe) : ''
-  if (id === current) return
+const syncFiltersToQuery = () => {
+  const next = casaisListQuery({
+    equipeId: filterEquipe.value,
+    search: search.value,
+  })
+  const current = casaisListQueryFromRoute(route.query)
+  if (next.equipe === current.equipe && next.q === current.q) return
   const query = { ...route.query }
-  if (id) query.equipe = id
+  if (next.equipe) query.equipe = next.equipe
   else delete query.equipe
+  if (next.q) query.q = next.q
+  else delete query.q
   router.replace({ name: 'ecc-casais', query })
-})
+}
+
+watch(() => [route.query.equipe, route.query.q], applyFiltersFromQuery, { immediate: true })
+watch([filterEquipe, search], syncFiltersToQuery)
+
+const openCasalDetail = (casal) => {
+  router.push({
+    name: 'ecc-casal-detail',
+    params: { id: casal.id },
+    query: casaisListQueryFromRoute(route.query),
+  })
+}
 
 const emptyForm = () => ({
   id: null,
@@ -474,7 +489,7 @@ onMounted(async () => {
               <button
                 class="btn btn-ghost"
                 data-testid="casais-abrir"
-                @click="$router.push(`/ecc/casais/${casal.id}`)"
+                @click="openCasalDetail(casal)"
               >
                 Abrir
               </button>

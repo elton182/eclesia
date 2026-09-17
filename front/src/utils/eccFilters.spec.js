@@ -1,6 +1,13 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { filterCasais, filterEquipesBySearch, casaisRouteForEquipe } from './eccFilters.js'
+import {
+  filterCasais,
+  filterEquipesBySearch,
+  casaisRouteForEquipe,
+  casaisListQuery,
+  casaisListQueryFromRoute,
+  casaisListRoute,
+} from './eccFilters.js'
 
 describe('filterEquipesBySearch', () => {
   const equipes = [
@@ -46,15 +53,42 @@ describe('filterCasais', () => {
   })
 })
 
-describe('casaisRouteForEquipe', () => {
-  it('monta query com id da equipe', () => {
+describe('casaisListQuery', () => {
+  it('monta equipe e pesquisa', () => {
+    assert.deepEqual(casaisListQuery({ equipeId: 'abc-1', search: 'eliseu' }), {
+      equipe: 'abc-1',
+      q: 'eliseu',
+    })
+  })
+
+  it('omite vazios e faz trim', () => {
+    assert.deepEqual(casaisListQuery({ equipeId: '  ', search: '  ' }), {})
+    assert.deepEqual(casaisListQuery({ search: '  vera  ' }), { q: 'vera' })
+  })
+})
+
+describe('casaisListQueryFromRoute', () => {
+  it('preserva filtros e ignora edit', () => {
+    assert.deepEqual(
+      casaisListQueryFromRoute({ equipe: '1', q: 'vera', edit: 'xyz' }),
+      { equipe: '1', q: 'vera' },
+    )
+  })
+})
+
+describe('casaisListRoute / casaisRouteForEquipe', () => {
+  it('monta rota com filtros', () => {
+    assert.deepEqual(casaisListRoute({ equipeId: 'abc-1', search: 'x' }), {
+      name: 'ecc-casais',
+      query: { equipe: 'abc-1', q: 'x' },
+    })
+  })
+
+  it('casaisRouteForEquipe mantém compatibilidade', () => {
     assert.deepEqual(casaisRouteForEquipe('abc-1'), {
       name: 'ecc-casais',
       query: { equipe: 'abc-1' },
     })
-  })
-
-  it('sem equipe retorna rota limpa', () => {
     assert.deepEqual(casaisRouteForEquipe(''), {
       name: 'ecc-casais',
       query: {},

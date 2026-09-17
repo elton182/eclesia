@@ -33,10 +33,35 @@ export function filterCasais({ casais, search, equipeId }) {
   })
 }
 
-/** Rota nomeada para listar casais, opcionalmente filtrados por equipe. */
-export function casaisRouteForEquipe(equipeId) {
+/**
+ * Query de listagem de casais preservável na URL (equipe + pesquisa).
+ * Ignora outros params (ex.: edit).
+ */
+export function casaisListQuery({ equipeId = '', search = '' } = {}) {
+  const query = {}
+  const equipe = String(equipeId || '').trim()
+  const q = String(search || '').trim()
+  if (equipe) query.equipe = equipe
+  if (q) query.q = q
+  return query
+}
+
+/** Extrai filtros de listagem a partir de route.query (ou objeto similar). */
+export function casaisListQueryFromRoute(routeQuery = {}) {
+  const equipe = routeQuery.equipe ? String(routeQuery.equipe) : ''
+  const q = routeQuery.q ? String(routeQuery.q) : ''
+  return casaisListQuery({ equipeId: equipe, search: q })
+}
+
+/** Rota nomeada para listar casais, opcionalmente filtrados. */
+export function casaisListRoute({ equipeId = '', search = '' } = {}) {
   return {
     name: 'ecc-casais',
-    query: equipeId ? { equipe: String(equipeId) } : {},
+    query: casaisListQuery({ equipeId, search }),
   }
+}
+
+/** @deprecated Preferir casaisListRoute — mantido para compatibilidade. */
+export function casaisRouteForEquipe(equipeId) {
+  return casaisListRoute({ equipeId })
 }
