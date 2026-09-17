@@ -101,7 +101,7 @@ async function removeFoto() {
     </div>
     <div class="flex items-center gap-3 flex-wrap">
       <div
-        class="w-[72px] h-[72px] rounded-full overflow-hidden shrink-0 flex items-center justify-center"
+        class="w-10 h-10 rounded-full overflow-hidden shrink-0 flex items-center justify-center"
         style="background: #C88A5E; color: #4E1220; border: 1px solid rgba(42,20,24,0.12)"
       >
         <img
@@ -111,7 +111,7 @@ async function removeFoto() {
           class="w-full h-full object-cover"
           data-testid="pessoa-foto-preview"
         >
-        <span v-else class="font-serif text-xl font-medium" aria-hidden="true">·</span>
+        <span v-else class="font-serif text-sm font-medium" aria-hidden="true">·</span>
       </div>
 
       <div v-if="editable" class="flex flex-col gap-1.5">

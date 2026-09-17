@@ -429,16 +429,30 @@ onMounted(async () => {
             <div class="flex items-center gap-3 min-w-0 flex-1">
               <div class="flex -space-x-2 shrink-0">
                 <div
-                  class="w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold text-white border-2 border-white"
+                  class="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center text-xs font-bold text-white border-2 border-white"
                   style="background: #4E1220"
+                  data-testid="casais-avatar-ele"
                 >
-                  {{ (casalEle(casal) || '?').charAt(0) }}
+                  <img
+                    v-if="casal.ele?.foto_url"
+                    :src="casal.ele.foto_url"
+                    :alt="casalEle(casal)"
+                    class="w-full h-full object-cover"
+                  >
+                  <template v-else>{{ (casalEle(casal) || '?').charAt(0) }}</template>
                 </div>
                 <div
-                  class="w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold border-2 border-white"
+                  class="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center text-xs font-bold border-2 border-white"
                   style="background: #C88A5E; color: #4E1220"
+                  data-testid="casais-avatar-ela"
                 >
-                  {{ (casalEla(casal) || '?').charAt(0) }}
+                  <img
+                    v-if="casal.ela?.foto_url"
+                    :src="casal.ela.foto_url"
+                    :alt="casalEla(casal)"
+                    class="w-full h-full object-cover"
+                  >
+                  <template v-else>{{ (casalEla(casal) || '?').charAt(0) }}</template>
                 </div>
               </div>
               <div class="flex-1 min-w-0">

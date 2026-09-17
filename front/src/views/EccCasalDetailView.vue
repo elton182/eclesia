@@ -132,7 +132,7 @@ onMounted(load)
         </button>
         <div class="flex flex-wrap items-center gap-4">
           <div
-            class="w-[62px] h-[62px] rounded-full overflow-hidden flex items-center justify-center font-serif text-[21px] font-medium shrink-0"
+            class="w-12 h-12 rounded-full overflow-hidden flex items-center justify-center font-serif text-[18px] font-medium shrink-0"
             style="background: #C88A5E; color: #4E1220"
           >
             <img
