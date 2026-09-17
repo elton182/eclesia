@@ -462,7 +462,9 @@ components:
         foto_url:
           type: string
           nullable: true
-          description: URL pública da foto no storage do tenant
+          description: >
+            URL assinada temporária de GET /pessoas/{id}/foto (query tenant + signature).
+            Adequada para <img src>; não usa /storage do symlink central.
     Pessoa:
       type: object
       properties:
@@ -486,6 +488,7 @@ components:
         foto_url:
           type: string
           nullable: true
+          description: URL assinada temporária para GET /pessoas/{id}/foto
         igreja_id:
           type: string
     EscalaTipo:
@@ -1473,6 +1476,55 @@ paths:
         '204':
           description: Removido
   /pessoas/{id}/foto:
+    get:
+      summary: Servir arquivo da foto da pessoa
+      description: >
+        Stream do arquivo no storage do tenant. Autorização via URL assinada
+        (expires + signature) gerada em `foto_url`. Tenant via query `tenant`
+        (ADR-0002; <img> não envia X-Tenant). Spec: SPEC-006.
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: tenant
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Slug do tenant
+        - name: expires
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: signature
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Imagem
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/png:
+              schema:
+                type: string
+                format: binary
+            image/webp:
+              schema:
+                type: string
+                format: binary
+        '403':
+          description: Assinatura inválida ou expirada
+        '404':
+          description: Pessoa ou arquivo ausente
     post:
       summary: Upload ou substituição da foto da pessoa
       description: >

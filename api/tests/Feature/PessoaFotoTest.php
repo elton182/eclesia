@@ -108,7 +108,14 @@ class PessoaFotoTest extends TestCase
             ]);
 
         $upload->assertOk();
-        $this->assertNotNull($upload->json('data.foto_url'));
+        $fotoUrl = $upload->json('data.foto_url');
+        $this->assertNotNull($fotoUrl);
+        $this->assertStringContainsString('/api/v1/pessoas/'.$pessoaId.'/foto', $fotoUrl);
+        $this->assertStringContainsString('tenant=demo-foto', $fotoUrl);
+        $this->assertStringContainsString('signature=', $fotoUrl);
+        $this->assertStringNotContainsString('/storage/', $fotoUrl);
+
+        $this->get($fotoUrl)->assertOk();
 
         $atualizado = $this->tenantJson('GET', '/api/v1/ecc/casais/'.$casal['id'])
             ->assertOk()
@@ -116,6 +123,7 @@ class PessoaFotoTest extends TestCase
 
         $this->assertTrue($atualizado['ficha_com_foto']);
         $this->assertNotNull($atualizado['ele']['foto_url']);
+        $this->get($atualizado['ele']['foto_url'])->assertOk();
 
         $this->withHeader('X-Tenant', 'demo-foto')
             ->deleteJson('/api/v1/pessoas/'.$pessoaId.'/foto')
@@ -127,6 +135,21 @@ class PessoaFotoTest extends TestCase
 
         $this->assertFalse($semFoto['ficha_com_foto']);
         $this->assertNull($semFoto['ele']['foto_url']);
+    }
+
+    public function test_servir_foto_exige_assinatura_valida(): void
+    {
+        $casal = $this->createCasal();
+        $pessoaId = $casal['ele']['id'];
+
+        $this->withHeader('X-Tenant', 'demo-foto')
+            ->post('/api/v1/pessoas/'.$pessoaId.'/foto', [
+                'file' => UploadedFile::fake()->image('rosto.jpg', 200, 200),
+            ])
+            ->assertOk();
+
+        $this->get('/api/v1/pessoas/'.$pessoaId.'/foto?tenant=demo-foto')
+            ->assertForbidden();
     }
 
     public function test_upload_rejeita_arquivo_invalido(): void

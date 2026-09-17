@@ -62,6 +62,11 @@ Route::middleware([
             ->middleware('throttle:10,1');
     });
 
+    // Foto: URL assinada + ?tenant= (img não envia X-Tenant/Bearer). Spec SPEC-006 / ADR-0002.
+    Route::get('pessoas/{id}/foto', [PessoaFotoController::class, 'show'])
+        ->middleware('signed')
+        ->name('pessoas.foto.show');
+
     // Só usuário do tenant (token no DB do tenant)
     Route::post('web/refresh', [AuthWebController::class, 'refresh']);
     Route::post('web/me', [AuthWebController::class, 'me'])->middleware(['cookie.to.token', 'auth:sanctum', SetIgrejaFromHeader::class]);

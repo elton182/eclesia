@@ -8,7 +8,7 @@ use ESolution\DBEncryption\Traits\EncryptedAttribute;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
 
 class Pessoa extends Model
 {
@@ -64,6 +64,20 @@ class Pessoa extends Model
             return $this->foto_path;
         }
 
-        return Storage::disk('public')->url($this->foto_path);
+        $tenantSlug = tenant('slug');
+        if (! is_string($tenantSlug) || $tenantSlug === '') {
+            return null;
+        }
+
+        // URL assinada: <img> não envia X-Tenant/Bearer; o middleware aceita ?tenant=
+        // e o arquivo fica no storage do tenant (não no symlink public/storage central).
+        return URL::temporarySignedRoute(
+            'pessoas.foto.show',
+            now()->addHours(12),
+            [
+                'id' => $this->id,
+                'tenant' => $tenantSlug,
+            ],
+        );
     }
 }
