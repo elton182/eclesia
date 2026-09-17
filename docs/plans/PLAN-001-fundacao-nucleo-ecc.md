@@ -4,7 +4,7 @@
 **Data:** 2026-09-03  
 **Brief:** [docs/product/BRIEF.md](../product/BRIEF.md)  
 **ADRs:** [ADR-0001](../architecture/ADR-0001-multitenancy-lgpd.md), [ADR-0002](../architecture/ADR-0002-hierarquia-tenant-igreja.md)  
-**Specs:** [SPEC-001](../specs/SPEC-001-admin-tenants-identidade.md), [SPEC-002](../specs/SPEC-002-ecc-equipes-casais.md), [SPEC-003](../specs/SPEC-003-usuarios-papeis-tenant.md), [SPEC-004](../specs/SPEC-004-cadastro-igrejas-seletor.md)
+**Specs:** [SPEC-001](../specs/SPEC-001-admin-tenants-identidade.md), [SPEC-002](../specs/SPEC-002-ecc-equipes-casais.md), [SPEC-003](../specs/SPEC-003-usuarios-papeis-tenant.md), [SPEC-004](../specs/SPEC-004-cadastro-igrejas-seletor.md), [SPEC-008](../specs/SPEC-008-ecc-eventos-agenda-compras.md)
 
 ## Objetivo
 
@@ -25,7 +25,8 @@ Entregar a fundação SaaS multi-tenant (banco por tenant), o núcleo compartilh
 - [x] ECC: equipes, casais, importação Excel (MVP)
 - [x] Seletor de igreja / multi-igreja completo
 - [x] spatie/permission com teams (SPEC-003)
-- [ ] Demais telas ECC (escala, caixa, perseverança…)
+- [x] ECC: eventos (lista/calendário) + publicação em `evento_agenda` + compras + caixa (SPEC-008 / SPEC-009)
+- [ ] Demais telas ECC (escala ECC, perseverança…)
 
 ## Etapas
 
@@ -55,7 +56,7 @@ Entregar a fundação SaaS multi-tenant (banco por tenant), o núcleo compartilh
 - Permissões `ecc.*`.
 - Telas no front (ordem sugerida): Comunidade → Equipes de serviço → Escala → Eventos → Perseverança → Caixa/compras → Painel.
 - Identidade visual ECC dentro do design system existente.
-- Specs OpenAPI + specs em `docs/specs/` conforme for abrindo cada fatia.
+- Specs OpenAPI + specs em `docs/specs/` conforme for abrindo cada fatia — **SPEC-008** cobre Eventos + compras (sem caixa).
 
 **Checkpoint:** fluxos principais do protótipo cobertos.
 

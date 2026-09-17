@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Eclesia API
-  version: 0.6.0
+  version: 0.7.0
   description: |
     API multi-tenant do Eclesia (gestão eclesial).
     Contexto central (landlord): `/admin/*`.
@@ -10,6 +10,7 @@ info:
     Login web resolve tenant por slug|apelido|nome no body (sem X-Tenant obrigatório).
     Dados pessoais criptografados em repouso (LGPD).
     Site público do tenant: `/public/site*` (X-Tenant, sem auth) — SPEC-005 / ADR-0003.
+    Escalas genéricas (núcleo): `/escalas*` — SPEC-007 / ADR-0005.
 servers:
   - url: http://localhost:8000/api/v1
     description: Local
@@ -398,45 +399,15 @@ components:
           nullable: true
           enum: [M, F]
         ele:
-          type: object
+          allOf:
+            - $ref: '#/components/schemas/PessoaResumo'
           nullable: true
           description: Cônjuge masculino (por sexo; fallback = pessoa A)
-          properties:
-            nome:
-              type: string
-              nullable: true
-            email:
-              type: string
-              nullable: true
-            telefone:
-              type: string
-              nullable: true
-            data_nascimento:
-              type: string
-              nullable: true
-            sexo:
-              type: string
-              nullable: true
         ela:
-          type: object
+          allOf:
+            - $ref: '#/components/schemas/PessoaResumo'
           nullable: true
           description: Cônjuge feminino (por sexo; fallback = pessoa B)
-          properties:
-            nome:
-              type: string
-              nullable: true
-            email:
-              type: string
-              nullable: true
-            telefone:
-              type: string
-              nullable: true
-            data_nascimento:
-              type: string
-              nullable: true
-            sexo:
-              type: string
-              nullable: true
         endereco:
           type: string
           nullable: true
@@ -461,6 +432,281 @@ components:
         observacoes:
           type: string
           nullable: true
+        ficha_com_foto:
+          type: boolean
+          description: Derivado — true se ele ou ela possui foto cadastrada (somente leitura)
+        piloto:
+          type: boolean
+    PessoaResumo:
+      type: object
+      properties:
+        id:
+          type: string
+          description: ULID da pessoa
+        nome:
+          type: string
+          nullable: true
+        email:
+          type: string
+          nullable: true
+        telefone:
+          type: string
+          nullable: true
+        data_nascimento:
+          type: string
+          nullable: true
+        sexo:
+          type: string
+          nullable: true
+          enum: [M, F]
+        foto_url:
+          type: string
+          nullable: true
+          description: URL pública da foto no storage do tenant
+    Pessoa:
+      type: object
+      properties:
+        id:
+          type: string
+        nome:
+          type: string
+        email:
+          type: string
+          nullable: true
+        telefone:
+          type: string
+          nullable: true
+        data_nascimento:
+          type: string
+          nullable: true
+        sexo:
+          type: string
+          nullable: true
+          enum: [M, F]
+        foto_url:
+          type: string
+          nullable: true
+        igreja_id:
+          type: string
+    EscalaTipo:
+      type: object
+      properties:
+        id:
+          type: string
+          description: ULID
+        nome:
+          type: string
+        descricao:
+          type: string
+          nullable: true
+        unidade_preferida:
+          type: string
+          enum: [pessoa, casal, ambos]
+        recorrencia:
+          type: string
+          enum: [avulsa, semanal, mensal]
+        equipes_count:
+          type: integer
+        ocorrencias_count:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    EscalaEquipe:
+      type: object
+      properties:
+        id:
+          type: string
+        escala_tipo_id:
+          type: string
+        nome:
+          type: string
+        cor:
+          type: string
+          nullable: true
+        ordem:
+          type: integer
+        vagas_sugeridas:
+          type: integer
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    EscalaOcorrencia:
+      type: object
+      properties:
+        id:
+          type: string
+        escala_tipo_id:
+          type: string
+        titulo:
+          type: string
+          nullable: true
+        inicia_em:
+          type: string
+          format: date-time
+        termina_em:
+          type: string
+          format: date-time
+          nullable: true
+        local:
+          type: string
+          nullable: true
+        evento_agenda_id:
+          type: string
+          nullable: true
+        tipo_nome:
+          type: string
+          nullable: true
+        atribuicoes:
+          type: array
+          items:
+            $ref: '#/components/schemas/EscalaAtribuicao'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    EscalaAtribuicao:
+      type: object
+      properties:
+        id:
+          type: string
+        escala_ocorrencia_id:
+          type: string
+        escala_equipe_id:
+          type: string
+        equipe_nome:
+          type: string
+          nullable: true
+        pessoa_id:
+          type: string
+          nullable: true
+        casal_id:
+          type: string
+          nullable: true
+        pessoa_nome:
+          type: string
+          nullable: true
+        casal_rotulo:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+    EventoAgenda:
+      type: object
+      properties:
+        id:
+          type: string
+        titulo:
+          type: string
+        inicia_em:
+          type: string
+          format: date-time
+        termina_em:
+          type: string
+          format: date-time
+          nullable: true
+        local:
+          type: string
+          nullable: true
+        dono_modulo:
+          type: string
+        tipo:
+          type: string
+        referencia_tipo:
+          type: string
+          nullable: true
+        referencia_id:
+          type: string
+          nullable: true
+    EccEvento:
+      type: object
+      properties:
+        id:
+          type: string
+        titulo:
+          type: string
+        tipo:
+          type: string
+          enum: [encontro, anual, servos, perseveranca, formacao]
+        inicia_em:
+          type: string
+          format: date-time
+        termina_em:
+          type: string
+          format: date-time
+          nullable: true
+        local:
+          type: string
+          nullable: true
+        casal_compras_id:
+          type: string
+          nullable: true
+        evento_agenda_id:
+          type: string
+          nullable: true
+        participantes_count:
+          type: integer
+        participantes:
+          type: array
+          items:
+            $ref: '#/components/schemas/EccEventoParticipante'
+        itens_compra:
+          type: array
+          items:
+            $ref: '#/components/schemas/EccItemCompra'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    EccEventoParticipante:
+      type: object
+      properties:
+        casal_id:
+          type: string
+        casal_rotulo:
+          type: string
+          nullable: true
+    EccItemCompra:
+      type: object
+      properties:
+        id:
+          type: string
+        nome:
+          type: string
+        qtd:
+          type: number
+        unidade:
+          type: string
+        status:
+          type: string
+          enum: [pendente, doado, comprado]
+        doador_casal_id:
+          type: string
+          nullable: true
+        doador_rotulo:
+          type: string
+          nullable: true
+        valor_gasto:
+          type: number
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
 paths:
   /health:
     get:
@@ -942,7 +1188,7 @@ paths:
       summary: Sincronizar papéis do usuário (N papéis)
       description: |
         Substitui papéis do escopo igreja (e admin-tenant se o ator for SuperAdmin).
-        Papéis canônicos: admin-tenant, admin-igreja, cadastros-usuarios, cadastros-equipes, cadastros-casais, lider-equipe.
+        Papéis canônicos: admin-tenant, gestor-site, admin-igreja, cadastros-usuarios, cadastros-equipes, cadastros-casais, cadastros-eventos, cadastros-escalas, lider-equipe.
         lider-equipe exige equipe_ids (min 1).
       security:
         - tenantHeader: []
@@ -972,7 +1218,7 @@ paths:
                     properties:
                       name:
                         type: string
-                        enum: [admin-tenant, admin-igreja, cadastros-usuarios, cadastros-equipes, cadastros-casais, lider-equipe]
+                        enum: [admin-tenant, gestor-site, admin-igreja, cadastros-usuarios, cadastros-equipes, cadastros-casais, cadastros-eventos, cadastros-escalas, lider-equipe]
                       equipe_ids:
                         type: array
                         items:
@@ -1226,6 +1472,72 @@ paths:
       responses:
         '204':
           description: Removido
+  /pessoas/{id}/foto:
+    post:
+      summary: Upload ou substituição da foto da pessoa
+      description: >
+        Multipart field `file`. Requer `pessoas.manage` ou `ecc.casais.manage`.
+        Atualiza `ficha_com_foto` dos casais vinculados. Spec: SPEC-006.
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: jpg, jpeg, png ou webp — máx. 5 MB
+      responses:
+        '200':
+          description: Pessoa com foto_url atualizada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Pessoa'
+        '401':
+          description: Não autenticado
+        '403':
+          description: Sem permissão
+        '404':
+          description: Pessoa não encontrada na igreja atual
+        '422':
+          description: Arquivo inválido
+    delete:
+      summary: Remover foto da pessoa
+      description: Requer `pessoas.manage` ou `ecc.casais.manage`. Spec: SPEC-006.
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Foto removida
+        '401':
+          description: Não autenticado
+        '403':
+          description: Sem permissão
+        '404':
+          description: Pessoa não encontrada
   /ecc/casais/{id}/swap:
     post:
       summary: Trocar Ele/Ela (pessoa A ↔ B) e normalizar sexo
@@ -1671,3 +1983,794 @@ paths:
           description: Lista
         '403':
           description: Sem permissão
+  /escalas/tipos:
+    get:
+      summary: Listar tipos de escala
+      description: Requer escalas.view ou escalas.manage.
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      responses:
+        '200':
+          description: Lista
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/EscalaTipo'
+        '403':
+          description: Sem permissão
+    post:
+      summary: Criar tipo de escala
+      description: Requer escalas.manage.
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nome]
+              properties:
+                nome:
+                  type: string
+                descricao:
+                  type: string
+                unidade_preferida:
+                  type: string
+                  enum: [pessoa, casal, ambos]
+                recorrencia:
+                  type: string
+                  enum: [avulsa, semanal, mensal]
+      responses:
+        '201':
+          description: Criado
+        '422':
+          description: Validação
+  /escalas/tipos/{id}:
+    get:
+      summary: Detalhe do tipo (com equipes)
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Tipo
+        '404':
+          description: Não encontrado
+    put:
+      summary: Atualizar tipo
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Atualizado
+    delete:
+      summary: Remover tipo (cascade equipes/ocorrências)
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Removido
+  /escalas/tipos/{tipoId}/equipes:
+    get:
+      summary: Listar equipes/funções do tipo
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: tipoId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Lista
+    post:
+      summary: Criar equipe/função no tipo
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: tipoId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nome]
+              properties:
+                nome:
+                  type: string
+                cor:
+                  type: string
+                ordem:
+                  type: integer
+                vagas_sugeridas:
+                  type: integer
+      responses:
+        '201':
+          description: Criada
+  /escalas/equipes/{id}:
+    put:
+      summary: Atualizar equipe/função
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Atualizada
+    delete:
+      summary: Remover equipe/função
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Removida
+  /escalas/tipos/{tipoId}/ocorrencias:
+    get:
+      summary: Listar ocorrências do tipo
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: tipoId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Lista
+    post:
+      summary: Criar ocorrência avulsa (sincroniza EventoAgenda)
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: tipoId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [inicia_em]
+              properties:
+                titulo:
+                  type: string
+                inicia_em:
+                  type: string
+                  format: date-time
+                termina_em:
+                  type: string
+                  format: date-time
+                local:
+                  type: string
+      responses:
+        '201':
+          description: Criada
+  /escalas/tipos/{tipoId}/ocorrencias/gerar:
+    post:
+      summary: Gerar ocorrências em lote (semanal ou mensal)
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: tipoId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [inicio, fim, frequencia]
+              properties:
+                inicio:
+                  type: string
+                  format: date-time
+                fim:
+                  type: string
+                  format: date-time
+                frequencia:
+                  type: string
+                  enum: [semanal, mensal]
+                local:
+                  type: string
+                titulo:
+                  type: string
+      responses:
+        '201':
+          description: Lista das ocorrências criadas
+  /escalas/ocorrencias/{id}:
+    get:
+      summary: Detalhe da ocorrência com atribuições
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Ocorrência
+    put:
+      summary: Atualizar ocorrência (resync EventoAgenda)
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Atualizada
+    delete:
+      summary: Remover ocorrência e EventoAgenda
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Removida
+  /escalas/ocorrencias/{id}/atribuicoes:
+    post:
+      summary: Escalar pessoa ou casal em uma equipe da ocorrência
+      description: >
+        Exige exatamente um de pessoa_id ou casal_id.
+        Mesma pessoa/casal em equipes diferentes na ocorrência é permitido.
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [escala_equipe_id]
+              properties:
+                escala_equipe_id:
+                  type: string
+                pessoa_id:
+                  type: string
+                casal_id:
+                  type: string
+      responses:
+        '201':
+          description: Criada
+        '422':
+          description: Validação (XOR ou duplicata)
+  /escalas/atribuicoes/{id}:
+    delete:
+      summary: Remover atribuição
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Removida
+  /escalas/agenda:
+    get:
+      summary: Agenda de ocorrências (lista para calendário)
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: tipo_id
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Lista de ocorrências no período
+  /escalas/candidatos:
+    get:
+      summary: Busca pessoas e casais para montagem da escala
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Listas de candidatos
+  /ecc/eventos:
+    get:
+      summary: Listar eventos ECC
+      description: Requer ecc.eventos.view ou ecc.eventos.manage. Filtros from/to/tipo.
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: tipo
+          in: query
+          schema:
+            type: string
+            enum: [encontro, anual, servos, perseveranca, formacao]
+      responses:
+        '200':
+          description: Lista
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/EccEvento'
+        '403':
+          description: Sem permissão
+    post:
+      summary: Criar evento ECC (sincroniza EventoAgenda)
+      description: Requer ecc.eventos.manage.
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [titulo, tipo, inicia_em]
+              properties:
+                titulo:
+                  type: string
+                tipo:
+                  type: string
+                  enum: [encontro, anual, servos, perseveranca, formacao]
+                inicia_em:
+                  type: string
+                  format: date-time
+                termina_em:
+                  type: string
+                  format: date-time
+                  nullable: true
+                local:
+                  type: string
+                  nullable: true
+                casal_compras_id:
+                  type: string
+                  nullable: true
+      responses:
+        '201':
+          description: Criado
+        '422':
+          description: Validação
+  /ecc/eventos/{id}:
+    get:
+      summary: Detalhe do evento ECC
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Evento com participantes e itens (se anual)
+        '404':
+          description: Não encontrado
+    put:
+      summary: Atualizar evento ECC (resync EventoAgenda)
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                titulo:
+                  type: string
+                tipo:
+                  type: string
+                  enum: [encontro, anual, servos, perseveranca, formacao]
+                inicia_em:
+                  type: string
+                  format: date-time
+                termina_em:
+                  type: string
+                  format: date-time
+                  nullable: true
+                local:
+                  type: string
+                  nullable: true
+                casal_compras_id:
+                  type: string
+                  nullable: true
+      responses:
+        '200':
+          description: Atualizado
+    delete:
+      summary: Remover evento ECC e EventoAgenda
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Removido
+  /ecc/eventos/{id}/participantes:
+    post:
+      summary: Adicionar casal participante
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [casal_id]
+              properties:
+                casal_id:
+                  type: string
+      responses:
+        '201':
+          description: Adicionado
+        '422':
+          description: Duplicata ou casal inválido
+    delete:
+      summary: Remover casal participante
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [casal_id]
+              properties:
+                casal_id:
+                  type: string
+      responses:
+        '204':
+          description: Removido
+  /ecc/eventos/{id}/itens-compra:
+    get:
+      summary: Listar itens de compra (somente anual)
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Lista
+        '422':
+          description: Evento não é anual
+    post:
+      summary: Adicionar item de compra (somente anual)
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nome]
+              properties:
+                nome:
+                  type: string
+                qtd:
+                  type: number
+                unidade:
+                  type: string
+      responses:
+        '201':
+          description: Criado
+        '422':
+          description: Não anual ou validação
+  /ecc/eventos/{id}/itens-compra/{itemId}/doar:
+    post:
+      summary: Marcar item como doado
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [casal_id]
+              properties:
+                casal_id:
+                  type: string
+      responses:
+        '200':
+          description: Atualizado
+        '422':
+          description: Status inválido ou não anual
+  /ecc/eventos/{id}/itens-compra/{itemId}/comprar:
+    post:
+      summary: Marcar item como comprado (débito no caixa do evento)
+      description: Grava valor_gasto, status comprado e cria saída na conta corrente. Exige saldo suficiente.
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [valor_gasto]
+              properties:
+                valor_gasto:
+                  type: number
+                  minimum: 0
+      responses:
+        '200':
+          description: Atualizado
+        '422':
+          description: Status inválido ou não anual
+  /ecc/eventos/{id}/itens-compra/{itemId}/desfazer:
+    post:
+      summary: Voltar item para pendente
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Atualizado
+        '422':
+          description: Não anual
+  /ecc/eventos/{id}/itens-compra/{itemId}:
+    delete:
+      summary: Remover item de compra
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Removido
+        '422':
+          description: Não anual
+  /ecc/eventos/{id}/caixa:
+    get:
+      summary: Relatório da conta corrente do evento
+      description: Saldo, doações, saídas (compras) e resumo de itens.
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Relatório
+  /ecc/eventos/{id}/caixa/doacoes:
+    post:
+      summary: Registrar doação em dinheiro (entrada)
+      description: >
+        Exige exatamente um doador: casal_id, ecc_equipe_id ou doador_nome
+        (padre, paróquia, voluntário, etc.).
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [valor]
+              properties:
+                valor:
+                  type: number
+                  minimum: 0.01
+                descricao:
+                  type: string
+                casal_id:
+                  type: string
+                ecc_equipe_id:
+                  type: string
+                doador_nome:
+                  type: string
+                  description: Nome livre quando o doador não é casal nem equipe
+                  maxLength: 255
+      responses:
+        '201':
+          description: Doação registrada
+        '422':
+          description: Validação

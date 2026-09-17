@@ -5,6 +5,7 @@ import {
   PILARES,
   PASSOS,
   NAV_PUBLICA,
+  PORTAL_PREVIEW,
   modulosDisponiveis,
   modulosRoadmap,
   rotuloSituacaoModulo,
@@ -70,5 +71,20 @@ describe('conteúdo da landing', () => {
   it('aponta a navegação pública apenas para âncoras da própria página', () => {
     assert.ok(NAV_PUBLICA.length > 0)
     assert.ok(NAV_PUBLICA.every((item) => item.href.startsWith('#') && item.label))
+  })
+})
+
+describe('PORTAL_PREVIEW', () => {
+  it('descreve o launcher com org, usuário e módulos desktop/mobile', () => {
+    assert.ok(PORTAL_PREVIEW.orgNome)
+    assert.ok(PORTAL_PREVIEW.usuario)
+    assert.ok(PORTAL_PREVIEW.urlBar)
+    assert.ok(PORTAL_PREVIEW.modulos.length >= 3)
+    for (const modulo of PORTAL_PREVIEW.modulos) {
+      assert.ok(modulo.chave)
+      assert.ok(modulo.nome)
+      assert.ok(modulo.meta)
+      assert.ok(modulo.cor)
+    }
   })
 })

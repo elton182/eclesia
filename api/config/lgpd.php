@@ -36,6 +36,7 @@ return [
         'birth_date',
         'document_number',
         'payload', // site_form_submissions (JSON criptografado)
+        'foto_path', // caminho da foto da pessoa (arquivo no storage do tenant)
     ],
 
     /*

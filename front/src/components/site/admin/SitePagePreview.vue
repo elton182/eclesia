@@ -61,8 +61,12 @@ function onSelect(idx) {
             >{{ brandInitial }}</div>
             <span class="font-serif text-[13px] font-medium truncate">{{ brandTitle }}</span>
           </div>
-          <nav class="hidden sm:flex gap-3 text-[10px]" style="color: rgba(42, 20, 24, 0.7)">
+          <nav class="hidden sm:flex items-center gap-3 text-[10px]" style="color: rgba(42, 20, 24, 0.7)">
             <span v-for="link in menuLinks" :key="link.href">{{ link.label }}</span>
+            <span
+              class="px-2 py-1 rounded-md font-medium"
+              style="border: 1px solid #6B1C2B; color: #6B1C2B"
+            >Entrar</span>
           </nav>
         </header>
 

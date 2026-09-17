@@ -202,6 +202,51 @@ export const SEGURANCA = [
   },
 ]
 
+/**
+ * Conteúdo estático da prévia do portal no hero (launcher 1c/1d).
+ * Espelha a home autenticada sem depender de sessão ou API.
+ */
+export const PORTAL_PREVIEW = {
+  orgNome: 'Paróquia São José',
+  comunidade: 'Comunidade Matriz',
+  usuario: 'Maria Silva',
+  papel: 'Administração',
+  iniciais: 'MS',
+  saudacao: 'Bom dia',
+  tituloDesktop: 'Onde você quer trabalhar hoje, Maria?',
+  tituloMobile: 'Olá, Maria',
+  urlBar: 'app.eclesias.com.br/inicio',
+  modulos: [
+    {
+      chave: 'ecc',
+      letra: 'C',
+      nome: 'ECC',
+      descricao: 'Equipes, casais e encontros do movimento.',
+      meta: '7 equipes · 124 casais',
+      badge: 'ativo',
+      cor: '#6B1C2B',
+    },
+    {
+      chave: 'escalas',
+      letra: 'E',
+      nome: 'Escalas',
+      descricao: 'Liturgia, equipes de apoio e agenda da igreja.',
+      meta: '4 tipos',
+      badge: 'ativo',
+      cor: '#8A2436',
+    },
+    {
+      chave: 'site',
+      letra: 'S',
+      nome: 'Site',
+      descricao: 'Página pública, comunicados e horários.',
+      meta: '/site/sao-jose',
+      badge: 'publicado',
+      cor: '#2A1418',
+    },
+  ],
+}
+
 /** Âncoras do menu do cabeçalho público. */
 export const NAV_PUBLICA = [
   { href: '#plataforma', label: 'A plataforma' },

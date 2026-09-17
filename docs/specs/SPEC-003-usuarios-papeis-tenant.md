@@ -23,8 +23,8 @@ A autenticação web do tenant existe (`web/login|me|logout`), mas não há gest
 - [ ] Resolução: slug → apelido → nome (case-insensitive); nome ambíguo → 422; inexistente → 404/422.
 - [ ] Resposta de login bem-sucedido inclui `tenant.slug` (canônico) para o front setar `X-Tenant`.
 - [ ] Tabelas Spatie existem nas migrations de tenant; `teams` = `igreja_id`.
-- [ ] Seed cria papéis canônicos: `admin-tenant`, `admin-igreja`, `cadastros-usuarios`, `cadastros-equipes`, `cadastros-casais`, `lider-equipe`.
-- [ ] Seed cria permissões de tela: `telas.usuarios`, `telas.equipes`, `telas.casais` (+ gestão users/roles e stubs `ecc.*`).
+- [ ] Seed cria papéis canônicos: `admin-tenant`, `gestor-site`, `admin-igreja`, `cadastros-usuarios`, `cadastros-equipes`, `cadastros-casais`, `cadastros-eventos`, `cadastros-escalas`, `lider-equipe`.
+- [ ] Seed cria permissões de tela: `telas.usuarios`, `telas.equipes`, `telas.casais`, `telas.eventos`, `telas.escalas` (+ gestão users/roles, `ecc.*`, `escalas.*`).
 - [ ] Provisionar tenant cria usuário admin inicial com papel `admin-tenant`.
 - [ ] `GET/POST/PATCH/DELETE /api/v1/users` (ULID público); PII `name`/`email` encryptable.
 - [ ] `PUT /api/v1/users/{id}/roles` sincroniza N papéis (`igreja_id` + `roles[]`); `lider-equipe` exige `equipe_ids` (N:M em `ecc_equipe_user`).

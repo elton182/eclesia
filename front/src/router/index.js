@@ -12,6 +12,14 @@ import UsersView from '../views/UsersView.vue'
 import IgrejasView from '../views/IgrejasView.vue'
 import EccCasaisView from '../views/EccCasaisView.vue'
 import EccCasalDetailView from '../views/EccCasalDetailView.vue'
+import EccEventosView from '../views/EccEventosView.vue'
+import EccEventoDetailView from '../views/EccEventoDetailView.vue'
+import EventosView from '../views/EventosView.vue'
+import EventoDetailView from '../views/EventoDetailView.vue'
+import EscalasTiposView from '../views/EscalasTiposView.vue'
+import EscalasTipoDetailView from '../views/EscalasTipoDetailView.vue'
+import EscalasOcorrenciaView from '../views/EscalasOcorrenciaView.vue'
+import EscalasAgendaView from '../views/EscalasAgendaView.vue'
 import SiteAdminView from '../views/SiteAdminView.vue'
 import PublicSiteView from '../views/site/PublicSiteView.vue'
 import AdminLayout from '../layouts/AdminLayout.vue'
@@ -34,6 +42,20 @@ const ModuleLayoutSiteWrapper = {
   name: 'ModuleLayoutSite',
   setup() {
     return () => h(ModuleLayout, { moduleKey: 'site' })
+  },
+}
+
+const ModuleLayoutEscalasWrapper = {
+  name: 'ModuleLayoutEscalas',
+  setup() {
+    return () => h(ModuleLayout, { moduleKey: 'escalas' })
+  },
+}
+
+const ModuleLayoutEventosWrapper = {
+  name: 'ModuleLayoutEventos',
+  setup() {
+    return () => h(ModuleLayout, { moduleKey: 'eventos' })
   },
 }
 
@@ -154,6 +176,60 @@ const router = createRouter({
           path: 'ecc/casais',
           name: 'ecc-casais',
           component: EccCasaisView,
+        },
+        {
+          path: 'ecc/eventos',
+          name: 'ecc-eventos',
+          component: EccEventosView,
+        },
+        {
+          path: 'ecc/eventos/:id',
+          name: 'ecc-evento-detail',
+          component: EccEventoDetailView,
+        },
+      ],
+    },
+    {
+      path: '/',
+      component: ModuleLayoutEscalasWrapper,
+      meta: { requiresAuthTenantOrAdmin: true },
+      children: [
+        {
+          path: 'escalas',
+          name: 'escalas-tipos',
+          component: EscalasTiposView,
+        },
+        {
+          path: 'escalas/agenda',
+          name: 'escalas-agenda',
+          component: EscalasAgendaView,
+        },
+        {
+          path: 'escalas/tipos/:id',
+          name: 'escalas-tipo-detail',
+          component: EscalasTipoDetailView,
+        },
+        {
+          path: 'escalas/ocorrencias/:id',
+          name: 'escalas-ocorrencia',
+          component: EscalasOcorrenciaView,
+        },
+      ],
+    },
+    {
+      path: '/',
+      component: ModuleLayoutEventosWrapper,
+      meta: { requiresAuthTenantOrAdmin: true },
+      children: [
+        {
+          path: 'eventos',
+          name: 'eventos',
+          component: EventosView,
+        },
+        {
+          path: 'eventos/:id',
+          name: 'eventos-detail',
+          component: EventoDetailView,
         },
       ],
     },

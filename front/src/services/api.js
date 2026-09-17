@@ -20,6 +20,13 @@ let refreshPromise = null
 
 api.interceptors.request.use(
   (config) => {
+    if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+      if (config.headers) {
+        delete config.headers['Content-Type']
+        delete config.headers['content-type']
+      }
+    }
+
     let tenantSlug = ''
     try {
       const tenantStore = useTenantStore()

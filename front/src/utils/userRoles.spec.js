@@ -7,6 +7,8 @@ import {
   isLiderEquipeScoped,
   equipesLideradasIds,
   canSeeEccCasaisNav,
+  canSeeEccEventosNav,
+  canSeeEscalasNav,
 } from './userRoles.js'
 
 describe('userRoles', () => {
@@ -14,6 +16,8 @@ describe('userRoles', () => {
     assert.equal(roleLabel('cadastros-usuarios'), 'Cadastros · Usuários')
     assert.equal(roleLabel('cadastros-equipes'), 'Cadastros · Equipes')
     assert.equal(roleLabel('cadastros-casais'), 'Cadastros · Casais')
+    assert.equal(roleLabel('cadastros-eventos'), 'Cadastros · Eventos')
+    assert.equal(roleLabel('cadastros-escalas'), 'Cadastros · Escalas')
     assert.equal(roleLabel('lider-equipe'), 'Líder de Equipe')
     assert.equal(roleLabel('admin-tenant'), 'Admin Organização')
   })
@@ -128,5 +132,56 @@ describe('userRoles', () => {
       false,
     )
     assert.equal(canSeeEccCasaisNav(null, { isSuperAdmin: true }), true)
+  })
+
+  it('canSeeEccEventosNav para líder, admin e cadastros-eventos', () => {
+    assert.equal(
+      canSeeEccEventosNav({ roles: [{ name: 'lider-equipe' }] }),
+      true,
+    )
+    assert.equal(
+      canSeeEccEventosNav({ roles: [{ name: 'admin-igreja' }] }),
+      true,
+    )
+    assert.equal(
+      canSeeEccEventosNav({ roles: [{ name: 'cadastros-eventos' }] }),
+      true,
+    )
+    assert.equal(
+      userHasPermission({ roles: [{ name: 'cadastros-eventos' }] }, 'ecc.eventos.manage'),
+      true,
+    )
+    assert.equal(
+      canSeeEccEventosNav({ permissions: ['ecc.eventos.view'], roles: [] }),
+      true,
+    )
+    assert.equal(
+      canSeeEccEventosNav({ roles: [{ name: 'gestor-site' }] }),
+      false,
+    )
+  })
+
+  it('canSeeEscalasNav para admin-igreja, cadastros-escalas e permissões explícitas', () => {
+    assert.equal(
+      canSeeEscalasNav({ roles: [{ name: 'admin-igreja' }] }),
+      true,
+    )
+    assert.equal(
+      canSeeEscalasNav({ roles: [{ name: 'cadastros-escalas' }] }),
+      true,
+    )
+    assert.equal(
+      userHasPermission({ roles: [{ name: 'cadastros-escalas' }] }, 'escalas.manage'),
+      true,
+    )
+    assert.equal(
+      canSeeEscalasNav({ permissions: ['telas.escalas'], roles: [] }),
+      true,
+    )
+    assert.equal(
+      canSeeEscalasNav({ roles: [{ name: 'gestor-site' }] }),
+      false,
+    )
+    assert.equal(canSeeEscalasNav(null, { isSuperAdmin: true }), true)
   })
 })

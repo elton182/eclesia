@@ -5,7 +5,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useAuthAdminStore } from '@/stores/authAdmin'
 import { useTenantStore } from '@/stores/tenant'
 import { useIgrejaStore } from '@/stores/igreja'
-import { userHasPermission, canSeeEccCasaisNav } from '@/utils/userRoles'
+import { userHasPermission, canSeeEccCasaisNav, canSeeEscalasNav, canSeeEccEventosNav } from '@/utils/userRoles'
 import api from '@/services/api'
 
 const router = useRouter()
@@ -15,6 +15,7 @@ const tenantStore = useTenantStore()
 const igrejaStore = useIgrejaStore()
 
 const eccCounts = ref({ equipes: null, casais: null })
+const escalasCount = ref(null)
 const sitePublished = ref(null)
 const userMenuOpen = ref(false)
 
@@ -49,6 +50,8 @@ const roleLabel = computed(() => {
     'cadastros-equipes': 'Cadastros',
     'cadastros-casais': 'Cadastros',
     'cadastros-usuarios': 'Cadastros',
+    'cadastros-eventos': 'Cadastros',
+    'cadastros-escalas': 'Cadastros',
     'lider-equipe': 'Liderança',
   }
   return map[name] || String(name)
@@ -82,6 +85,8 @@ const moduleAccessCount = computed(() => {
   let n = 0
   if (canSeeEccCasaisNav(authTenant.user, { isSuperAdmin: isPlatformAdmin.value })) n++
   if (can('telas.site') || isPlatformAdmin.value) n++
+  if (showEscalas.value) n++
+  if (showEventos.value) n++
   return n
 })
 
@@ -104,6 +109,12 @@ const siteMeta = computed(() => {
 
 const showEcc = computed(() =>
   canSeeEccCasaisNav(authTenant.user, { isSuperAdmin: isPlatformAdmin.value }),
+)
+const showEscalas = computed(() =>
+  canSeeEscalasNav(authTenant.user, { isSuperAdmin: isPlatformAdmin.value }),
+)
+const showEventos = computed(() =>
+  canSeeEccEventosNav(authTenant.user, { isSuperAdmin: isPlatformAdmin.value }),
 )
 const showSite = computed(() => can('telas.site') || isPlatformAdmin.value)
 const showIgrejas = computed(() => can('telas.igrejas') || isPlatformAdmin.value)
@@ -128,6 +139,15 @@ async function loadCounts() {
         equipes: Array.isArray(eqList) ? eqList.length : null,
         casais: Array.isArray(caList) ? caList.length : null,
       }
+    } catch {
+      /* ignore */
+    }
+  }
+  if (showEscalas.value) {
+    try {
+      const { data } = await api.get('/escalas/tipos')
+      const list = data?.data || data || []
+      escalasCount.value = Array.isArray(list) ? list.length : null
     } catch {
       /* ignore */
     }
@@ -313,6 +333,77 @@ function go(path) {
         </button>
 
         <button
+          v-if="showEscalas"
+          type="button"
+          class="text-left rounded-xl p-[22px] flex flex-col gap-3 cursor-pointer transition-shadow"
+          style="background: #FFFDFA; border: 1px solid rgba(42, 20, 24, 0.11)"
+          data-testid="launcher-card-escalas"
+          @click="go('/escalas')"
+          @mouseenter="($event.currentTarget.style.borderColor = '#8A2436')"
+          @mouseleave="($event.currentTarget.style.borderColor = 'rgba(42, 20, 24, 0.11)')"
+        >
+          <div class="flex items-start justify-between">
+            <div
+              class="w-[38px] h-[38px] rounded-[9px] flex items-center justify-center font-serif text-[17px] font-medium"
+              style="background: #8A2436; color: #F0D8C2"
+            >
+              E
+            </div>
+            <span
+              v-if="escalasCount != null"
+              class="text-[11px] font-medium px-2 py-1 rounded-full"
+              style="color: #B4703F; background: #F6EDE4"
+            >
+              ativo
+            </span>
+          </div>
+          <div>
+            <div class="font-serif text-[17px] font-medium" style="color: #2A1418">Escalas</div>
+            <div class="text-[12.5px] leading-relaxed mt-1" style="color: rgba(42, 20, 24, 0.62)">
+              Liturgia, equipes de apoio e agenda da igreja.
+            </div>
+          </div>
+          <div class="mt-auto flex gap-3.5 text-[12px]" style="color: rgba(42, 20, 24, 0.62)">
+            <span>
+              {{
+                escalasCount == null
+                  ? 'Tipos e montagem'
+                  : `${escalasCount} tipo${escalasCount === 1 ? '' : 's'}`
+              }}
+            </span>
+          </div>
+        </button>
+
+        <button
+          v-if="showEventos"
+          type="button"
+          class="text-left rounded-xl p-[22px] flex flex-col gap-3 cursor-pointer transition-shadow"
+          style="background: #FFFDFA; border: 1px solid rgba(42, 20, 24, 0.11)"
+          data-testid="launcher-card-eventos"
+          @click="go('/eventos')"
+          @mouseenter="($event.currentTarget.style.borderColor = '#8A2436')"
+          @mouseleave="($event.currentTarget.style.borderColor = 'rgba(42, 20, 24, 0.11)')"
+        >
+          <div class="flex items-start justify-between">
+            <div
+              class="w-[38px] h-[38px] rounded-[9px] flex items-center justify-center font-serif text-[17px] font-medium"
+              style="background: #B4703F; color: #F0D8C2"
+            >
+              A
+            </div>
+          </div>
+          <div>
+            <div class="font-serif text-[17px] font-medium" style="color: #2A1418">Eventos</div>
+            <div class="text-[12.5px] leading-relaxed mt-1" style="color: rgba(42, 20, 24, 0.62)">
+              Agenda paroquial fora do ECC — festas, encontros e celebrações.
+            </div>
+          </div>
+          <div class="mt-auto flex gap-3.5 text-[12px]" style="color: rgba(42, 20, 24, 0.62)">
+            <span>Lista e calendário</span>
+          </div>
+        </button>
+
+        <button
           v-if="showSite"
           type="button"
           class="text-left rounded-xl p-[22px] flex flex-col gap-3 cursor-pointer"
@@ -483,6 +574,52 @@ function go(path) {
         <div class="flex-1 min-w-0">
           <div class="font-serif text-[15px] font-medium" style="color: #2A1418">ECC</div>
           <div class="text-[12px] mt-0.5" style="color: rgba(42, 20, 24, 0.62)">{{ eccMeta }}</div>
+        </div>
+      </button>
+
+      <button
+        v-if="showEscalas"
+        type="button"
+        class="flex items-center gap-3.5 rounded-[11px] p-[15px] min-h-11 text-left"
+        style="background: #FFFDFA; border: 1px solid rgba(42, 20, 24, 0.11)"
+        data-testid="launcher-card-escalas-mobile"
+        @click="go('/escalas')"
+      >
+        <div
+          class="w-9 h-9 rounded-lg flex items-center justify-center font-serif text-[16px] font-medium shrink-0"
+          style="background: #8A2436; color: #F0D8C2"
+        >
+          E
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="font-serif text-[15px] font-medium" style="color: #2A1418">Escalas</div>
+          <div class="text-[12px] mt-0.5" style="color: rgba(42, 20, 24, 0.62)">
+            {{
+              escalasCount == null
+                ? 'Agenda e montagem'
+                : `${escalasCount} tipo${escalasCount === 1 ? '' : 's'}`
+            }}
+          </div>
+        </div>
+      </button>
+
+      <button
+        v-if="showEventos"
+        type="button"
+        class="flex items-center gap-3.5 rounded-[11px] p-[15px] min-h-11 text-left"
+        style="background: #FFFDFA; border: 1px solid rgba(42, 20, 24, 0.11)"
+        data-testid="launcher-card-eventos-mobile"
+        @click="go('/eventos')"
+      >
+        <div
+          class="w-9 h-9 rounded-lg flex items-center justify-center font-serif text-[16px] font-medium shrink-0"
+          style="background: #B4703F; color: #F0D8C2"
+        >
+          A
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="font-serif text-[15px] font-medium" style="color: #2A1418">Eventos</div>
+          <div class="text-[12px] mt-0.5" style="color: rgba(42, 20, 24, 0.62)">Agenda paroquial</div>
         </div>
       </button>
 

@@ -21,6 +21,8 @@ class RolesAndPermissionsSeeder extends Seeder
         'cadastros-usuarios',
         'cadastros-equipes',
         'cadastros-casais',
+        'cadastros-eventos',
+        'cadastros-escalas',
         'lider-equipe',
     ];
 
@@ -31,6 +33,8 @@ class RolesAndPermissionsSeeder extends Seeder
         'cadastros-usuarios',
         'cadastros-equipes',
         'cadastros-casais',
+        'cadastros-eventos',
+        'cadastros-escalas',
         'lider-equipe',
     ];
 
@@ -56,8 +60,16 @@ class RolesAndPermissionsSeeder extends Seeder
         'telas.usuarios',
         'telas.equipes',
         'telas.casais',
+        'telas.eventos',
         'telas.igrejas',
         'telas.site',
+        'telas.escalas',
+    ];
+
+    /** @var list<string> */
+    public const ESCALAS_PERMISSIONS = [
+        'escalas.view',
+        'escalas.manage',
     ];
 
     /** @var list<string> */
@@ -74,7 +86,10 @@ class RolesAndPermissionsSeeder extends Seeder
         'ecc.equipes.manage',
         'ecc.casais.view',
         'ecc.casais.manage',
+        'ecc.eventos.view',
+        'ecc.eventos.manage',
         'ecc.escala.editar',
+        'pessoas.manage',
     ];
 
     /** @var list<string> */
@@ -104,6 +119,7 @@ class RolesAndPermissionsSeeder extends Seeder
             ...self::SCREEN_PERMISSIONS,
             ...self::IGREJA_PERMISSIONS,
             ...self::ECC_STUB_PERMISSIONS,
+            ...self::ESCALAS_PERMISSIONS,
             ...self::SITE_PERMISSIONS,
         ] as $name) {
             Permission::findOrCreate($name, self::GUARD);
@@ -126,6 +142,7 @@ class RolesAndPermissionsSeeder extends Seeder
             ...self::MANAGEMENT_PERMISSIONS,
             ...self::SCREEN_PERMISSIONS,
             ...self::ECC_STUB_PERMISSIONS,
+            ...self::ESCALAS_PERMISSIONS,
             'igrejas.view',
             'igrejas.update',
             'telas.site',
@@ -153,13 +170,28 @@ class RolesAndPermissionsSeeder extends Seeder
             'telas.casais',
             'ecc.casais.view',
             'ecc.casais.manage',
+            'pessoas.manage',
+        ]);
+
+        Role::findByName('cadastros-eventos', self::GUARD)->syncPermissions([
+            'telas.eventos',
+            'ecc.eventos.view',
+            'ecc.eventos.manage',
+        ]);
+
+        Role::findByName('cadastros-escalas', self::GUARD)->syncPermissions([
+            'telas.escalas',
+            'escalas.view',
+            'escalas.manage',
         ]);
 
         Role::findByName('lider-equipe', self::GUARD)->syncPermissions([
             'telas.equipes',
             'telas.casais',
+            'telas.eventos',
             'ecc.equipes.view',
             'ecc.casais.view',
+            'ecc.eventos.view',
             'ecc.escala.editar',
         ]);
 

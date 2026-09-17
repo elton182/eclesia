@@ -45,7 +45,6 @@ class StoreEccCasalRequest extends FormRequest
             'preferencia_funcao' => ['nullable', 'string'],
             'funcao_dirigente' => ['nullable', 'string'],
             'foi_coordenador_geral' => ['sometimes', 'boolean'],
-            'ficha_com_foto' => ['sometimes', 'boolean'],
             'etapa_2' => ['nullable', 'string', 'max:50'],
             'etapa_3' => ['nullable', 'string', 'max:50'],
         ];

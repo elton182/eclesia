@@ -246,7 +246,7 @@ class EccEquipeCasalTest extends TestCase
         $this->assertSame('8º', $primeiro['ecc_origem']);
         $this->assertSame('Sim, Coordenou Cozinha', $primeiro['experiencia_servico']);
         $this->assertSame('Café', $primeiro['preferencia_funcao']);
-        $this->assertTrue($primeiro['ficha_com_foto']);
+        $this->assertFalse($primeiro['ficha_com_foto']);
         $this->assertSame('11º', $primeiro['etapa_2']);
         $this->assertStringContainsString('Indicação para 2025', (string) $primeiro['observacoes']);
         $this->assertStringNotContainsString('Piloto:', (string) $primeiro['observacoes']);

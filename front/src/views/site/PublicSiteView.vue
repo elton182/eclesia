@@ -4,6 +4,7 @@ import { useRoute, useRouter, RouterLink } from 'vue-router'
 import api from '@/services/api'
 import { useTenantStore } from '@/stores/tenant'
 import { normalizeBlocks, resolveMenuLinks, resolveSeo } from '@/utils/siteBlocks'
+import { rememberTenantForLogin } from '@/utils/tenantAuth'
 import SiteBlockRenderer from '@/components/site/SiteBlockRenderer.vue'
 
 const route = useRoute()
@@ -70,6 +71,10 @@ async function load() {
 
 onMounted(load)
 watch(() => [route.params.tenantSlug, route.params.pageSlug], load)
+
+function onSiteLogin() {
+  rememberTenantForLogin(tenantSlug.value)
+}
 </script>
 
 <template>
@@ -108,25 +113,37 @@ watch(() => [route.params.tenantSlug, route.params.pageSlug], load)
         </div>
       </RouterLink>
 
-      <nav class="hidden md:flex items-center gap-5 text-[13px]" style="color: rgba(42, 20, 24, 0.7)">
-        <template v-for="link in menuLinks" :key="link.href">
+      <div class="flex items-center gap-3 shrink-0">
+        <nav class="hidden md:flex items-center gap-5 text-[13px]" style="color: rgba(42, 20, 24, 0.7)">
+          <template v-for="link in menuLinks" :key="link.href">
+            <a
+              v-if="link.href.startsWith('#')"
+              :href="link.href"
+              class="no-underline hover:opacity-80"
+            >{{ link.label }}</a>
+            <RouterLink
+              v-else
+              :to="link.href"
+              class="no-underline hover:opacity-80"
+            >{{ link.label }}</RouterLink>
+          </template>
           <a
-            v-if="link.href.startsWith('#')"
-            :href="link.href"
-            class="no-underline hover:opacity-80"
-          >{{ link.label }}</a>
-          <RouterLink
-            v-else
-            :to="link.href"
-            class="no-underline hover:opacity-80"
-          >{{ link.label }}</RouterLink>
-        </template>
-        <a
-          href="#contato"
-          class="no-underline px-3.5 py-2 rounded-md font-medium"
-          style="background: #6B1C2B; color: #FFFDFA"
-        >Fale conosco</a>
-      </nav>
+            href="#contato"
+            class="no-underline px-3.5 py-2 rounded-md font-medium"
+            style="background: #6B1C2B; color: #FFFDFA"
+          >Fale conosco</a>
+        </nav>
+
+        <RouterLink
+          to="/entrar"
+          class="no-underline px-3.5 py-2 rounded-md font-medium text-[13px] shrink-0"
+          style="border: 1px solid #6B1C2B; color: #6B1C2B"
+          data-testid="site-login"
+          @click="onSiteLogin"
+        >
+          Entrar
+        </RouterLink>
+      </div>
     </header>
 
     <main class="flex-1">

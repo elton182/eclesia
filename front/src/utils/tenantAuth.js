@@ -34,6 +34,17 @@ export function loadLoginCredentials() {
   }
 }
 
+/**
+ * Grava só o slug da organização para pré-preencher `/entrar`
+ * (não altera o e-mail lembrado).
+ * @param {string} tenantSlug
+ */
+export function rememberTenantForLogin(tenantSlug) {
+  const t = String(tenantSlug || '').trim()
+  if (!t) return
+  localStorage.setItem(LOGIN_TENANT_STORAGE_KEY, t)
+}
+
 export function buildTenantLoginPayload(tenant, email, password) {
   return {
     tenant: String(tenant || '').trim(),

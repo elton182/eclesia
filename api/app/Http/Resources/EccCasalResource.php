@@ -53,7 +53,7 @@ class EccCasalResource extends JsonResource
             'preferencia_funcao' => $this->preferencia_funcao,
             'funcao_dirigente' => $this->funcao_dirigente,
             'foi_coordenador_geral' => (bool) $this->foi_coordenador_geral,
-            'ficha_com_foto' => (bool) $this->ficha_com_foto,
+            'ficha_com_foto' => filled($this->pessoaA?->foto_path) || filled($this->pessoaB?->foto_path),
             'etapa_2' => $this->etapa_2,
             'etapa_3' => $this->etapa_3,
             'created_at' => $this->created_at?->toIso8601String(),
@@ -83,7 +83,7 @@ class EccCasalResource extends JsonResource
     }
 
     /**
-     * @return array{nome: ?string, email: ?string, telefone: ?string, data_nascimento: ?string, sexo: ?string}|null
+     * @return array{id: string, nome: ?string, email: ?string, telefone: ?string, data_nascimento: ?string, sexo: ?string, foto_url: ?string}|null
      */
     private function personPayload(?Pessoa $pessoa): ?array
     {
@@ -92,11 +92,13 @@ class EccCasalResource extends JsonResource
         }
 
         return [
+            'id' => $pessoa->id,
             'nome' => $pessoa->nome,
             'email' => $pessoa->email,
             'telefone' => $pessoa->telefone,
             'data_nascimento' => $pessoa->data_nascimento?->toDateString(),
             'sexo' => $pessoa->sexo,
+            'foto_url' => $pessoa->fotoUrl(),
         ];
     }
 }

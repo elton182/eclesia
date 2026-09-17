@@ -7,6 +7,7 @@ import {
   extractApiError,
   persistLoginCredentials,
   loadLoginCredentials,
+  rememberTenantForLogin,
   LOGIN_TENANT_STORAGE_KEY,
   LOGIN_EMAIL_STORAGE_KEY,
 } from './tenantAuth.js'
@@ -40,6 +41,25 @@ describe('persistLoginCredentials / loadLoginCredentials', () => {
     assert.equal(localStorage.getItem(LOGIN_TENANT_STORAGE_KEY), null)
     assert.equal(localStorage.getItem(LOGIN_EMAIL_STORAGE_KEY), null)
     assert.deepEqual(loadLoginCredentials(), { tenant: '', email: '' })
+  })
+})
+
+describe('rememberTenantForLogin', () => {
+  beforeEach(() => {
+    localStorage.clear()
+  })
+
+  it('grava o slug sem apagar o e-mail lembrado', () => {
+    persistLoginCredentials({ tenant: 'antiga', email: 'a@b.com' })
+    rememberTenantForLogin('  paroquia-nova  ')
+    assert.equal(localStorage.getItem(LOGIN_TENANT_STORAGE_KEY), 'paroquia-nova')
+    assert.equal(localStorage.getItem(LOGIN_EMAIL_STORAGE_KEY), 'a@b.com')
+  })
+
+  it('ignora slug vazio', () => {
+    persistLoginCredentials({ tenant: 'paroquia', email: 'a@b.com' })
+    rememberTenantForLogin('   ')
+    assert.equal(localStorage.getItem(LOGIN_TENANT_STORAGE_KEY), 'paroquia')
   })
 })
 

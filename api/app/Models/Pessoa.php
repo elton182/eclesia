@@ -8,6 +8,7 @@ use ESolution\DBEncryption\Traits\EncryptedAttribute;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Storage;
 
 class Pessoa extends Model
 {
@@ -35,6 +36,7 @@ class Pessoa extends Model
         'telefone',
         'data_nascimento',
         'sexo',
+        'foto_path',
     ];
 
     /**
@@ -50,5 +52,18 @@ class Pessoa extends Model
     public function igreja(): BelongsTo
     {
         return $this->belongsTo(Igreja::class);
+    }
+
+    public function fotoUrl(): ?string
+    {
+        if ($this->foto_path === null || $this->foto_path === '') {
+            return null;
+        }
+
+        if (str_starts_with($this->foto_path, 'http://') || str_starts_with($this->foto_path, 'https://')) {
+            return $this->foto_path;
+        }
+
+        return Storage::disk('public')->url($this->foto_path);
     }
 }

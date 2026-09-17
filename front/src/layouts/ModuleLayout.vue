@@ -5,13 +5,13 @@ import { useAuthStore } from '@/stores/auth'
 import { useAuthAdminStore } from '@/stores/authAdmin'
 import { useTenantStore } from '@/stores/tenant'
 import { useIgrejaStore } from '@/stores/igreja'
-import { userHasPermission, canSeeEccCasaisNav } from '@/utils/userRoles'
+import { userHasPermission, canSeeEccCasaisNav, canSeeEccEventosNav } from '@/utils/userRoles'
 
 const props = defineProps({
   moduleKey: {
     type: String,
     required: true,
-    validator: (v) => ['ecc', 'site'].includes(v),
+    validator: (v) => ['ecc', 'site', 'escalas', 'eventos'].includes(v),
   },
 })
 
@@ -52,6 +52,20 @@ const moduleMeta = computed(() => {
       subtitleMono: true,
     }
   }
+  if (props.moduleKey === 'escalas') {
+    return {
+      title: 'Escalas',
+      subtitle: 'Agenda e montagem de equipes',
+      subtitleMono: false,
+    }
+  }
+  if (props.moduleKey === 'eventos') {
+    return {
+      title: 'Eventos',
+      subtitle: 'Agenda paroquial',
+      subtitleMono: false,
+    }
+  }
   return {
     title: 'ECC',
     subtitle: 'Encontro de Casais com Cristo',
@@ -72,11 +86,27 @@ const navItems = computed(() => {
       { label: 'Histórico de publicações', path: '/site', stub: true },
     ]
   }
+  if (props.moduleKey === 'escalas') {
+    const items = []
+    if (can('telas.escalas') || can('escalas.view') || can('escalas.manage') || isPlatformAdmin.value) {
+      items.push({ label: 'Tipos', path: '/escalas', exact: true })
+      items.push({ label: 'Agenda', path: '/escalas/agenda' })
+    }
+    return items
+  }
+  if (props.moduleKey === 'eventos') {
+    if (canSeeEccEventosNav(authTenant.user, { isSuperAdmin: isPlatformAdmin.value })) {
+      return [{ label: 'Agenda', path: '/eventos', exact: true }]
+    }
+    return []
+  }
   const items = []
   if (canSeeEccCasaisNav(authTenant.user, { isSuperAdmin: isPlatformAdmin.value })) {
     items.push({ label: 'Casais', path: '/ecc/casais' })
   }
-  items.push({ label: 'Encontros', path: '/ecc/encontros', stub: true })
+  if (canSeeEccEventosNav(authTenant.user, { isSuperAdmin: isPlatformAdmin.value })) {
+    items.push({ label: 'Eventos', path: '/ecc/eventos' })
+  }
   items.push({ label: 'Relatórios', path: '/ecc/relatorios', stub: true })
   return items
 })
@@ -89,6 +119,9 @@ function isActive(item) {
     if (item.query?.tab) return route.path === '/site' && q === item.query.tab
   }
   if (item.exact) return route.path === item.path
+  if (props.moduleKey === 'escalas' && item.path === '/escalas') {
+    return route.path === '/escalas'
+  }
   return route.path === item.path || route.path.startsWith(item.path + '/')
 }
 

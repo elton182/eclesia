@@ -17,6 +17,7 @@ class EccCasalService
         private readonly IgrejaContext $igrejaContext,
         private readonly EccEquipeService $equipes,
         private readonly EccVisibilityScope $visibility,
+        private readonly PessoaFotoService $fotos,
     ) {}
 
     /**
@@ -104,8 +105,14 @@ class EccCasalService
             $pessoaA = $casal->pessoaA;
             $pessoaB = $casal->pessoaB;
             $casal->delete();
-            $pessoaA->delete();
-            $pessoaB->delete();
+            if ($pessoaA !== null) {
+                $this->fotos->deleteFile($pessoaA);
+                $pessoaA->delete();
+            }
+            if ($pessoaB !== null) {
+                $this->fotos->deleteFile($pessoaB);
+                $pessoaB->delete();
+            }
         });
     }
 
@@ -229,7 +236,6 @@ class EccCasalService
             'preferencia_funcao' => $this->stringifyCell($data['preferencia_funcao'] ?? null),
             'funcao_dirigente' => $this->stringifyCell($data['funcao_dirigente'] ?? null),
             'foi_coordenador_geral' => (bool) ($data['foi_coordenador_geral'] ?? false),
-            'ficha_com_foto' => (bool) ($data['ficha_com_foto'] ?? false),
             'etapa_2' => $this->stringifyCell($data['etapa_2'] ?? null),
             'etapa_3' => $this->stringifyCell($data['etapa_3'] ?? null),
         ];
@@ -337,7 +343,6 @@ class EccCasalService
                 'já foi coordenador geral?',
                 'foi_coordenador_geral',
             ])),
-            'ficha_com_foto' => $this->parseBool($get(['ficha com foto:', 'ficha com foto', 'ficha_com_foto'])),
             'etapa_2' => $get(['tem 2ª etapa', 'tem 2a etapa', 'etapa_2']),
             'etapa_3' => $get(['tem 3ª etapa', 'tem 3a etapa', 'etapa_3']),
         ];

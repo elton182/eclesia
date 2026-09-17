@@ -23,6 +23,7 @@ import {
   faShieldHalved,
   faUserShield,
 } from '@fortawesome/free-solid-svg-icons'
+import LandingPortalPreview from '@/components/landing/LandingPortalPreview.vue'
 import {
   HERO,
   MARCA,
@@ -77,13 +78,6 @@ const icones = {
 }
 
 const icone = (chave) => icones[chave] ?? faCheck
-
-/** Amostra do painel do ECC exibida como prévia do produto no hero. */
-const equipesPreview = [
-  { nome: 'Acolhida', servos: 12, cor: '#7A2231' },
-  { nome: 'Cozinha', servos: 18, cor: '#B0812F' },
-  { nome: 'Liturgia', servos: 9, cor: '#00234E' },
-]
 </script>
 
 <template>
@@ -139,75 +133,13 @@ const equipesPreview = [
           </p>
         </div>
 
-        <!-- Prévia do produto -->
-        <div class="relative lg:pl-6" aria-hidden="true">
+        <!-- Prints do portal: desktop + mobile -->
+        <div class="relative lg:pl-4">
           <div
             class="absolute -top-8 -right-6 h-40 w-40 rounded-full blur-3xl opacity-40 hidden lg:block"
-            style="background: var(--color-accent-soft)"
+            style="background: rgba(200, 138, 94, 0.35)"
           ></div>
-
-          <div class="card relative p-5 md:p-6">
-            <div class="flex items-center justify-between">
-              <div>
-                <p class="page-eyebrow" style="margin-bottom: 2px">ECC · Painel</p>
-                <p class="text-[15px] font-semibold" style="color: var(--color-primary)">
-                  Paróquia São José
-                </p>
-              </div>
-              <span class="badge badge-info">1ª etapa</span>
-            </div>
-
-            <div class="mt-5 grid grid-cols-3 gap-3">
-              <div
-                v-for="stat in [
-                  { valor: '124', label: 'Casais' },
-                  { valor: '39', label: 'Servos' },
-                  { valor: '7', label: 'Equipes' },
-                ]"
-                :key="stat.label"
-                class="rounded-xl p-3 text-center"
-                style="background: var(--color-surface-2)"
-              >
-                <p
-                  class="text-[26px] leading-none font-semibold"
-                  style="font-family: Fraunces, Georgia, serif; color: var(--color-primary)"
-                >
-                  {{ stat.valor }}
-                </p>
-                <p class="mt-1 text-[11.5px]" style="color: var(--color-muted)">{{ stat.label }}</p>
-              </div>
-            </div>
-
-            <p class="mt-6 text-[12.5px] font-semibold" style="color: var(--color-muted)">
-              Equipes de serviço
-            </p>
-            <div class="mt-2 space-y-2">
-              <div
-                v-for="equipe in equipesPreview"
-                :key="equipe.nome"
-                class="flex items-center gap-3 rounded-xl border p-3"
-                style="border-color: var(--color-line)"
-              >
-                <span class="h-8 w-1.5 rounded-full shrink-0" :style="{ background: equipe.cor }"></span>
-                <span class="text-[14px] font-medium flex-1" style="color: var(--color-ink)">
-                  {{ equipe.nome }}
-                </span>
-                <span class="flex -space-x-2">
-                  <span
-                    class="h-6 w-6 rounded-full border-2 border-white"
-                    style="background: var(--color-primary)"
-                  ></span>
-                  <span
-                    class="h-6 w-6 rounded-full border-2 border-white"
-                    style="background: var(--color-accent)"
-                  ></span>
-                </span>
-                <span class="text-[12.5px] tabular-nums" style="color: var(--color-muted)">
-                  {{ equipe.servos }}
-                </span>
-              </div>
-            </div>
-          </div>
+          <LandingPortalPreview />
         </div>
       </div>
     </section>

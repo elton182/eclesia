@@ -9,6 +9,8 @@ export const ROLE_LABELS = {
   'cadastros-usuarios': 'Cadastros · Usuários',
   'cadastros-equipes': 'Cadastros · Equipes',
   'cadastros-casais': 'Cadastros · Casais',
+  'cadastros-eventos': 'Cadastros · Eventos',
+  'cadastros-escalas': 'Cadastros · Escalas',
   'lider-equipe': 'Líder de Equipe',
 }
 
@@ -53,15 +55,49 @@ export function userHasPermission(user, permission, opts = {}) {
   if (permission === 'telas.casais' && (roleNames.includes('cadastros-casais') || roleNames.includes('lider-equipe'))) {
     return true
   }
+  if (
+    permission === 'telas.eventos' &&
+    (roleNames.includes('lider-equipe') || roleNames.includes('cadastros-eventos'))
+  ) {
+    return true
+  }
   if (permission === 'ecc.casais.manage' && roleNames.includes('cadastros-casais')) return true
   if (permission === 'ecc.equipes.manage' && roleNames.includes('cadastros-equipes')) return true
+  if (permission === 'ecc.eventos.manage' && roleNames.includes('cadastros-eventos')) return true
   if (permission === 'ecc.casais.view' && (roleNames.includes('cadastros-casais') || roleNames.includes('lider-equipe'))) {
     return true
   }
   if (permission === 'ecc.equipes.view' && (roleNames.includes('cadastros-equipes') || roleNames.includes('lider-equipe'))) {
     return true
   }
+  if (
+    permission === 'ecc.eventos.view' &&
+    (roleNames.includes('lider-equipe') || roleNames.includes('cadastros-eventos'))
+  ) {
+    return true
+  }
+  if (
+    (permission === 'telas.escalas' ||
+      permission === 'escalas.view' ||
+      permission === 'escalas.manage') &&
+    (roleNames.includes('admin-igreja') || roleNames.includes('cadastros-escalas'))
+  ) {
+    return true
+  }
   return false
+}
+
+/**
+ * Nav / launcher Escalas (núcleo).
+ * @param {{ permissions?: string[], roles?: Array<{ name: string }> }|null|undefined} user
+ * @param {{ isSuperAdmin?: boolean }} [opts]
+ */
+export function canSeeEscalasNav(user, opts = {}) {
+  return (
+    userHasPermission(user, 'telas.escalas', opts) ||
+    userHasPermission(user, 'escalas.view', opts) ||
+    userHasPermission(user, 'escalas.manage', opts)
+  )
 }
 
 /**
@@ -73,6 +109,19 @@ export function canSeeEccCasaisNav(user, opts = {}) {
   return (
     userHasPermission(user, 'telas.casais', opts) ||
     userHasPermission(user, 'telas.equipes', opts)
+  )
+}
+
+/**
+ * Nav Eventos ECC.
+ * @param {{ permissions?: string[], roles?: Array<{ name: string }> }|null|undefined} user
+ * @param {{ isSuperAdmin?: boolean }} [opts]
+ */
+export function canSeeEccEventosNav(user, opts = {}) {
+  return (
+    userHasPermission(user, 'telas.eventos', opts) ||
+    userHasPermission(user, 'ecc.eventos.view', opts) ||
+    userHasPermission(user, 'ecc.eventos.manage', opts)
   )
 }
 

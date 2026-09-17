@@ -174,6 +174,8 @@ class TenantUserAuthTest extends TestCase
         $this->assertContains('cadastros-usuarios', $roleNames);
         $this->assertContains('cadastros-equipes', $roleNames);
         $this->assertContains('cadastros-casais', $roleNames);
+        $this->assertContains('cadastros-eventos', $roleNames);
+        $this->assertContains('cadastros-escalas', $roleNames);
         $this->assertContains('admin-igreja', $roleNames);
         $this->assertContains('lider-equipe', $roleNames);
         $this->assertNotContains('admin-tenant', $roleNames);

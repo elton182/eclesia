@@ -12,6 +12,8 @@ import { isoToBr } from '@/utils/dateBr'
 import { userHasPermission } from '@/utils/userRoles'
 import { casalEle, casalEla, formFieldsFromEleEla } from '@/utils/casalDisplay'
 import DateInput from '@/components/form/DateInput.vue'
+import PessoaFotoField from '@/components/ecc/PessoaFotoField.vue'
+import { uploadPessoaFoto } from '@/utils/pessoaFoto'
 
 const route = useRoute()
 const router = useRouter()
@@ -87,9 +89,14 @@ const emptyForm = () => ({
   preferencia_funcao: '',
   funcao_dirigente: '',
   foi_coordenador_geral: false,
-  ficha_com_foto: false,
   etapa_2: '',
   etapa_3: '',
+  pessoa_a_id: null,
+  pessoa_b_id: null,
+  foto_url_ele: null,
+  foto_url_ela: null,
+  pending_foto_ele: null,
+  pending_foto_ela: null,
 })
 
 const form = ref(emptyForm())
@@ -219,22 +226,47 @@ watch(
   },
 )
 
-const payload = () => ({
-  ...form.value,
-  equipe_id: form.value.equipe_id || null,
-  anos_casados: form.value.anos_casados === '' || form.value.anos_casados === null
-    ? null
-    : Number(form.value.anos_casados),
-})
+const payload = () => {
+  const {
+    pessoa_a_id: _a,
+    pessoa_b_id: _b,
+    foto_url_ele: _fe,
+    foto_url_ela: _fa,
+    pending_foto_ele: _pe,
+    pending_foto_ela: _pa,
+    ficha_com_foto: _f,
+    ...rest
+  } = form.value
+  return {
+    ...rest,
+    equipe_id: form.value.equipe_id || null,
+    anos_casados: form.value.anos_casados === '' || form.value.anos_casados === null
+      ? null
+      : Number(form.value.anos_casados),
+  }
+}
 
 const save = async () => {
   saving.value = true
   try {
+    let saved
     if (form.value.id) {
-      await api.put(`/ecc/casais/${form.value.id}`, payload())
+      const { data } = await api.put(`/ecc/casais/${form.value.id}`, payload())
+      saved = data.data || data
     } else {
-      await api.post('/ecc/casais', payload())
+      const { data } = await api.post('/ecc/casais', payload())
+      saved = data.data || data
     }
+
+    const eleId = saved?.ele?.id
+    const elaId = saved?.ela?.id
+    if (form.value.pending_foto_ele && eleId) {
+      await uploadPessoaFoto(api, eleId, form.value.pending_foto_ele)
+    }
+    if (form.value.pending_foto_ela && elaId) {
+      await uploadPessoaFoto(api, elaId, form.value.pending_foto_ela)
+    }
+
     innovToast('success', 'OK', 'Casal salvo')
     mode.value = 'list'
     await load()
@@ -628,6 +660,24 @@ onMounted(async () => {
           name="data_nascimento_conjuge"
           label="Nascimento (Ela)"
         />
+        <div class="md:col-span-2 grid md:grid-cols-2 gap-4">
+          <PessoaFotoField
+            :pessoa-id="form.pessoa_a_id"
+            :foto-url="form.foto_url_ele"
+            label="Foto (Ele)"
+            :pending-file="form.pending_foto_ele"
+            @update:foto-url="form.foto_url_ele = $event"
+            @update:pending-file="form.pending_foto_ele = $event"
+          />
+          <PessoaFotoField
+            :pessoa-id="form.pessoa_b_id"
+            :foto-url="form.foto_url_ela"
+            label="Foto (Ela)"
+            :pending-file="form.pending_foto_ela"
+            @update:foto-url="form.foto_url_ela = $event"
+            @update:pending-file="form.pending_foto_ela = $event"
+          />
+        </div>
         <div class="md:col-span-2">
           <label class="fld">Endereço</label>
           <input v-model="form.endereco" class="input">
@@ -666,10 +716,14 @@ onMounted(async () => {
             <input v-model="form.foi_coordenador_geral" type="checkbox" class="rounded">
             Foi coordenador geral
           </label>
-          <label class="inline-flex items-center gap-2 text-sm" style="color: var(--color-ink)">
-            <input v-model="form.ficha_com_foto" type="checkbox" class="rounded">
+          <span
+            v-if="form.foto_url_ele || form.foto_url_ela || form.pending_foto_ele || form.pending_foto_ela"
+            class="text-sm"
+            style="color: rgba(42,20,24,0.62)"
+            data-testid="ficha-com-foto-indicator"
+          >
             Ficha com foto
-          </label>
+          </span>
         </div>
         <div>
           <label class="fld">ECC de origem</label>

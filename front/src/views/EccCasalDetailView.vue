@@ -7,6 +7,7 @@ import { casalEle, casalEla } from '@/utils/casalDisplay'
 import { useAuthStore } from '@/stores/auth'
 import { useAuthAdminStore } from '@/stores/authAdmin'
 import { userHasPermission } from '@/utils/userRoles'
+import PessoaFotoField from '@/components/ecc/PessoaFotoField.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -19,8 +20,12 @@ const casal = ref(null)
 const canManage = computed(() =>
   userHasPermission(authStore.user, 'ecc.casais.manage', {
     isSuperAdmin: authAdminStore.isAuthenticated,
+  }) || userHasPermission(authStore.user, 'pessoas.manage', {
+    isSuperAdmin: authAdminStore.isAuthenticated,
   }),
 )
+
+const headerPhoto = computed(() => casal.value?.ele?.foto_url || casal.value?.ela?.foto_url || null)
 
 const initials = computed(() => {
   const a = (casalEle(casal.value) || '?')[0]
@@ -76,6 +81,24 @@ async function load() {
   }
 }
 
+function onEleFoto(url) {
+  if (!casal.value?.ele) return
+  casal.value = {
+    ...casal.value,
+    ele: { ...casal.value.ele, foto_url: url },
+    ficha_com_foto: Boolean(url || casal.value.ela?.foto_url),
+  }
+}
+
+function onElaFoto(url) {
+  if (!casal.value?.ela) return
+  casal.value = {
+    ...casal.value,
+    ela: { ...casal.value.ela, foto_url: url },
+    ficha_com_foto: Boolean(casal.value.ele?.foto_url || url),
+  }
+}
+
 async function swapEleEla() {
   if (!casal.value || swapping.value) return
   if (!confirm('Trocar Ele e Ela neste casal?')) return
@@ -109,14 +132,26 @@ onMounted(load)
         </button>
         <div class="flex flex-wrap items-center gap-4">
           <div
-            class="w-[62px] h-[62px] rounded-full flex items-center justify-center font-serif text-[21px] font-medium shrink-0"
+            class="w-[62px] h-[62px] rounded-full overflow-hidden flex items-center justify-center font-serif text-[21px] font-medium shrink-0"
             style="background: #C88A5E; color: #4E1220"
           >
-            {{ initials }}
+            <img
+              v-if="headerPhoto"
+              :src="headerPhoto"
+              alt=""
+              class="w-full h-full object-cover"
+            >
+            <template v-else>{{ initials }}</template>
           </div>
           <div class="flex-1 min-w-0">
             <h1 class="font-serif text-[27px] leading-tight" style="color: #FFFDFA">{{ title }}</h1>
             <div class="flex flex-wrap gap-2 mt-2">
+              <span
+                v-if="casal.ficha_com_foto"
+                class="text-[11.5px] font-medium px-2.5 py-1 rounded-full"
+                style="color: #4E1220; background: #C88A5E"
+                data-testid="casal-ficha-com-foto"
+              >Ficha com foto</span>
               <span
                 v-if="casal.funcao_dirigente"
                 class="text-[11.5px] font-medium px-2.5 py-1 rounded-full"
@@ -164,6 +199,14 @@ onMounted(load)
           style="background: #FFFDFA; border: 1px solid rgba(42, 20, 24, 0.1)"
         >
           <div class="text-[11px] font-medium tracking-wider uppercase mb-3.5" style="color: #B4703F">Ele</div>
+          <PessoaFotoField
+            class="mb-4"
+            :pessoa-id="ele.id"
+            :foto-url="ele.foto_url"
+            label="Foto"
+            :editable="canManage && !!ele.id"
+            @update:foto-url="onEleFoto"
+          />
           <div class="text-[15px] font-medium" style="color: #2A1418">{{ ele.nome || '—' }}</div>
           <div class="flex flex-col gap-2.5 mt-3.5 text-[13px]" style="color: rgba(42, 20, 24, 0.7)">
             <div class="flex justify-between gap-3">
@@ -186,6 +229,14 @@ onMounted(load)
           style="background: #FFFDFA; border: 1px solid rgba(42, 20, 24, 0.1)"
         >
           <div class="text-[11px] font-medium tracking-wider uppercase mb-3.5" style="color: #B4703F">Ela</div>
+          <PessoaFotoField
+            class="mb-4"
+            :pessoa-id="ela.id"
+            :foto-url="ela.foto_url"
+            label="Foto"
+            :editable="canManage && !!ela.id"
+            @update:foto-url="onElaFoto"
+          />
           <div class="text-[15px] font-medium" style="color: #2A1418">{{ ela.nome || '—' }}</div>
           <div class="flex flex-col gap-2.5 mt-3.5 text-[13px]" style="color: rgba(42, 20, 24, 0.7)">
             <div class="flex justify-between gap-3">
