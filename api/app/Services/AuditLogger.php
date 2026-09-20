@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\AuditLog;
+use App\Models\Igreja;
 use App\Models\SuperAdmin;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
@@ -72,6 +73,13 @@ class AuditLogger
 
         if ($auditable !== null && $auditable->getAttribute('igreja_id')) {
             $igrejaId = $auditable->getAttribute('igreja_id');
+        }
+
+        // Igreja não tem igreja_id; ao excluir a linha já sumiu — FK impediria o audit.
+        if ($auditable instanceof Igreja) {
+            $igrejaId = $action === self::ACTION_DELETED
+                ? null
+                : $auditable->getKey();
         }
 
         $auditableType = $auditable !== null ? $auditable::class : null;
