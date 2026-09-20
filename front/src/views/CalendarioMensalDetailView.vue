@@ -914,7 +914,7 @@ onUnmounted(() => {
           />
 
           <div
-            class="relative w-full sm:max-w-lg max-h-[92vh] overflow-y-auto rounded-t-2xl sm:rounded-xl p-5 md:p-6 shadow-xl space-y-4"
+            class="relative w-full sm:max-w-lg md:max-w-4xl lg:max-w-5xl max-h-[92vh] overflow-y-auto rounded-t-2xl sm:rounded-xl p-5 md:p-6 shadow-xl space-y-4"
             style="background: var(--color-surface); border: 1px solid var(--color-line)"
             data-testid="montagem-dia-painel"
           >
@@ -960,81 +960,143 @@ onUnmounted(() => {
               <h3 class="text-xs font-medium uppercase tracking-wide" style="color: var(--color-muted)">
                 Celebrações do dia
               </h3>
-              <div
-                v-for="item in diaItensGrade"
-                :key="item.id"
-                class="space-y-3 border-t pt-3"
-                style="border-color: var(--color-line)"
-              >
-                <div class="flex items-start justify-between gap-2">
-                <p class="text-sm font-medium m-0" style="color: var(--color-ink)">
-                  {{ item.tipo?.nome || item.titulo || 'Evento' }}
-                  · {{ item.local?.nome || '—' }} · {{ item.hora || '—' }}
-                </p>
-                  <button
-                    v-if="canManage && !fechado"
-                    type="button"
-                    class="btn btn-ghost !py-1 !px-2 text-xs"
-                    style="color: var(--color-danger)"
-                    :data-testid="`montagem-remover-${item.id}`"
-                    @click="removerItem(item)"
-                  >
-                    Remover
-                  </button>
-                </div>
-                <div>
-                  <label class="fld" :for="`cel-${item.id}`">Celebrante</label>
-                  <input
-                    :id="`cel-${item.id}`"
-                    v-model="item.celebrante_nome"
-                    class="input"
-                    placeholder="Nome do celebrante"
-                    :disabled="fechado || !canManage"
-                    @change="salvarItem(item)"
-                  />
-                </div>
-                <div>
-                  <label class="fld" :for="`notas-${item.id}`">Notas</label>
-                  <input
-                    :id="`notas-${item.id}`"
-                    v-model="item.notas"
-                    class="input"
-                    placeholder="Notas"
-                    :disabled="fechado || !canManage"
-                    @change="salvarItem(item)"
-                  />
-                </div>
-                <div>
-                  <label class="fld" :for="`obs-${item.id}`">Observação fixa</label>
-                    <select
-                    :id="`obs-${item.id}`"
-                    v-model="item.observacao_id"
-                    class="input"
-                    :disabled="fechado || !canManage"
-                    :data-testid="`item-obs-${item.id}`"
-                    @change="salvarItem(item)"
-                  >
-                    <option value="">— nenhuma —</option>
-                    <option
-                      v-for="(obs, idx) in observacoes"
-                      :key="obs.id"
-                      :value="obs.id"
-                    >
-                      {{ labelObsSelect(obs, idx) }}
-                    </option>
-                  </select>
-                  <p
-                    v-if="refObsItem(item)"
-                    class="text-xs mt-1 m-0"
-                    style="color: var(--color-muted)"
-                  >
-                    No PDF: ({{ refObsItem(item) }})
-                  </p>
-                </div>
-              </div>
+
               <p v-if="!diaItensGrade.length" class="text-sm" style="color: var(--color-muted)">
                 Nenhuma celebração neste dia ainda.
               </p>
+
+              <div
+                v-else
+                class="overflow-x-auto md:rounded-xl md:border"
+                style="border-color: var(--color-line)"
+                data-testid="montagem-dia-tabela"
+              >
+                <table class="montagem-grade-table w-full text-sm text-left">
+                  <thead class="montagem-grade-head" style="background: var(--color-bg); color: var(--color-ink)">
+                    <tr>
+                      <th class="px-3 py-2.5 font-medium whitespace-nowrap">Hora</th>
+                      <th class="px-3 py-2.5 font-medium">Local</th>
+                      <th class="px-3 py-2.5 font-medium">Tipo</th>
+                      <th class="px-3 py-2.5 font-medium min-w-[9rem]">Celebrante</th>
+                      <th class="px-3 py-2.5 font-medium min-w-[12rem]">Notas</th>
+                      <th class="px-3 py-2.5 font-medium min-w-[10rem]">Observação</th>
+                      <th v-if="canManage && !fechado" class="px-3 py-2.5 font-medium text-right w-24">
+                        <span class="sr-only">Ações</span>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr
+                      v-for="item in diaItensGrade"
+                      :key="item.id"
+                      class="montagem-grade-row border-t align-top"
+                      style="border-color: var(--color-line)"
+                    >
+                      <td
+                        class="montagem-grade-meta px-3 py-2.5 md:whitespace-nowrap font-medium"
+                        style="color: var(--color-ink)"
+                        data-label="Hora"
+                      >
+                        <div class="flex items-start justify-between gap-2 md:block">
+                          <span class="md:hidden text-sm font-medium" style="color: var(--color-ink)">
+                            {{ item.tipo?.nome || item.titulo || 'Evento' }}
+                            · {{ item.local?.nome || '—' }} · {{ item.hora || '—' }}
+                          </span>
+                          <span class="hidden md:inline">{{ item.hora || '—' }}</span>
+                          <button
+                            v-if="canManage && !fechado"
+                            type="button"
+                            class="btn btn-ghost !py-1 !px-2 text-xs md:hidden shrink-0"
+                            style="color: var(--color-danger)"
+                            :data-testid="`montagem-remover-m-${item.id}`"
+                            @click="removerItem(item)"
+                          >
+                            Remover
+                          </button>
+                        </div>
+                      </td>
+                      <td
+                        class="montagem-grade-hide-sm px-3 py-2.5"
+                        style="color: var(--color-ink)"
+                        data-label="Local"
+                      >
+                        {{ item.local?.nome || '—' }}
+                      </td>
+                      <td
+                        class="montagem-grade-hide-sm px-3 py-2.5"
+                        style="color: var(--color-muted)"
+                        data-label="Tipo"
+                      >
+                        {{ item.tipo?.nome || item.titulo || 'Evento' }}
+                      </td>
+                      <td class="px-3 py-2" data-label="Celebrante">
+                        <label class="fld md:sr-only" :for="`cel-${item.id}`">Celebrante</label>
+                        <input
+                          :id="`cel-${item.id}`"
+                          v-model="item.celebrante_nome"
+                          class="input md:!py-1.5 md:!text-sm"
+                          placeholder="Nome do celebrante"
+                          :disabled="fechado || !canManage"
+                          @change="salvarItem(item)"
+                        />
+                      </td>
+                      <td class="px-3 py-2" data-label="Notas">
+                        <label class="fld md:sr-only" :for="`notas-${item.id}`">Notas</label>
+                        <input
+                          :id="`notas-${item.id}`"
+                          v-model="item.notas"
+                          class="input md:!py-1.5 md:!text-sm"
+                          placeholder="Notas"
+                          :disabled="fechado || !canManage"
+                          @change="salvarItem(item)"
+                        />
+                      </td>
+                      <td class="px-3 py-2" data-label="Observação">
+                        <label class="fld md:sr-only" :for="`obs-${item.id}`">Observação fixa</label>
+                        <select
+                          :id="`obs-${item.id}`"
+                          v-model="item.observacao_id"
+                          class="input md:!py-1.5 md:!text-sm"
+                          :disabled="fechado || !canManage"
+                          :data-testid="`item-obs-${item.id}`"
+                          @change="salvarItem(item)"
+                        >
+                          <option value="">— nenhuma —</option>
+                          <option
+                            v-for="(obs, idx) in observacoes"
+                            :key="obs.id"
+                            :value="obs.id"
+                          >
+                            {{ labelObsSelect(obs, idx) }}
+                          </option>
+                        </select>
+                        <p
+                          v-if="refObsItem(item)"
+                          class="text-xs mt-1 m-0"
+                          style="color: var(--color-muted)"
+                        >
+                          No PDF: ({{ refObsItem(item) }})
+                        </p>
+                      </td>
+                      <td
+                        v-if="canManage && !fechado"
+                        class="montagem-grade-hide-sm px-3 py-2 text-right"
+                        data-label="Ações"
+                      >
+                        <button
+                          type="button"
+                          class="btn btn-ghost !py-1 !px-2 text-xs"
+                          style="color: var(--color-danger)"
+                          :data-testid="`montagem-remover-${item.id}`"
+                          @click="removerItem(item)"
+                        >
+                          Remover
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
 
             <div v-if="diaFestas.length || diaCasamentos.length" class="space-y-2 text-sm">
@@ -1104,42 +1166,43 @@ onUnmounted(() => {
                 Cadastre um local em
                 <router-link to="/calendario/locais" class="underline">Locais e horários</router-link>.
               </p>
-              <div>
-                <label class="fld" for="evt-local">Local</label>
-                <select
-                  id="evt-local"
-                  v-model="eventoForm.local_id"
-                  class="input"
-                  data-testid="montagem-evento-local"
-                >
-                  <option value="">—</option>
-                  <option v-for="loc in locais" :key="loc.id" :value="loc.id">{{ loc.nome }}</option>
-                </select>
-              </div>
-              <div>
-                <label class="fld" for="evt-tipo">Tipo</label>
-                <select
-                  id="evt-tipo"
-                  v-model="eventoForm.tipo_id"
-                  class="input"
-                  required
-                  data-testid="montagem-evento-tipo"
-                >
-                  <option disabled value="">Selecione…</option>
-                  <option v-for="tp in tipos" :key="tp.id" :value="tp.id">{{ tp.nome }}</option>
-                </select>
-              </div>
-              <div v-if="exigeTitulo">
-                <label class="fld" for="evt-titulo">Nome do evento</label>
-                <input
-                  id="evt-titulo"
-                  v-model="eventoForm.titulo"
-                  class="input"
-                  placeholder="Descreva o evento"
-                  required
-                  data-testid="montagem-evento-titulo"
-                />
-              </div>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label class="fld" for="evt-local">Local</label>
+                  <select
+                    id="evt-local"
+                    v-model="eventoForm.local_id"
+                    class="input"
+                    data-testid="montagem-evento-local"
+                  >
+                    <option value="">—</option>
+                    <option v-for="loc in locais" :key="loc.id" :value="loc.id">{{ loc.nome }}</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="fld" for="evt-tipo">Tipo</label>
+                  <select
+                    id="evt-tipo"
+                    v-model="eventoForm.tipo_id"
+                    class="input"
+                    required
+                    data-testid="montagem-evento-tipo"
+                  >
+                    <option disabled value="">Selecione…</option>
+                    <option v-for="tp in tipos" :key="tp.id" :value="tp.id">{{ tp.nome }}</option>
+                  </select>
+                </div>
+                <div v-if="exigeTitulo" class="md:col-span-2">
+                  <label class="fld" for="evt-titulo">Nome do evento</label>
+                  <input
+                    id="evt-titulo"
+                    v-model="eventoForm.titulo"
+                    class="input"
+                    placeholder="Descreva o evento"
+                    required
+                    data-testid="montagem-evento-titulo"
+                  />
+                </div>
                 <div>
                   <label class="fld" for="evt-hora">Hora</label>
                   <input
@@ -1154,24 +1217,25 @@ onUnmounted(() => {
                     @blur="onHoraInput"
                   />
                 </div>
-              <div>
-                <label class="fld" for="evt-notas">Notas</label>
-                <input
-                  id="evt-notas"
-                  v-model="eventoForm.notas"
-                  class="input"
-                  placeholder="Opcional"
-                />
-              </div>
-              <div>
-                <label class="fld" for="evt-cel">Celebrante</label>
-                <input
-                  id="evt-cel"
-                  v-model="eventoForm.celebrante_nome"
-                  class="input"
-                  placeholder="Nome do celebrante"
-                  data-testid="montagem-evento-celebrante"
-                />
+                <div>
+                  <label class="fld" for="evt-cel">Celebrante</label>
+                  <input
+                    id="evt-cel"
+                    v-model="eventoForm.celebrante_nome"
+                    class="input"
+                    placeholder="Nome do celebrante"
+                    data-testid="montagem-evento-celebrante"
+                  />
+                </div>
+                <div class="md:col-span-2">
+                  <label class="fld" for="evt-notas">Notas</label>
+                  <input
+                    id="evt-notas"
+                    v-model="eventoForm.notas"
+                    class="input"
+                    placeholder="Opcional"
+                  />
+                </div>
               </div>
               <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2.5 pt-1">
                 <button type="button" class="btn btn-ghost" @click="fecharDiaModal">
@@ -1236,5 +1300,38 @@ button:focus-visible {
 .dia-modal-fade-enter-from,
 .dia-modal-fade-leave-to {
   opacity: 0;
+}
+
+/* Mobile: tabela vira cartões empilhados */
+@media (max-width: 767px) {
+  .montagem-grade-table,
+  .montagem-grade-table tbody {
+    display: block;
+    width: 100%;
+  }
+  .montagem-grade-head {
+    display: none;
+  }
+  .montagem-grade-row {
+    display: block;
+    padding-top: 0.75rem;
+    margin-top: 0.75rem;
+  }
+  .montagem-grade-row:first-child {
+    margin-top: 0;
+  }
+  .montagem-grade-row > td {
+    display: block;
+    width: 100%;
+    padding-left: 0;
+    padding-right: 0;
+    white-space: normal;
+  }
+  .montagem-grade-hide-sm {
+    display: none !important;
+  }
+  .montagem-grade-meta {
+    padding-bottom: 0.25rem;
+  }
 }
 </style>
