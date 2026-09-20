@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '@/services/api'
 import { innovToast } from '@/plugins/toast'
@@ -46,8 +46,9 @@ const eventoForm = ref({
 })
 const linkUrl = ref('')
 const diaSelecionado = ref('')
-const obsForm = ref({ titulo: '', descricao: '' })
-const savingObs = ref(false)
+/** Rascunhos locais ainda não persistidos (permite várias linhas vazias de uma vez). */
+const obsDrafts = ref([])
+const savingObsIds = ref(new Set())
 
 const isPlatformAdmin = computed(() => authAdmin.isAuthenticated && !auth.isAuthenticated)
 const canManage = computed(
@@ -63,6 +64,7 @@ const indisponiveis = computed(() => indexarIndisponibilidades(mensal.value?.ind
 const festas = computed(() => (mensal.value?.itens || []).filter((i) => i.secao === 'festa'))
 const casamentos = computed(() => (mensal.value?.itens || []).filter((i) => i.secao === 'casamento'))
 const observacoes = computed(() => mensal.value?.observacoes || [])
+const observacoesTabela = computed(() => [...observacoes.value, ...obsDrafts.value])
 const temposLiturgicos = computed(() => mensal.value?.tempos_liturgicos || [])
 
 const cells = computed(() => {
@@ -219,7 +221,10 @@ async function load(opts = {}) {
     }
     locais.value = l.data.data || l.data || []
     tipos.value = t.data.data || t.data || []
-    if (!silent) resetEventoForm()
+    if (!silent) {
+      resetEventoForm()
+      obsDrafts.value = []
+    }
     syncLinkUrl()
   } catch (e) {
     innovToast('error', 'Calendário', e.response?.data?.message || 'Falha ao carregar')
@@ -267,29 +272,58 @@ async function salvarMeta() {
   }
 }
 
-async function adicionarObservacao() {
-  if (!obsForm.value.titulo.trim() || !obsForm.value.descricao.trim()) {
-    innovToast('error', 'Observação', 'Informe título e descrição.')
+async function adicionarLinhaObs() {
+  const localId = `draft-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  obsDrafts.value.push({ localId, titulo: '', descricao: '' })
+  await nextTick()
+  document.getElementById(`obs-titulo-${localId}`)?.focus()
+}
+
+function isObsDraft(obs) {
+  return Boolean(obs?.localId) && !obs?.id
+}
+
+function obsRowKey(obs) {
+  return obs.id || obs.localId
+}
+
+function isObsSaving(obs) {
+  return savingObsIds.value.has(obsRowKey(obs))
+}
+
+async function persistirOuSalvarObs(obs) {
+  const titulo = String(obs.titulo || '').trim()
+  const descricao = String(obs.descricao || '').trim()
+  const key = obsRowKey(obs)
+
+  if (isObsDraft(obs)) {
+    if (!titulo || !descricao) return
+    if (savingObsIds.value.has(key)) return
+    const next = new Set(savingObsIds.value)
+    next.add(key)
+    savingObsIds.value = next
+    try {
+      const { data } = await api.post(`/calendario/mensais/${mensal.value.id}/observacoes`, {
+        titulo,
+        descricao,
+      })
+      const created = data.data || data
+      obsDrafts.value = obsDrafts.value.filter((d) => d.localId !== obs.localId)
+      mensal.value = {
+        ...mensal.value,
+        observacoes: [...(mensal.value.observacoes || []), created],
+      }
+    } catch (e) {
+      innovToast('error', 'Erro', e.response?.data?.message || 'Falha ao adicionar')
+    } finally {
+      const done = new Set(savingObsIds.value)
+      done.delete(key)
+      savingObsIds.value = done
+    }
     return
   }
-  savingObs.value = true
-  try {
-    const { data } = await api.post(`/calendario/mensais/${mensal.value.id}/observacoes`, {
-      titulo: obsForm.value.titulo.trim(),
-      descricao: obsForm.value.descricao.trim(),
-    })
-    const created = data.data || data
-    mensal.value = {
-      ...mensal.value,
-      observacoes: [...(mensal.value.observacoes || []), created],
-    }
-    obsForm.value = { titulo: '', descricao: '' }
-    innovToast('success', 'Observação', 'Adicionada')
-  } catch (e) {
-    innovToast('error', 'Erro', e.response?.data?.message || 'Falha ao adicionar')
-  } finally {
-    savingObs.value = false
-  }
+
+  await salvarObservacao(obs)
 }
 
 async function salvarObservacao(obs) {
@@ -312,9 +346,25 @@ async function salvarObservacao(obs) {
 }
 
 async function removerObservacao(obs) {
+  if (isObsDraft(obs)) {
+    const vazia = !String(obs.titulo || '').trim() && !String(obs.descricao || '').trim()
+    if (!vazia) {
+      const ok = await innovConfirm({
+        title: 'Descartar linha',
+        message: 'Esta observação ainda não foi salva. Descartar?',
+        confirmText: 'Descartar',
+        danger: true,
+      })
+      if (!ok) return
+    }
+    obsDrafts.value = obsDrafts.value.filter((d) => d.localId !== obs.localId)
+    return
+  }
+
+  const rotulo = String(obs.titulo || '').trim() || 'esta observação'
   const ok = await innovConfirm({
     title: 'Remover observação',
-    message: `Remover “${obs.titulo}”? Células que a referenciam perdem o vínculo.`,
+    message: `Remover “${rotulo}”? Células que a referenciam perdem o vínculo.`,
     confirmText: 'Remover',
   })
   if (!ok) return
@@ -803,16 +853,21 @@ onUnmounted(() => {
         Observações fixas
       </summary>
       <p class="mt-2 text-sm" style="color: var(--color-muted)">
-        Cada observação tem título e descrição. Na grade do dia, associe a observação à celebração;
-        a lista aparece no final do PDF.
+        Clique em Adicionar para criar linhas e preencha à vontade — salva ao completar título e
+        descrição. Na grade do dia, associe a observação à celebração; a lista aparece no final do
+        PDF.
       </p>
 
-      <p v-if="!observacoes.length" class="mt-4 text-sm" style="color: var(--color-muted)">
+      <p
+        v-if="!observacoesTabela.length"
+        class="mt-4 text-sm"
+        style="color: var(--color-muted)"
+      >
         Nenhuma observação cadastrada ainda.
       </p>
 
       <div
-        v-else
+        v-if="observacoesTabela.length"
         class="mt-4 overflow-x-auto md:rounded-xl md:border"
         style="border-color: var(--color-line)"
         data-testid="calendario-observacoes-tabela"
@@ -829,29 +884,31 @@ onUnmounted(() => {
           </thead>
           <tbody>
             <tr
-              v-for="obs in observacoes"
-              :key="obs.id"
+              v-for="obs in observacoesTabela"
+              :key="obsRowKey(obs)"
               class="obs-fixas-row border-t align-top"
               style="border-color: var(--color-line)"
             >
               <td class="px-3 py-2" data-label="Título">
-                <label class="fld md:sr-only" :for="`obs-titulo-${obs.id}`">Título</label>
+                <label class="fld md:sr-only" :for="`obs-titulo-${obsRowKey(obs)}`">Título</label>
                 <input
-                  :id="`obs-titulo-${obs.id}`"
+                  :id="`obs-titulo-${obsRowKey(obs)}`"
                   v-model="obs.titulo"
                   class="input md:!py-1.5 md:!text-sm"
-                  :disabled="fechado || !canManage"
-                  @change="salvarObservacao(obs)"
+                  placeholder="Ex.: ECC"
+                  :disabled="fechado || !canManage || isObsSaving(obs)"
+                  @change="persistirOuSalvarObs(obs)"
                 />
               </td>
               <td class="px-3 py-2" data-label="Descrição">
-                <label class="fld md:sr-only" :for="`obs-desc-${obs.id}`">Descrição</label>
+                <label class="fld md:sr-only" :for="`obs-desc-${obsRowKey(obs)}`">Descrição</label>
                 <textarea
-                  :id="`obs-desc-${obs.id}`"
+                  :id="`obs-desc-${obsRowKey(obs)}`"
                   v-model="obs.descricao"
                   class="input min-h-[4rem] md:min-h-[2.75rem] md:!py-1.5 md:!text-sm"
-                  :disabled="fechado || !canManage"
-                  @change="salvarObservacao(obs)"
+                  placeholder="Texto que aparece no PDF"
+                  :disabled="fechado || !canManage || isObsSaving(obs)"
+                  @change="persistirOuSalvarObs(obs)"
                 />
               </td>
               <td
@@ -863,7 +920,8 @@ onUnmounted(() => {
                   type="button"
                   class="btn btn-ghost !py-1 !px-2 text-xs"
                   style="color: var(--color-danger)"
-                  :data-testid="`obs-remover-${obs.id}`"
+                  :data-testid="`obs-remover-${obsRowKey(obs)}`"
+                  :disabled="isObsSaving(obs)"
                   @click="removerObservacao(obs)"
                 >
                   Remover
@@ -874,30 +932,17 @@ onUnmounted(() => {
         </table>
       </div>
 
-      <form
-        v-if="canManage && !fechado"
-        class="mt-4 space-y-3 border-t pt-4"
-        style="border-color: var(--color-line)"
-        data-testid="obs-add-form"
-        @submit.prevent="adicionarObservacao"
-      >
-        <h3 class="font-serif text-[16px] font-medium m-0" style="color: var(--color-ink)">
-          Nova observação
-        </h3>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div>
-            <label class="fld" for="obs-nova-titulo">Título</label>
-            <input id="obs-nova-titulo" v-model="obsForm.titulo" class="input" />
-          </div>
-          <div>
-            <label class="fld" for="obs-nova-desc">Descrição</label>
-            <textarea id="obs-nova-desc" v-model="obsForm.descricao" class="input min-h-[4rem]" />
-          </div>
-        </div>
-        <div class="flex justify-end">
-          <button type="submit" class="btn btn-primary" :disabled="savingObs">Adicionar</button>
-        </div>
-      </form>
+      <div v-if="canManage && !fechado" class="mt-4 flex justify-end">
+        <button
+          type="button"
+          class="btn btn-ghost"
+          data-testid="obs-add-linha"
+          :disabled="savingObsIds.size > 0"
+          @click="adicionarLinhaObs"
+        >
+          + Adicionar observação
+        </button>
+      </div>
     </details>
 
     <details v-if="festas.length || casamentos.length" class="card p-4 md:p-5">
