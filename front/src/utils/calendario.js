@@ -300,7 +300,7 @@ export function proximoMesCalendario(ano, mes) {
 }
 
 /**
- * Número 1-based da observação na lista ordenada (como no PDF).
+ * Número 1-based da observação na lista ordenada (para labels na UI).
  * @param {Array<{ id?: string, ordem?: number }>|null|undefined} observacoes
  * @param {string|null|undefined} observacaoId
  * @returns {number|null}

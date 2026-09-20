@@ -135,7 +135,7 @@ class CalendarioOficialPdfLayoutTest extends TestCase
         $this->assertStringNotContainsString('white-space: pre-wrap', $html);
         $this->assertStringNotContainsString('obs-fixas', $html);
         $this->assertMatchesRegularExpression(
-            '/Observações fixas:<\/div>\s*<ul class="lista lista-obs">\s*<li>\s*<strong>1\) 1º final de semana:<\/strong>\s*<span class="obs-desc">Missa com crianças<br\s*\/?>\s*Horário especial<\/span>\s*<\/li>/',
+            '/Observações fixas:<\/div>\s*<ul class="lista lista-obs">\s*<li>\s*<strong>1º final de semana:<\/strong>\s*<span class="obs-desc">Missa com crianças<br\s*\/?>\s*Horário especial<\/span>\s*<\/li>/',
             $html,
         );
         $this->assertStringContainsString('.lista-obs li', $html);

@@ -388,9 +388,9 @@
   @if($listaObs->isNotEmpty())
     <div class="sec-title">Observações fixas:</div>
     <ul class="lista lista-obs">
-      @foreach($listaObs->values() as $i => $obs)
+      @foreach($listaObs->values() as $obs)
         <li>
-          <strong>{{ $i + 1 }}) {{ $obs->titulo }}:</strong>
+          <strong>{{ $obs->titulo }}:</strong>
           <span class="obs-desc">{!! nl2br(e($obs->descricao)) !!}</span>
         </li>
       @endforeach

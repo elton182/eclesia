@@ -13,7 +13,6 @@ import {
   labelObservacaoOpcao,
   labelStatusCalendario,
   MES_NOMES,
-  numeroObservacao,
   previewLinhasDia,
   proximosStatusCalendario,
   proximoMesCalendario,
@@ -353,10 +352,6 @@ async function salvarTempoLiturgico(tempo) {
 
 function labelObsSelect(obs, index) {
   return labelObservacaoOpcao(obs, index + 1)
-}
-
-function refObsItem(item) {
-  return numeroObservacao(observacoes.value, item.observacao_id)
 }
 
 async function mudarStatus(status) {
@@ -808,53 +803,77 @@ onUnmounted(() => {
         Observações fixas
       </summary>
       <p class="mt-2 text-sm" style="color: var(--color-muted)">
-        Cada observação tem título e descrição. Na grade, escolha a observação na célula — o PDF
-        imprime o número (N).
+        Cada observação tem título e descrição. Na grade do dia, associe a observação à celebração;
+        a lista aparece no final do PDF.
       </p>
-      <ul class="mt-4 space-y-4 list-none p-0 m-0">
-        <li
-          v-for="(obs, idx) in observacoes"
-          :key="obs.id"
-          class="rounded-lg border p-3 space-y-2"
-          style="border-color: var(--color-line)"
-        >
-          <div class="flex items-center justify-between gap-2">
-            <span class="text-sm font-medium" style="color: var(--color-accent-dark)">
-              {{ idx + 1 }})
-            </span>
-            <button
-              v-if="canManage && !fechado"
-              type="button"
-              class="btn btn-ghost !py-1 !px-2 text-xs"
-              style="color: var(--color-danger)"
-              :data-testid="`obs-remover-${obs.id}`"
-              @click="removerObservacao(obs)"
+
+      <p v-if="!observacoes.length" class="mt-4 text-sm" style="color: var(--color-muted)">
+        Nenhuma observação cadastrada ainda.
+      </p>
+
+      <div
+        v-else
+        class="mt-4 overflow-x-auto md:rounded-xl md:border"
+        style="border-color: var(--color-line)"
+        data-testid="calendario-observacoes-tabela"
+      >
+        <table class="obs-fixas-table w-full text-sm text-left">
+          <thead class="obs-fixas-head" style="background: var(--color-bg); color: var(--color-ink)">
+            <tr>
+              <th class="px-3 py-2.5 font-medium min-w-[10rem]">Título</th>
+              <th class="px-3 py-2.5 font-medium min-w-[16rem]">Descrição</th>
+              <th v-if="canManage && !fechado" class="px-3 py-2.5 font-medium text-right w-24">
+                <span class="sr-only">Ações</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="obs in observacoes"
+              :key="obs.id"
+              class="obs-fixas-row border-t align-top"
+              style="border-color: var(--color-line)"
             >
-              Remover
-            </button>
-          </div>
-          <div>
-            <label class="fld" :for="`obs-titulo-${obs.id}`">Título</label>
-            <input
-              :id="`obs-titulo-${obs.id}`"
-              v-model="obs.titulo"
-              class="input"
-              :disabled="fechado || !canManage"
-              @change="salvarObservacao(obs)"
-            />
-          </div>
-          <div>
-            <label class="fld" :for="`obs-desc-${obs.id}`">Descrição</label>
-            <textarea
-              :id="`obs-desc-${obs.id}`"
-              v-model="obs.descricao"
-              class="input min-h-[4rem]"
-              :disabled="fechado || !canManage"
-              @change="salvarObservacao(obs)"
-            />
-          </div>
-        </li>
-      </ul>
+              <td class="px-3 py-2" data-label="Título">
+                <label class="fld md:sr-only" :for="`obs-titulo-${obs.id}`">Título</label>
+                <input
+                  :id="`obs-titulo-${obs.id}`"
+                  v-model="obs.titulo"
+                  class="input md:!py-1.5 md:!text-sm"
+                  :disabled="fechado || !canManage"
+                  @change="salvarObservacao(obs)"
+                />
+              </td>
+              <td class="px-3 py-2" data-label="Descrição">
+                <label class="fld md:sr-only" :for="`obs-desc-${obs.id}`">Descrição</label>
+                <textarea
+                  :id="`obs-desc-${obs.id}`"
+                  v-model="obs.descricao"
+                  class="input min-h-[4rem] md:min-h-[2.75rem] md:!py-1.5 md:!text-sm"
+                  :disabled="fechado || !canManage"
+                  @change="salvarObservacao(obs)"
+                />
+              </td>
+              <td
+                v-if="canManage && !fechado"
+                class="px-3 py-2 text-right"
+                data-label="Ações"
+              >
+                <button
+                  type="button"
+                  class="btn btn-ghost !py-1 !px-2 text-xs"
+                  style="color: var(--color-danger)"
+                  :data-testid="`obs-remover-${obs.id}`"
+                  @click="removerObservacao(obs)"
+                >
+                  Remover
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
       <form
         v-if="canManage && !fechado"
         class="mt-4 space-y-3 border-t pt-4"
@@ -865,13 +884,15 @@ onUnmounted(() => {
         <h3 class="font-serif text-[16px] font-medium m-0" style="color: var(--color-ink)">
           Nova observação
         </h3>
-        <div>
-          <label class="fld" for="obs-nova-titulo">Título</label>
-          <input id="obs-nova-titulo" v-model="obsForm.titulo" class="input" />
-        </div>
-        <div>
-          <label class="fld" for="obs-nova-desc">Descrição</label>
-          <textarea id="obs-nova-desc" v-model="obsForm.descricao" class="input min-h-[4rem]" />
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label class="fld" for="obs-nova-titulo">Título</label>
+            <input id="obs-nova-titulo" v-model="obsForm.titulo" class="input" />
+          </div>
+          <div>
+            <label class="fld" for="obs-nova-desc">Descrição</label>
+            <textarea id="obs-nova-desc" v-model="obsForm.descricao" class="input min-h-[4rem]" />
+          </div>
         </div>
         <div class="flex justify-end">
           <button type="submit" class="btn btn-primary" :disabled="savingObs">Adicionar</button>
@@ -1070,13 +1091,6 @@ onUnmounted(() => {
                             {{ labelObsSelect(obs, idx) }}
                           </option>
                         </select>
-                        <p
-                          v-if="refObsItem(item)"
-                          class="text-xs mt-1 m-0"
-                          style="color: var(--color-muted)"
-                        >
-                          No PDF: ({{ refObsItem(item) }})
-                        </p>
                       </td>
                       <td
                         v-if="canManage && !fechado"
@@ -1305,22 +1319,28 @@ button:focus-visible {
 /* Mobile: tabela vira cartões empilhados */
 @media (max-width: 767px) {
   .montagem-grade-table,
-  .montagem-grade-table tbody {
+  .montagem-grade-table tbody,
+  .obs-fixas-table,
+  .obs-fixas-table tbody {
     display: block;
     width: 100%;
   }
-  .montagem-grade-head {
+  .montagem-grade-head,
+  .obs-fixas-head {
     display: none;
   }
-  .montagem-grade-row {
+  .montagem-grade-row,
+  .obs-fixas-row {
     display: block;
     padding-top: 0.75rem;
     margin-top: 0.75rem;
   }
-  .montagem-grade-row:first-child {
+  .montagem-grade-row:first-child,
+  .obs-fixas-row:first-child {
     margin-top: 0;
   }
-  .montagem-grade-row > td {
+  .montagem-grade-row > td,
+  .obs-fixas-row > td {
     display: block;
     width: 100%;
     padding-left: 0;
@@ -1332,6 +1352,9 @@ button:focus-visible {
   }
   .montagem-grade-meta {
     padding-bottom: 0.25rem;
+  }
+  .obs-fixas-row > td[data-label="Ações"] {
+    text-align: right;
   }
 }
 </style>

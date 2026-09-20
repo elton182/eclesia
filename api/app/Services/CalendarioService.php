@@ -777,13 +777,12 @@ class CalendarioService
 
         $branding = $this->pdfBrandingContext($mensal->igreja);
         $corMap = $this->pdfCelebranteCores($mensal->itens);
-        $obsNumeroMap = $this->pdfObservacaoNumeroMap($mensal->observacoes);
 
         $pdf = Pdf::loadView('calendario.oficial-pdf', [
             'mensal' => $mensal,
             'mesNome' => $meses[$mensal->mes] ?? (string) $mensal->mes,
-            'gradeSemana' => $this->pdfGradeSemana($mensal->itens, $corMap, $mensal->ano, $mensal->mes, $obsNumeroMap),
-            'gradeFds' => $this->pdfGradeFds($mensal->itens, $corMap, $mensal->ano, $mensal->mes, $obsNumeroMap),
+            'gradeSemana' => $this->pdfGradeSemana($mensal->itens, $corMap, $mensal->ano, $mensal->mes),
+            'gradeFds' => $this->pdfGradeFds($mensal->itens, $corMap, $mensal->ano, $mensal->mes),
             'temposLiturgicosLabels' => $this->pdfTemposLiturgicosLabels($mensal),
             'observacoes' => $mensal->observacoes->values(),
             'festas' => $mensal->itens->where('secao', 'festa')->sortBy(
@@ -838,7 +837,6 @@ class CalendarioService
     /**
      * @param  Collection<int, CalendarioItem>  $itens
      * @param  array<string, string>  $corMap
-     * @param  array<string, int>  $obsNumeroMap
      * @return list<array{diaLabel: string, datas: list<string>, linhas: list<array{local: string, hora: string, celulas: list<array{texto: string, cor: ?string, ref: ?string, cancelado: bool}>}>}>
      */
     private function pdfGradeSemana(
@@ -846,7 +844,6 @@ class CalendarioService
         array $corMap,
         int $ano,
         int $mes,
-        array $obsNumeroMap = [],
     ): array {
         $labels = [
             1 => 'SEGUNDA',
@@ -862,7 +859,7 @@ class CalendarioService
         foreach ([1, 2, 3, 4, 5] as $dow) {
             $datasIso = $this->pdfDatasDoMes($ano, $mes, $dow);
             $doDia = $semana->filter(fn (CalendarioItem $i) => (int) $i->data->dayOfWeek === $dow);
-            $grupos[] = $this->pdfMontarBlocoDia($labels[$dow], $doDia, $corMap, $datasIso, $obsNumeroMap);
+            $grupos[] = $this->pdfMontarBlocoDia($labels[$dow], $doDia, $corMap, $datasIso);
         }
 
         return $grupos;
@@ -871,7 +868,6 @@ class CalendarioService
     /**
      * @param  Collection<int, CalendarioItem>  $itens
      * @param  array<string, string>  $corMap
-     * @param  array<string, int>  $obsNumeroMap
      * @return list<array{diaLabel: string, datas: list<string>, linhas: list<array{local: string, hora: string, celulas: list<array{texto: string, cor: ?string, ref: ?string, cancelado: bool}>}>}>
      */
     private function pdfGradeFds(
@@ -879,7 +875,6 @@ class CalendarioService
         array $corMap,
         int $ano,
         int $mes,
-        array $obsNumeroMap = [],
     ): array {
         $fds = $itens->where('secao', 'fds')->values();
         if ($fds->isEmpty()) {
@@ -893,7 +888,7 @@ class CalendarioService
             if ($doDia->isEmpty()) {
                 continue;
             }
-            $grupos[] = $this->pdfMontarBlocoDia($label, $doDia, $corMap, $datasIso, $obsNumeroMap);
+            $grupos[] = $this->pdfMontarBlocoDia($label, $doDia, $corMap, $datasIso);
         }
 
         return $grupos;
@@ -922,7 +917,6 @@ class CalendarioService
      * @param  Collection<int, CalendarioItem>  $itensDoDia
      * @param  array<string, string>  $corMap
      * @param  list<string>|null  $datasIsoForcadas
-     * @param  array<string, int>  $obsNumeroMap
      * @return array{diaLabel: string, datas: list<string>, linhas: list<array{local: string, hora: string, celulas: list<array{texto: string, cor: ?string, ref: ?string, cancelado: bool}>}>}
      */
     private function pdfMontarBlocoDia(
@@ -930,7 +924,6 @@ class CalendarioService
         Collection $itensDoDia,
         array $corMap,
         ?array $datasIsoForcadas = null,
-        array $obsNumeroMap = [],
     ): array {
         $datas = $datasIsoForcadas !== null
             ? collect($datasIsoForcadas)->values()
@@ -968,7 +961,7 @@ class CalendarioService
             $celulas = [];
             foreach ($datas as $dataIso) {
                 $item = $index[$linha['key'].'|'.$dataIso] ?? null;
-                $celulas[] = $this->pdfCelulaCelebrante($item, $corMap, $obsNumeroMap);
+                $celulas[] = $this->pdfCelulaCelebrante($item, $corMap);
             }
             $linhas[] = [
                 'local' => $linha['local'],
@@ -986,10 +979,9 @@ class CalendarioService
 
     /**
      * @param  array<string, string>  $corMap
-     * @param  array<string, int>  $obsNumeroMap
      * @return array{texto: string, cor: ?string, ref: ?string, cancelado: bool}
      */
-    private function pdfCelulaCelebrante(?CalendarioItem $item, array $corMap, array $obsNumeroMap = []): array
+    private function pdfCelulaCelebrante(?CalendarioItem $item, array $corMap): array
     {
         if ($item === null) {
             return ['texto' => '-', 'cor' => null, 'ref' => null, 'cancelado' => false];
@@ -1016,10 +1008,9 @@ class CalendarioService
             return ['texto' => '-', 'cor' => null, 'ref' => null, 'cancelado' => false];
         }
 
+        // Ref manual legado: número entre parênteses nas notas (não usa mais n° de observação fixa).
         $ref = null;
-        if ($item->observacao_id && isset($obsNumeroMap[$item->observacao_id])) {
-            $ref = (string) $obsNumeroMap[$item->observacao_id];
-        } elseif (preg_match('/\((\d+)\)/', $notas, $m)) {
+        if (preg_match('/\((\d+)\)/', $notas, $m)) {
             $ref = $m[1];
         }
 
@@ -1193,20 +1184,6 @@ class CalendarioService
                 'rotulo' => null,
             ]);
         }
-    }
-
-    /**
-     * @param  Collection<int, CalendarioObservacao>  $observacoes
-     * @return array<string, int> observacao_id => numero 1-based
-     */
-    private function pdfObservacaoNumeroMap(Collection $observacoes): array
-    {
-        $map = [];
-        foreach ($observacoes->values() as $i => $obs) {
-            $map[$obs->id] = $i + 1;
-        }
-
-        return $map;
     }
 
     /**
