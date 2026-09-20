@@ -12,7 +12,10 @@ import { useAuthAdminStore } from '@/stores/authAdmin'
 import { useAuthStore } from '@/stores/auth'
 import { useTenantStore } from '@/stores/tenant'
 import { useIgrejaStore } from '@/stores/igreja'
+import { useBrandingStore } from '@/stores/branding'
 import { igrejaTipoLabel } from '@/utils/igrejaContext'
+import PwaInstallNavButton from '@/components/base/PwaInstallNavButton.vue'
+import fallbackLogo from '@/assets/logo-icon.png'
 
 library.add(faBars, faSignOutAlt, faChevronDown)
 
@@ -21,12 +24,20 @@ const authAdmin = useAuthAdminStore()
 const authTenant = useAuthStore()
 const tenantStore = useTenantStore()
 const igrejaStore = useIgrejaStore()
+const branding = useBrandingStore()
 const router = useRouter()
 const route = useRoute()
 const userMenuOpen = ref(false)
 
 const displayName = computed(
   () => authTenant.user?.name || authAdmin.user?.name || 'Usuário',
+)
+
+const brandLogo = computed(() => branding.logoUrl || fallbackLogo)
+const brandAlt = computed(() =>
+  branding.logoUrl
+    ? tenantStore.name || tenantStore.slug || 'Logo'
+    : 'Eclésia',
 )
 
 const isAdminArea = computed(() => route.path.startsWith('/admin') || route.path.startsWith('/ecc'))
@@ -68,6 +79,7 @@ const logout = async () => {
   if (isAdminArea.value && authAdmin.isAuthenticated) {
     tenantStore.clear()
     igrejaStore.reset()
+    branding.reset()
     await authAdmin.logout()
     router.push('/admin/login')
     return
@@ -89,6 +101,12 @@ const logout = async () => {
       >
         <FontAwesomeIcon :icon="faBars" />
       </button>
+      <img
+        :src="brandLogo"
+        :alt="brandAlt"
+        class="h-11 w-11 rounded-lg object-cover shrink-0 bg-white/80"
+        data-testid="navbar-brand-logo"
+      />
       <div v-if="tenantStore.slug" class="hidden sm:block min-w-0">
         <span class="top-navbar__eyebrow text-xs uppercase tracking-wider font-bold">
           Tenant ativo
@@ -125,6 +143,7 @@ const logout = async () => {
     </div>
 
     <div class="flex items-center gap-2">
+      <PwaInstallNavButton labeled />
       <div class="relative user-menu">
         <button
           type="button"

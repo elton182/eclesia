@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import api from '@/services/api'
 import { useTenantStore } from '@/stores/tenant'
 import { innovToast } from '@/plugins/toast'
+import { innovConfirm } from '@/plugins/dialog'
 import { parseTenantAliases, extractApiError } from '@/utils/tenantAuth'
 
 const router = useRouter()
@@ -89,7 +90,13 @@ const save = async () => {
 }
 
 const remove = async (tenant) => {
-  if (!confirm(`Remover o tenant "${tenant.name}" e o banco associado?`)) return
+  const ok = await innovConfirm({
+    title: 'Remover',
+    message: `Remover o tenant "${tenant.name}" e o banco associado?`,
+    confirmText: 'Remover',
+    danger: true,
+  })
+  if (!ok) return
   try {
     await api.delete(`/admin/tenants/${tenant.id}`)
     if (tenantStore.slug === tenant.slug) tenantStore.clear()

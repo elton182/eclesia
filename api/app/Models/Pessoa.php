@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Models\Concerns\AuditsActivity;
 use ESolution\DBEncryption\Traits\EncryptedAttribute;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
@@ -12,6 +13,7 @@ use Illuminate\Support\Facades\URL;
 
 class Pessoa extends Model
 {
+    use AuditsActivity;
     use EncryptedAttribute;
     use HasUlids;
 
@@ -24,6 +26,11 @@ class Pessoa extends Model
         'nome',
         'email',
         'telefone',
+        'nome_usual',
+        'profissao',
+        'religiao',
+        'endereco_profissional',
+        'telefone_profissional',
     ];
 
     /**
@@ -34,6 +41,11 @@ class Pessoa extends Model
         'nome',
         'email',
         'telefone',
+        'nome_usual',
+        'profissao',
+        'religiao',
+        'endereco_profissional',
+        'telefone_profissional',
         'data_nascimento',
         'sexo',
         'foto_path',

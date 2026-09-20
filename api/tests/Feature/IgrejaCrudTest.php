@@ -84,12 +84,14 @@ class IgrejaCrudTest extends TestCase
             'tipo' => 'comunidade',
             'cidade' => 'Campinas',
             'uf' => 'sp',
+            'diocese' => 'Arquidiocese de Campinas',
             'email' => 'norte@example.com',
             'telefone' => '11999990000',
         ])->assertCreated()
             ->assertJsonPath('data.nome', 'Comunidade Norte')
             ->assertJsonPath('data.tipo', 'comunidade')
             ->assertJsonPath('data.uf', 'SP')
+            ->assertJsonPath('data.diocese', 'Arquidiocese de Campinas')
             ->json('data');
 
         $this->asAdminTenant('GET', '/api/v1/igrejas')

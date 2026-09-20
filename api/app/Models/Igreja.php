@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Models\Concerns\AuditsActivity;
 use ESolution\DBEncryption\Traits\EncryptedAttribute;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
@@ -11,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Igreja extends Model
 {
+    use AuditsActivity;
     use EncryptedAttribute;
     use HasUlids;
 
@@ -41,6 +43,7 @@ class Igreja extends Model
         'bairro',
         'cidade',
         'uf',
+        'diocese',
         'cep',
         'telefone',
         'email',
@@ -68,6 +71,11 @@ class Igreja extends Model
     public function equipes(): HasMany
     {
         return $this->hasMany(EccEquipe::class);
+    }
+
+    public function equipesServico(): HasMany
+    {
+        return $this->hasMany(EccEquipeServico::class);
     }
 
     public function casais(): HasMany

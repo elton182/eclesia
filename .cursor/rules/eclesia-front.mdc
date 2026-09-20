@@ -7,9 +7,11 @@ alwaysApply: false
 # Front
 
 Leia `front/CLAUDE.md` e `front/AGENTS.md`.
+UI: siga [`docs/design/DESIGN-GUIDE.md`](../../docs/design/DESIGN-GUIDE.md).
 
 - Composition API com `<script setup>`
 - Preferir componentes `Innov*` existentes
+- Tokens via `var(--color-*)`; botões = `btn` + variante
 - Tipos via OpenAPI — não duplicar modelos
 - `data-testid` em elementos testáveis
 - Alteração relevante no front exige testes Vitest; se cruzar com `api/`, testes PHPUnit/Pest também

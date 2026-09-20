@@ -7,13 +7,22 @@ import { useTenantStore } from '@/stores/tenant'
 import { useAuthStore } from '@/stores/auth'
 import { useAuthAdminStore } from '@/stores/authAdmin'
 import { innovToast } from '@/plugins/toast'
+import { innovConfirm } from '@/plugins/dialog'
 import { casaisListQuery, casaisListQueryFromRoute, filterCasais } from '@/utils/eccFilters'
 import { isoToBr } from '@/utils/dateBr'
 import { userHasPermission } from '@/utils/userRoles'
-import { casalEle, casalEla, formFieldsFromEleEla } from '@/utils/casalDisplay'
+import { casalEle, casalEla, formFieldsFromEleEla, swapEleElaFormFields } from '@/utils/casalDisplay'
 import DateInput from '@/components/form/DateInput.vue'
 import PessoaFotoField from '@/components/ecc/PessoaFotoField.vue'
 import { uploadPessoaFoto } from '@/utils/pessoaFoto'
+import {
+  ATIVIDADE_STATUS_CODES,
+  atividadeStatusLabel,
+  emptyAtividadeRow,
+  emptyPreferenciaRow,
+  etapasPayload,
+  normalizeEtapasForm,
+} from '@/utils/eccFicha'
 
 const route = useRoute()
 const router = useRouter()
@@ -35,10 +44,12 @@ const canManageEquipes = computed(() =>
 
 const casais = ref([])
 const equipes = ref([])
+const equipesServico = ref([])
 const loading = ref(false)
 /** @type {import('vue').Ref<'list'|'form'|'equipes'|'equipe-form'>} */
 const mode = ref('list')
 const saving = ref(false)
+const swapping = ref(false)
 const savingEquipe = ref(false)
 const importing = ref(false)
 const filterEquipe = ref('')
@@ -85,10 +96,20 @@ const emptyForm = () => ({
   email: '',
   telefone: '',
   data_nascimento: '',
+  nome_usual_ele: '',
+  profissao_ele: '',
+  religiao_ele: '',
+  endereco_profissional_ele: '',
+  telefone_profissional_ele: '',
   nome_conjuge: '',
   email_conjuge: '',
   telefone_conjuge: '',
   data_nascimento_conjuge: '',
+  nome_usual_ela: '',
+  profissao_ela: '',
+  religiao_ela: '',
+  endereco_profissional_ela: '',
+  telefone_profissional_ela: '',
   endereco: '',
   bairro: '',
   cidade: '',
@@ -97,15 +118,16 @@ const emptyForm = () => ({
   data_casamento: '',
   filhos: '',
   observacoes: '',
+  engajamento_paroquial: '',
+  habilidades: '',
   piloto: false,
   anos_casados: '',
   ecc_origem: '',
-  experiencia_servico: '',
-  preferencia_funcao: '',
   funcao_dirigente: '',
   foi_coordenador_geral: false,
-  etapa_2: '',
-  etapa_3: '',
+  etapas: normalizeEtapasForm([]),
+  atividades: [],
+  preferencias: [],
   pessoa_a_id: null,
   pessoa_b_id: null,
   foto_url_ele: null,
@@ -141,6 +163,11 @@ const loadEquipes = async () => {
   }
 }
 
+const loadEquipesServico = async () => {
+  const { data } = await api.get('/ecc/equipes-servico')
+  equipesServico.value = data.data || data
+}
+
 const load = async () => {
   if (!ensureTenant()) return
   loading.value = true
@@ -148,6 +175,7 @@ const load = async () => {
     const [casaisRes] = await Promise.all([
       api.get('/ecc/casais'),
       loadEquipes(),
+      loadEquipesServico(),
     ])
     casais.value = casaisRes.data.data || casaisRes.data
   } catch (e) {
@@ -172,6 +200,22 @@ const openEdit = (item) => {
     data_nascimento: isoToBr(pessoas.data_nascimento),
     data_nascimento_conjuge: isoToBr(pessoas.data_nascimento_conjuge),
     data_casamento: isoToBr(item.data_casamento),
+    etapas: normalizeEtapasForm(item.etapas).map((e) => ({
+      ...e,
+      data: isoToBr(e.data) || e.data || '',
+    })),
+    atividades: (item.atividades || []).map((a) => ({
+      ecc_numero: a.ecc_numero || '',
+      equipe_servico_id: a.equipe_servico_id || '',
+      status: a.status || 'A',
+      observacao: a.observacao || '',
+    })),
+    preferencias: (item.preferencias || []).map((p, i) => ({
+      equipe_servico_id: p.equipe_servico_id || '',
+      ordem: p.ordem ?? i + 1,
+    })),
+    engajamento_paroquial: item.engajamento_paroquial || '',
+    habilidades: item.habilidades || '',
   }
   mode.value = 'form'
 }
@@ -250,6 +294,21 @@ const payload = () => {
     pending_foto_ele: _pe,
     pending_foto_ela: _pa,
     ficha_com_foto: _f,
+    nome_usual_ele,
+    profissao_ele,
+    religiao_ele,
+    endereco_profissional_ele,
+    telefone_profissional_ele,
+    nome_usual_ela,
+    profissao_ela,
+    religiao_ela,
+    endereco_profissional_ela,
+    telefone_profissional_ela,
+    etapas,
+    atividades,
+    preferencias,
+    ele: _ele,
+    ela: _ela,
     ...rest
   } = form.value
   return {
@@ -258,6 +317,85 @@ const payload = () => {
     anos_casados: form.value.anos_casados === '' || form.value.anos_casados === null
       ? null
       : Number(form.value.anos_casados),
+    ele: {
+      nome_usual: nome_usual_ele || null,
+      profissao: profissao_ele || null,
+      religiao: religiao_ele || null,
+      endereco_profissional: endereco_profissional_ele || null,
+      telefone_profissional: telefone_profissional_ele || null,
+    },
+    ela: {
+      nome_usual: nome_usual_ela || null,
+      profissao: profissao_ela || null,
+      religiao: religiao_ela || null,
+      endereco_profissional: endereco_profissional_ela || null,
+      telefone_profissional: telefone_profissional_ela || null,
+    },
+    etapas: etapasPayload(etapas),
+    atividades: (atividades || [])
+      .filter((a) => a.ecc_numero && a.equipe_servico_id && a.status)
+      .map((a) => ({
+        ecc_numero: a.ecc_numero,
+        equipe_servico_id: a.equipe_servico_id,
+        status: a.status,
+        observacao: a.observacao || null,
+      })),
+    preferencias: (preferencias || [])
+      .filter((p) => p.equipe_servico_id)
+      .map((p, i) => ({
+        equipe_servico_id: p.equipe_servico_id,
+        ordem: p.ordem ? Number(p.ordem) : i + 1,
+      })),
+  }
+}
+
+const addAtividade = () => {
+  form.value.atividades.push(emptyAtividadeRow())
+}
+
+const removeAtividade = (index) => {
+  form.value.atividades.splice(index, 1)
+}
+
+const addPreferencia = () => {
+  form.value.preferencias.push(emptyPreferenciaRow(form.value.preferencias.length + 1))
+}
+
+const removePreferencia = (index) => {
+  form.value.preferencias.splice(index, 1)
+}
+
+const swapEleEla = async () => {
+  if (swapping.value) return
+  const ok = await innovConfirm({
+    title: 'Trocar',
+    message: 'Trocar Ele e Ela neste casal?',
+    confirmText: 'Trocar',
+    danger: true,
+  })
+  if (!ok) return
+
+  if (!form.value.id) {
+    form.value = swapEleElaFormFields(form.value)
+    innovToast('success', 'OK', 'Ele e Ela invertidos no formulário')
+    return
+  }
+
+  swapping.value = true
+  try {
+    const { data } = await api.post(`/ecc/casais/${form.value.id}/swap`)
+    const saved = data.data || data
+    // Preserva pendências de foto locais após o swap persistido
+    const pendingEle = form.value.pending_foto_ele
+    const pendingEla = form.value.pending_foto_ela
+    openEdit(saved)
+    form.value.pending_foto_ele = pendingEla
+    form.value.pending_foto_ela = pendingEle
+    innovToast('success', 'OK', 'Ele e Ela corrigidos')
+  } catch (e) {
+    innovToast('error', 'Erro', e.response?.data?.message || 'Falha ao trocar')
+  } finally {
+    swapping.value = false
   }
 }
 
@@ -293,7 +431,13 @@ const save = async () => {
 }
 
 const remove = async (item) => {
-  if (!confirm(`Remover o casal ${casalEle(item)} & ${casalEla(item)}?`)) return
+  const ok = await innovConfirm({
+    title: 'Remover',
+    message: `Remover o casal ${casalEle(item)} & ${casalEla(item)}?`,
+    confirmText: 'Remover',
+    danger: true,
+  })
+  if (!ok) return
   try {
     await api.delete(`/ecc/casais/${item.id}`)
     await load()
@@ -644,8 +788,19 @@ onMounted(async () => {
     </div>
 
     <!-- Form casal -->
-    <div v-else class="card p-6">
-      <h3 class="text-xl mb-4">{{ form.id ? 'Editar casal' : 'Novo casal' }}</h3>
+    <div v-else class="card p-6" data-testid="casal-form">
+      <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <h3 class="text-xl mb-0">{{ form.id ? 'Editar casal' : 'Novo casal' }}</h3>
+        <button
+          type="button"
+          class="btn btn-ghost"
+          :disabled="swapping"
+          data-testid="casal-form-swap-ele-ela"
+          @click="swapEleEla"
+        >
+          Trocar Ele/Ela
+        </button>
+      </div>
       <form class="grid grid-cols-1 md:grid-cols-2 gap-4" @submit.prevent="save">
         <div class="md:col-span-2">
           <label class="fld">Equipe</label>
@@ -707,6 +862,46 @@ onMounted(async () => {
             @update:pending-file="form.pending_foto_ela = $event"
           />
         </div>
+        <div>
+          <label class="fld">Nome usual (Ele)</label>
+          <input v-model="form.nome_usual_ele" class="input" data-testid="form-nome-usual-ele">
+        </div>
+        <div>
+          <label class="fld">Nome usual (Ela)</label>
+          <input v-model="form.nome_usual_ela" class="input" data-testid="form-nome-usual-ela">
+        </div>
+        <div>
+          <label class="fld">Profissão (Ele)</label>
+          <input v-model="form.profissao_ele" class="input">
+        </div>
+        <div>
+          <label class="fld">Profissão (Ela)</label>
+          <input v-model="form.profissao_ela" class="input">
+        </div>
+        <div>
+          <label class="fld">Religião (Ele)</label>
+          <input v-model="form.religiao_ele" class="input">
+        </div>
+        <div>
+          <label class="fld">Religião (Ela)</label>
+          <input v-model="form.religiao_ela" class="input">
+        </div>
+        <div>
+          <label class="fld">Endereço profissional (Ele)</label>
+          <input v-model="form.endereco_profissional_ele" class="input">
+        </div>
+        <div>
+          <label class="fld">Endereço profissional (Ela)</label>
+          <input v-model="form.endereco_profissional_ela" class="input">
+        </div>
+        <div>
+          <label class="fld">Telefone profissional (Ele)</label>
+          <input v-model="form.telefone_profissional_ele" class="input">
+        </div>
+        <div>
+          <label class="fld">Telefone profissional (Ela)</label>
+          <input v-model="form.telefone_profissional_ela" class="input">
+        </div>
         <div class="md:col-span-2">
           <label class="fld">Endereço</label>
           <input v-model="form.endereco" class="input">
@@ -762,21 +957,101 @@ onMounted(async () => {
           <label class="fld">Função dirigente</label>
           <input v-model="form.funcao_dirigente" class="input">
         </div>
-        <div>
-          <label class="fld">2ª etapa</label>
-          <input v-model="form.etapa_2" class="input">
-        </div>
-        <div>
-          <label class="fld">3ª etapa</label>
-          <input v-model="form.etapa_3" class="input">
+        <div class="md:col-span-2" data-testid="form-etapas">
+          <div class="fld mb-2">Etapas (nº do ECC, data e local)</div>
+          <div
+            v-for="(et, idx) in form.etapas"
+            :key="et.etapa"
+            class="grid md:grid-cols-4 gap-3 mb-3"
+          >
+            <div class="text-[13px] font-medium self-center" style="color: var(--color-ink)">
+              {{ et.etapa }}ª etapa
+            </div>
+            <div>
+              <label class="fld">Nº ECC</label>
+              <input v-model="form.etapas[idx].ecc_numero" class="input" :data-testid="`etapa-${et.etapa}-numero`">
+            </div>
+            <DateInput
+              v-model="form.etapas[idx].data"
+              :name="`etapa_${et.etapa}_data`"
+              label="Data"
+            />
+            <div>
+              <label class="fld">Local</label>
+              <input v-model="form.etapas[idx].local" class="input">
+            </div>
+          </div>
         </div>
         <div class="md:col-span-2">
-          <label class="fld">Experiência no encontro</label>
-          <textarea v-model="form.experiencia_servico" class="input min-h-20" />
+          <label class="fld">Engajamento paroquial</label>
+          <textarea v-model="form.engajamento_paroquial" class="input min-h-20" data-testid="form-engajamento" />
         </div>
         <div class="md:col-span-2">
-          <label class="fld">Preferência de função</label>
-          <textarea v-model="form.preferencia_funcao" class="input min-h-20" />
+          <label class="fld">Habilidades</label>
+          <textarea v-model="form.habilidades" class="input min-h-20" data-testid="form-habilidades" />
+        </div>
+        <div class="md:col-span-2" data-testid="form-atividades">
+          <div class="flex items-center justify-between mb-2">
+            <div class="fld mb-0">Histórico de atividades (equipes de trabalho)</div>
+            <button type="button" class="btn btn-ghost text-sm" @click="addAtividade">+ Atividade</button>
+          </div>
+          <div
+            v-for="(at, idx) in form.atividades"
+            :key="idx"
+            class="grid md:grid-cols-5 gap-2 mb-2 items-end"
+          >
+            <div>
+              <label class="fld">Nº ECC</label>
+              <input v-model="at.ecc_numero" class="input">
+            </div>
+            <div>
+              <label class="fld">Equipe</label>
+              <select v-model="at.equipe_servico_id" class="input">
+                <option value="">—</option>
+                <option v-for="eq in equipesServico" :key="eq.id" :value="eq.id">{{ eq.nome }}</option>
+              </select>
+            </div>
+            <div>
+              <label class="fld">Status</label>
+              <select v-model="at.status" class="input">
+                <option v-for="code in ATIVIDADE_STATUS_CODES" :key="code" :value="code">
+                  {{ code }} — {{ atividadeStatusLabel(code) }}
+                </option>
+              </select>
+            </div>
+            <div>
+              <label class="fld">Obs.</label>
+              <input v-model="at.observacao" class="input">
+            </div>
+            <button type="button" class="btn btn-ghost" @click="removeAtividade(idx)">Remover</button>
+          </div>
+          <p v-if="!form.atividades.length" class="text-[12.5px]" style="color: rgba(42,20,24,0.55)">
+            Nenhum serviço registrado. Ex.: ECC 34 na Cozinha.
+          </p>
+        </div>
+        <div class="md:col-span-2" data-testid="form-preferencias">
+          <div class="flex items-center justify-between mb-2">
+            <div class="fld mb-0">Preferências de equipe</div>
+            <button type="button" class="btn btn-ghost text-sm" @click="addPreferencia">+ Preferência</button>
+          </div>
+          <div
+            v-for="(pref, idx) in form.preferencias"
+            :key="idx"
+            class="grid md:grid-cols-3 gap-2 mb-2 items-end"
+          >
+            <div>
+              <label class="fld">Ordem</label>
+              <input v-model="pref.ordem" type="number" min="1" class="input">
+            </div>
+            <div>
+              <label class="fld">Equipe</label>
+              <select v-model="pref.equipe_servico_id" class="input">
+                <option value="">—</option>
+                <option v-for="eq in equipesServico" :key="eq.id" :value="eq.id">{{ eq.nome }}</option>
+              </select>
+            </div>
+            <button type="button" class="btn btn-ghost" @click="removePreferencia(idx)">Remover</button>
+          </div>
         </div>
         <div class="md:col-span-2">
           <label class="fld">Filhos</label>

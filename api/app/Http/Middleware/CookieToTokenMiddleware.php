@@ -202,10 +202,16 @@ class CookieToTokenMiddleware
                 return null;
             }
 
-            // Criar novo access token
+            $authTokens = app(\App\Services\AuthTokenService::class);
+            $sessionId = $authTokens->sessionIdFromToken($refreshTokenRecord);
+            $abilities = $sessionId !== null
+                ? $authTokens->abilitiesForSession($sessionId)
+                : ['*'];
+
+            // Criar novo access token na mesma sessão do refresh
             $newAccessToken = $user->createToken(
                 'access-token',
-                ['*'],
+                $abilities,
                 $now->copy()->addMinutes(CookieManager::ACCESS_TOKEN_EXPIRY)
             );
 

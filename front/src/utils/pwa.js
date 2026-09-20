@@ -3,6 +3,8 @@
  * O evento beforeinstallprompt é capturado em registerInstallPrompt().
  */
 
+export const INSTALL_BANNER_DISMISSED_KEY = 'eclesia_pwa_install_banner_dismissed'
+
 /** @type {BeforeInstallPromptEvent | null} */
 let deferredPrompt = null
 
@@ -38,6 +40,27 @@ export function isRunningStandalone() {
  */
 export function canPromptInstall() {
   return Boolean(deferredPrompt) && !isRunningStandalone()
+}
+
+/**
+ * Indica se o usuário fechou o banner de instalação (persistido).
+ * @returns {boolean}
+ */
+export function isInstallBannerDismissed() {
+  if (typeof localStorage === 'undefined') {
+    return false
+  }
+  return localStorage.getItem(INSTALL_BANNER_DISMISSED_KEY) === '1'
+}
+
+/**
+ * Marca o banner de instalação como fechado (não some o ícone da navbar).
+ */
+export function dismissInstallBanner() {
+  if (typeof localStorage === 'undefined') {
+    return
+  }
+  localStorage.setItem(INSTALL_BANNER_DISMISSED_KEY, '1')
 }
 
 /**

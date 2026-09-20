@@ -175,7 +175,8 @@ class TenantUserAuthTest extends TestCase
         $this->assertContains('cadastros-equipes', $roleNames);
         $this->assertContains('cadastros-casais', $roleNames);
         $this->assertContains('cadastros-eventos', $roleNames);
-        $this->assertContains('cadastros-escalas', $roleNames);
+        $this->assertContains('cadastros-calendario', $roleNames);
+        $this->assertNotContains('cadastros-escalas', $roleNames);
         $this->assertContains('admin-igreja', $roleNames);
         $this->assertContains('lider-equipe', $roleNames);
         $this->assertNotContains('admin-tenant', $roleNames);
@@ -283,6 +284,131 @@ class TenantUserAuthTest extends TestCase
             ->assertOk()
             ->assertJsonPath('success', true)
             ->assertJsonPath('email', 'admin@paroquia-teste.local');
+    }
+
+    public function test_dois_logins_mantem_ambas_sessoes(): void
+    {
+        $login1 = $this->postJson('/api/v1/web/login', [
+            'tenant' => 'paroquia-teste',
+            'email' => 'admin@paroquia-teste.local',
+            'password' => 'password',
+        ])->assertOk();
+
+        $token1 = $login1->json('access_token');
+
+        if (tenancy()->initialized) {
+            tenancy()->end();
+        }
+
+        $login2 = $this->postJson('/api/v1/web/login', [
+            'tenant' => 'paroquia-teste',
+            'email' => 'admin@paroquia-teste.local',
+            'password' => 'password',
+        ])->assertOk();
+
+        $token2 = $login2->json('access_token');
+        $this->assertNotSame($token1, $token2);
+
+        if (tenancy()->initialized) {
+            tenancy()->end();
+        }
+
+        $this->withHeader('Authorization', 'Bearer '.$token1)
+            ->withHeader('X-Tenant', 'paroquia-teste')
+            ->postJson('/api/v1/web/me')
+            ->assertOk()
+            ->assertJsonPath('success', true);
+
+        $this->withHeader('Authorization', 'Bearer '.$token2)
+            ->withHeader('X-Tenant', 'paroquia-teste')
+            ->postJson('/api/v1/web/me')
+            ->assertOk()
+            ->assertJsonPath('success', true);
+    }
+
+    public function test_logout_revoga_apenas_sessao_atual(): void
+    {
+        $login1 = $this->postJson('/api/v1/web/login', [
+            'tenant' => 'paroquia-teste',
+            'email' => 'admin@paroquia-teste.local',
+            'password' => 'password',
+        ])->assertOk();
+        $token1 = $login1->json('access_token');
+
+        if (tenancy()->initialized) {
+            tenancy()->end();
+        }
+        Auth::forgetGuards();
+
+        $login2 = $this->postJson('/api/v1/web/login', [
+            'tenant' => 'paroquia-teste',
+            'email' => 'admin@paroquia-teste.local',
+            'password' => 'password',
+        ])->assertOk();
+        $token2 = $login2->json('access_token');
+
+        if (tenancy()->initialized) {
+            tenancy()->end();
+        }
+        Auth::forgetGuards();
+
+        $this->withHeader('Authorization', 'Bearer '.$token1)
+            ->withHeader('X-Tenant', 'paroquia-teste')
+            ->postJson('/api/v1/web/logout')
+            ->assertOk();
+
+        if (tenancy()->initialized) {
+            tenancy()->end();
+        }
+        Auth::forgetGuards();
+        $this->flushSession();
+
+        $this->withHeader('Authorization', 'Bearer '.$token1)
+            ->withHeader('X-Tenant', 'paroquia-teste')
+            ->postJson('/api/v1/web/me')
+            ->assertUnauthorized();
+
+        $this->withHeader('Authorization', 'Bearer '.$token2)
+            ->withHeader('X-Tenant', 'paroquia-teste')
+            ->postJson('/api/v1/web/me')
+            ->assertOk()
+            ->assertJsonPath('success', true);
+    }
+
+    public function test_refresh_nao_apaga_access_de_outra_sessao(): void
+    {
+        $login1 = $this->postJson('/api/v1/web/login', [
+            'tenant' => 'paroquia-teste',
+            'email' => 'admin@paroquia-teste.local',
+            'password' => 'password',
+        ])->assertOk();
+        $token1 = $login1->json('access_token');
+
+        if (tenancy()->initialized) {
+            tenancy()->end();
+        }
+
+        $login2 = $this->postJson('/api/v1/web/login', [
+            'tenant' => 'paroquia-teste',
+            'email' => 'admin@paroquia-teste.local',
+            'password' => 'password',
+        ])->assertOk();
+        $refresh2 = $login2->getCookie('refresh_token', false)?->getValue();
+        $this->assertNotEmpty($refresh2);
+
+        if (tenancy()->initialized) {
+            tenancy()->end();
+        }
+
+        $this->withHeader('X-Tenant', 'paroquia-teste')
+            ->postJson('/api/v1/web/refresh', ['refresh_token' => $refresh2])
+            ->assertOk();
+
+        $this->withHeader('Authorization', 'Bearer '.$token1)
+            ->withHeader('X-Tenant', 'paroquia-teste')
+            ->postJson('/api/v1/web/me')
+            ->assertOk()
+            ->assertJsonPath('success', true);
     }
 
     public function test_users_require_auth(): void

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\Casal;
+use App\Models\EccEquipeServico;
 use App\Models\Pessoa;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection;
@@ -18,6 +19,7 @@ class EccCasalService
         private readonly EccEquipeService $equipes,
         private readonly EccVisibilityScope $visibility,
         private readonly PessoaFotoService $fotos,
+        private readonly EccCasalImportParser $importParser,
     ) {}
 
     /**
@@ -27,7 +29,14 @@ class EccCasalService
     {
         $query = Casal::query()
             ->where('igreja_id', $this->igrejaContext->current()->id)
-            ->with(['pessoaA', 'pessoaB', 'equipe']);
+            ->with([
+                'pessoaA',
+                'pessoaB',
+                'equipe',
+                'etapas',
+                'atividades.equipeServico',
+                'preferencias.equipeServico',
+            ]);
 
         $this->applyEquipeScope($query);
 
@@ -38,7 +47,14 @@ class EccCasalService
     {
         $query = Casal::query()
             ->where('igreja_id', $this->igrejaContext->current()->id)
-            ->with(['pessoaA', 'pessoaB', 'equipe']);
+            ->with([
+                'pessoaA',
+                'pessoaB',
+                'equipe',
+                'etapas',
+                'atividades.equipeServico',
+                'preferencias.equipeServico',
+            ]);
 
         $this->applyEquipeScope($query);
 
@@ -72,21 +88,29 @@ class EccCasalService
     public function update(Casal $casal, array $data): Casal
     {
         return DB::transaction(function () use ($casal, $data) {
-            $casal->pessoaA->update([
+            $pessoaAData = [
                 'nome' => $data['nome'],
                 'email' => $data['email'] ?? null,
                 'telefone' => $data['telefone'] ?? null,
                 'data_nascimento' => $this->parseDate($data['data_nascimento'] ?? null),
                 'sexo' => 'M',
-            ]);
+            ];
+            if (array_key_exists('ele', $data) && is_array($data['ele'])) {
+                $pessoaAData = array_merge($pessoaAData, $this->pessoaExtras($data['ele']));
+            }
+            $casal->pessoaA->update($pessoaAData);
 
-            $casal->pessoaB->update([
+            $pessoaBData = [
                 'nome' => $data['nome_conjuge'],
                 'email' => $data['email_conjuge'] ?? null,
                 'telefone' => $data['telefone_conjuge'] ?? null,
                 'data_nascimento' => $this->parseDate($data['data_nascimento_conjuge'] ?? null),
                 'sexo' => 'F',
-            ]);
+            ];
+            if (array_key_exists('ela', $data) && is_array($data['ela'])) {
+                $pessoaBData = array_merge($pessoaBData, $this->pessoaExtras($data['ela']));
+            }
+            $casal->pessoaB->update($pessoaBData);
 
             $equipeId = $data['equipe_id'] ?? null;
             if (! empty($data['equipe']) && empty($equipeId)) {
@@ -94,8 +118,16 @@ class EccCasalService
             }
 
             $casal->update($this->casalAttributes($data, $equipeId));
+            $this->syncFichaRelations($casal, $data);
 
-            return $casal->refresh()->load(['pessoaA', 'pessoaB', 'equipe']);
+            return $casal->refresh()->load([
+                'pessoaA',
+                'pessoaB',
+                'equipe',
+                'etapas',
+                'atividades.equipeServico',
+                'preferencias.equipeServico',
+            ]);
         });
     }
 
@@ -147,6 +179,7 @@ class EccCasalService
         $imported = 0;
         $skipped = 0;
         $errors = [];
+        $catalog = $this->equipeServicoCatalog();
 
         foreach ($rows as $index => $row) {
             $line = $index + 1;
@@ -156,7 +189,7 @@ class EccCasalService
                     continue;
                 }
 
-                $mapped = $this->mapImportRow($row);
+                $mapped = $this->mapImportRow($row, $catalog);
                 if ($mapped['nome'] === '' || $mapped['nome_conjuge'] === '') {
                     throw new \InvalidArgumentException('nome e nome do cônjuge são obrigatórios (ou use Nome no formato "Fulano e Ciclana").');
                 }
@@ -174,43 +207,79 @@ class EccCasalService
     }
 
     /**
+     * @return list<array{id: string, nome: string, slug: string}>
+     */
+    private function equipeServicoCatalog(): array
+    {
+        $igrejaId = $this->igrejaContext->current()->id;
+        EccEquipeServico::seedDefaultsForIgreja($igrejaId);
+
+        return EccEquipeServico::query()
+            ->where('igreja_id', $igrejaId)
+            ->where('ativo', true)
+            ->get(['id', 'nome', 'slug'])
+            ->map(static fn (EccEquipeServico $e): array => [
+                'id' => (string) $e->id,
+                'nome' => (string) $e->nome,
+                'slug' => (string) $e->slug,
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
      * @param  array<string, mixed>  $data
      */
     private function persistNew(array $data): Casal
     {
         $igrejaId = $this->igrejaContext->current()->id;
 
-        $pessoaA = Pessoa::query()->create([
+        $pessoaA = Pessoa::query()->create(array_merge([
             'igreja_id' => $igrejaId,
             'nome' => $data['nome'],
             'email' => $data['email'] ?? null,
             'telefone' => $data['telefone'] ?? null,
             'data_nascimento' => $this->parseDate($data['data_nascimento'] ?? null),
             'sexo' => 'M',
-        ]);
+        ], array_key_exists('ele', $data) && is_array($data['ele'])
+            ? $this->pessoaExtras($data['ele'])
+            : []));
 
-        $pessoaB = Pessoa::query()->create([
+        $pessoaB = Pessoa::query()->create(array_merge([
             'igreja_id' => $igrejaId,
             'nome' => $data['nome_conjuge'],
             'email' => $data['email_conjuge'] ?? null,
             'telefone' => $data['telefone_conjuge'] ?? null,
             'data_nascimento' => $this->parseDate($data['data_nascimento_conjuge'] ?? null),
             'sexo' => 'F',
-        ]);
+        ], array_key_exists('ela', $data) && is_array($data['ela'])
+            ? $this->pessoaExtras($data['ela'])
+            : []));
 
         $equipeId = $data['equipe_id'] ?? null;
         if (! empty($data['equipe']) && empty($equipeId)) {
             $equipeId = $this->equipes->findOrCreateByNome((string) $data['equipe'])->id;
         }
 
-        return Casal::query()->create(array_merge(
+        $casal = Casal::query()->create(array_merge(
             [
                 'igreja_id' => $igrejaId,
                 'pessoa_a_id' => $pessoaA->id,
                 'pessoa_b_id' => $pessoaB->id,
             ],
             $this->casalAttributes($data, $equipeId),
-        ))->load(['pessoaA', 'pessoaB', 'equipe']);
+        ));
+
+        $this->syncFichaRelations($casal, $data);
+
+        return $casal->load([
+            'pessoaA',
+            'pessoaB',
+            'equipe',
+            'etapas',
+            'atividades.equipeServico',
+            'preferencias.equipeServico',
+        ]);
     }
 
     /**
@@ -229,16 +298,78 @@ class EccCasalService
             'data_casamento' => $this->parseDate($data['data_casamento'] ?? null),
             'filhos' => $data['filhos'] ?? null,
             'observacoes' => $data['observacoes'] ?? null,
+            'engajamento_paroquial' => $this->stringifyCell($data['engajamento_paroquial'] ?? null),
+            'habilidades' => $this->stringifyCell($data['habilidades'] ?? null),
             'piloto' => (bool) ($data['piloto'] ?? false),
             'anos_casados' => $this->parseAnosCasados($data['anos_casados'] ?? null),
             'ecc_origem' => $this->stringifyCell($data['ecc_origem'] ?? null),
-            'experiencia_servico' => $this->stringifyCell($data['experiencia_servico'] ?? null),
-            'preferencia_funcao' => $this->stringifyCell($data['preferencia_funcao'] ?? null),
             'funcao_dirigente' => $this->stringifyCell($data['funcao_dirigente'] ?? null),
             'foi_coordenador_geral' => (bool) ($data['foi_coordenador_geral'] ?? false),
-            'etapa_2' => $this->stringifyCell($data['etapa_2'] ?? null),
-            'etapa_3' => $this->stringifyCell($data['etapa_3'] ?? null),
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $extras
+     * @return array<string, mixed>
+     */
+    private function pessoaExtras(array $extras): array
+    {
+        return [
+            'nome_usual' => $this->stringifyCell($extras['nome_usual'] ?? null),
+            'profissao' => $this->stringifyCell($extras['profissao'] ?? null),
+            'religiao' => $this->stringifyCell($extras['religiao'] ?? null),
+            'endereco_profissional' => $this->stringifyCell($extras['endereco_profissional'] ?? null),
+            'telefone_profissional' => $this->stringifyCell($extras['telefone_profissional'] ?? null),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function syncFichaRelations(Casal $casal, array $data): void
+    {
+        if (array_key_exists('etapas', $data)) {
+            $casal->etapas()->delete();
+            foreach ($data['etapas'] ?? [] as $row) {
+                if (! is_array($row) || ! isset($row['etapa'])) {
+                    continue;
+                }
+                $casal->etapas()->create([
+                    'etapa' => (int) $row['etapa'],
+                    'ecc_numero' => $this->stringifyCell($row['ecc_numero'] ?? null),
+                    'data' => $this->parseDate($row['data'] ?? null),
+                    'local' => $this->stringifyCell($row['local'] ?? null),
+                ]);
+            }
+        }
+
+        if (array_key_exists('atividades', $data)) {
+            $casal->atividades()->delete();
+            foreach ($data['atividades'] ?? [] as $row) {
+                if (! is_array($row)) {
+                    continue;
+                }
+                $casal->atividades()->create([
+                    'ecc_numero' => (string) ($row['ecc_numero'] ?? ''),
+                    'ecc_equipe_servico_id' => $row['equipe_servico_id'],
+                    'status' => (string) ($row['status'] ?? ''),
+                    'observacao' => $this->stringifyCell($row['observacao'] ?? null),
+                ]);
+            }
+        }
+
+        if (array_key_exists('preferencias', $data)) {
+            $casal->preferencias()->delete();
+            foreach ($data['preferencias'] ?? [] as $row) {
+                if (! is_array($row)) {
+                    continue;
+                }
+                $casal->preferencias()->create([
+                    'ecc_equipe_servico_id' => $row['equipe_servico_id'],
+                    'ordem' => isset($row['ordem']) ? (int) $row['ordem'] : null,
+                ]);
+            }
+        }
     }
 
     /**
@@ -263,11 +394,13 @@ class EccCasalService
     /**
      * Aceita o modelo detalhado (nome + nome conjuge) e o modelo real do ecc.xlsx
      * (coluna Nome = "Fulano e Ciclana", Endereço, Telefone, Equipe…).
+     * Enriquece com etapas/atividades/preferências quando o catálogo é informado.
      *
      * @param  array<string, mixed>  $row
+     * @param  list<array{id: string, nome: string, slug: string}>  $catalog
      * @return array<string, mixed>
      */
-    private function mapImportRow(array $row): array
+    private function mapImportRow(array $row, array $catalog = []): array
     {
         $get = function (array $keys) use ($row): mixed {
             return $this->pickColumn($row, $keys);
@@ -299,7 +432,7 @@ class EccCasalService
             'observações',
         ]));
 
-        return [
+        $mapped = [
             'equipe' => (string) ($get(['equipe']) ?? ''),
             'nome' => $nome,
             'email' => $get(['e-mail', 'email']),
@@ -320,18 +453,6 @@ class EccCasalService
             'piloto' => $this->parseBool($get(['piloto'])),
             'anos_casados' => $get(['quanto tempo de casados?', 'anos de casados', 'tempo de casados', 'anos_casados']),
             'ecc_origem' => $get(['qual ecc vocês fizeram?', 'qual ecc voces fizeram?', 'qual ecc vocês fizeram', 'ecc_origem']),
-            'experiencia_servico' => $get([
-                'já trabalharam no encontro do ecc?',
-                'ja trabalharam no encontro do ecc?',
-                'já trabalharam no encontro do ecc',
-                'experiencia_servico',
-            ]),
-            'preferencia_funcao' => $get([
-                'em qual função você gostaria de trabalhar?',
-                'em qual funcao voce gostaria de trabalhar?',
-                'em qual função você gostaria de trabalhar',
-                'preferencia_funcao',
-            ]),
             'funcao_dirigente' => $get([
                 'casal dirigente? qual função',
                 'casal dirigente? qual funcao',
@@ -343,9 +464,22 @@ class EccCasalService
                 'já foi coordenador geral?',
                 'foi_coordenador_geral',
             ])),
-            'etapa_2' => $get(['tem 2ª etapa', 'tem 2a etapa', 'etapa_2']),
-            'etapa_3' => $get(['tem 3ª etapa', 'tem 3a etapa', 'etapa_3']),
         ];
+
+        if ($catalog !== []) {
+            $enriched = $this->importParser->enrichFromSpreadsheetRow($row, $catalog, $get);
+            if ($enriched['etapas'] !== []) {
+                $mapped['etapas'] = $enriched['etapas'];
+            }
+            if ($enriched['atividades'] !== []) {
+                $mapped['atividades'] = $enriched['atividades'];
+            }
+            if ($enriched['preferencias'] !== []) {
+                $mapped['preferencias'] = $enriched['preferencias'];
+            }
+        }
+
+        return $mapped;
     }
 
     /**
@@ -427,26 +561,15 @@ class EccCasalService
 
         $extraExactOrPrefix = [
             'n casais',
-            '2023 convite para',
-            'aceitou',
             'ja foi circulo',
             'já foi circulo',
-            'indicacao para 2024',
-            'indicação para 2024',
-            'indicacao para 2025',
-            'indicação para 2025',
             'opcao para equipe dirigente',
             'opção para equipe dirigente',
         ];
 
-        // "Função" / "Função_1" / "Aceitou_1" da planilha (histórico)
-        $extraExact = [
-            'funcao',
-            'função',
-            'funcao 1',
-            'função 1',
-            'aceitou 1',
-        ];
+        // Colunas de indicação/convite passam a alimentar atividades estruturadas;
+        // mantemos só metadados livres que não viraram campo próprio.
+        $extraExact = [];
 
         foreach ($row as $header => $value) {
             if ($value === null || $value === '') {

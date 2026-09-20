@@ -181,6 +181,17 @@ class UserService
 
         setPermissionsTeamId(null);
 
+        app(AuditLogger::class)->log(
+            action: AuditLogger::ACTION_ROLES_SYNCED,
+            auditable: $user,
+            newValues: [
+                'igreja_id' => $igrejaId,
+                'roles' => $names,
+                'equipe_ids' => $liderEquipeIds,
+            ],
+            auditableLabel: $user->name,
+        );
+
         return $user->refresh()->load('equipesLideradas');
     }
 

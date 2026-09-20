@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Resources;
 
+use App\Services\AppBrandingService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -17,12 +18,18 @@ class SiteSettingResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        $branding = app(AppBrandingService::class)->brandingPayload();
+        $tenantName = tenant('name');
+        $titulo = is_string($tenantName) && $tenantName !== ''
+            ? $tenantName
+            : 'Site';
+
         return [
             'publicado' => (bool) $this->publicado,
-            'titulo' => $this->titulo,
-            'subtitulo' => $this->subtitulo,
-            'logo_path' => $this->logo_path,
-            'favicon_path' => $this->favicon_path,
+            'titulo' => $titulo,
+            'logo_path' => $branding['logo_path'],
+            'logo_url' => $branding['logo_url'],
+            'cores' => $branding['cores'],
             'seo' => $this->seo ?? [],
             'contato' => $this->contato ?? [],
             'menu' => $this->menu ?? [],

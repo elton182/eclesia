@@ -1,0 +1,33 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Http\Requests;
+
+use App\Models\CalendarioEventoTipo;
+use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
+
+class StoreCalendarioEventoTipoRequest extends FormRequest
+{
+    public function authorize(): bool
+    {
+        return true;
+    }
+
+    /** @return array<string, mixed> */
+    public function rules(): array
+    {
+        return [
+            'nome' => ['required', 'string', 'max:80'],
+            'secao_padrao' => ['required', Rule::in([
+                CalendarioEventoTipo::SECAO_GRADE,
+                CalendarioEventoTipo::SECAO_FESTA,
+                CalendarioEventoTipo::SECAO_CASAMENTO,
+            ])],
+            'exige_titulo' => ['sometimes', 'boolean'],
+            'ordem' => ['sometimes', 'integer', 'min:0'],
+            'ativo' => ['sometimes', 'boolean'],
+        ];
+    }
+}

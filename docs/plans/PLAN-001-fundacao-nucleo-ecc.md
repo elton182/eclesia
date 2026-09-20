@@ -43,7 +43,7 @@ Entregar a fundação SaaS multi-tenant (banco por tenant), o núcleo compartilh
 
 ### Etapa 2 — Núcleo (banco do tenant)
 
-- Migrations/models: Igreja, Pessoa, PessoaIgreja, Família, Casal, User, papéis, Módulo (ativação por igreja), EventoAgenda, auditoria.
+- Migrations/models: Igreja, Pessoa, PessoaIgreja, Família, Casal, User, papéis, Módulo (ativação por igreja), EventoAgenda, auditoria ([SPEC-013](../specs/SPEC-013-auditoria.md) / [ADR-0007](../architecture/ADR-0007-auditoria.md)).
 - Shell: seletor de igreja e de módulo; painel agregador.
 - Seed demo: **1 tenant com 2 igrejas**.
 

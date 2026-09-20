@@ -39,10 +39,14 @@ Não duplicar modelos da API manualmente.
 
 ### UI e testes
 
+- **Design guide:** [`../docs/design/DESIGN-GUIDE.md`](../docs/design/DESIGN-GUIDE.md) — tokens, layouts, botões, anti-padrões (ler antes de criar/alterar telas)
 - `<script setup>` obrigatório
 - Sem `any` — usar `unknown` + type guards (quando migrar para TS)
 - `label` em inputs; `alt` em imagens; `data-testid` em elementos testáveis
 - Preferir componentes `Innov*` existentes antes de criar novos
+- Botões: sempre `btn` + variante (`btn-primary`, `btn-ghost`, …)
+- Dialogs: `innovConfirm` / `innovPrompt` / `innovAlert` — nunca `alert`/`confirm`/`prompt` nativos
+- Cores: `var(--color-*)` / branding tenant — não hex de marca soltos
 - Chamadas API sob `VITE_API_URL` + `api/v1/`; autenticação alinhada aos endpoints tenant (`web/login`, `web/me`, `web/logout`)
 - Tenant: o host do front/API deve ser o domínio do tenant (não o central)
 

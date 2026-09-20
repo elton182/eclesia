@@ -1,7 +1,12 @@
 <script setup>
+import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
+import { faTimes } from '@fortawesome/free-solid-svg-icons'
+import { library } from '@fortawesome/fontawesome-svg-core'
 import { usePwaInstall } from '@/composables/usePwaInstall'
 
-const { canInstall, installing, install } = usePwaInstall()
+library.add(faTimes)
+
+const { showBanner, installing, install, dismissBanner } = usePwaInstall()
 
 async function onInstall() {
   await install()
@@ -10,7 +15,7 @@ async function onInstall() {
 
 <template>
   <div
-    v-if="canInstall"
+    v-if="showBanner"
     class="fixed bottom-4 left-4 right-4 z-50 mx-auto flex max-w-md items-center gap-3 rounded-xl px-4 py-3 shadow-lg md:left-auto"
     style="background: var(--color-primary); color: #F7EDE0"
     role="status"
@@ -29,6 +34,15 @@ async function onInstall() {
       @click="onInstall"
     >
       {{ installing ? 'Abrindo…' : 'Instalar' }}
+    </button>
+    <button
+      type="button"
+      class="shrink-0 rounded-lg p-2 opacity-80 hover:opacity-100"
+      aria-label="Fechar banner de instalação"
+      data-testid="pwa-install-dismiss"
+      @click="dismissBanner"
+    >
+      <FontAwesomeIcon :icon="faTimes" />
     </button>
   </div>
 </template>

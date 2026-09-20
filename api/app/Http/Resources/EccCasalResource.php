@@ -46,16 +46,17 @@ class EccCasalResource extends JsonResource
             'data_casamento' => $this->data_casamento?->toDateString(),
             'filhos' => $this->filhos,
             'observacoes' => $this->observacoes,
+            'engajamento_paroquial' => $this->engajamento_paroquial,
+            'habilidades' => $this->habilidades,
             'piloto' => (bool) $this->piloto,
             'anos_casados' => $this->anos_casados,
             'ecc_origem' => $this->ecc_origem,
-            'experiencia_servico' => $this->experiencia_servico,
-            'preferencia_funcao' => $this->preferencia_funcao,
             'funcao_dirigente' => $this->funcao_dirigente,
             'foi_coordenador_geral' => (bool) $this->foi_coordenador_geral,
             'ficha_com_foto' => filled($this->pessoaA?->foto_path) || filled($this->pessoaB?->foto_path),
-            'etapa_2' => $this->etapa_2,
-            'etapa_3' => $this->etapa_3,
+            'etapas' => $this->etapasPayload(),
+            'atividades' => $this->atividadesPayload(),
+            'preferencias' => $this->preferenciasPayload(),
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
         ];
@@ -83,7 +84,7 @@ class EccCasalResource extends JsonResource
     }
 
     /**
-     * @return array{id: string, nome: ?string, email: ?string, telefone: ?string, data_nascimento: ?string, sexo: ?string, foto_url: ?string}|null
+     * @return array<string, mixed>|null
      */
     private function personPayload(?Pessoa $pessoa): ?array
     {
@@ -99,6 +100,76 @@ class EccCasalResource extends JsonResource
             'data_nascimento' => $pessoa->data_nascimento?->toDateString(),
             'sexo' => $pessoa->sexo,
             'foto_url' => $pessoa->fotoUrl(),
+            'nome_usual' => $pessoa->nome_usual,
+            'profissao' => $pessoa->profissao,
+            'religiao' => $pessoa->religiao,
+            'endereco_profissional' => $pessoa->endereco_profissional,
+            'telefone_profissional' => $pessoa->telefone_profissional,
         ];
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function etapasPayload(): array
+    {
+        $structured = $this->relationLoaded('etapas')
+            ? $this->etapas
+            : $this->etapas()->get();
+
+        if ($structured->isNotEmpty()) {
+            return $structured->map(static fn ($e) => [
+                'etapa' => (int) $e->etapa,
+                'ecc_numero' => $e->ecc_numero,
+                'data' => $e->data?->toDateString(),
+                'local' => $e->local,
+            ])->values()->all();
+        }
+
+        return [];
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function atividadesPayload(): array
+    {
+        $rows = $this->relationLoaded('atividades')
+            ? $this->atividades
+            : $this->atividades()->with('equipeServico')->get();
+
+        if ($this->relationLoaded('atividades') && $rows->isNotEmpty() && ! $rows->first()->relationLoaded('equipeServico')) {
+            $rows->load('equipeServico');
+        }
+
+        return $rows->map(static fn ($a) => [
+            'id' => $a->id,
+            'ecc_numero' => $a->ecc_numero,
+            'equipe_servico_id' => $a->ecc_equipe_servico_id,
+            'equipe_servico_nome' => $a->equipeServico?->nome,
+            'status' => $a->status,
+            'observacao' => $a->observacao,
+        ])->values()->all();
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function preferenciasPayload(): array
+    {
+        $rows = $this->relationLoaded('preferencias')
+            ? $this->preferencias
+            : $this->preferencias()->with('equipeServico')->get();
+
+        if ($this->relationLoaded('preferencias') && $rows->isNotEmpty() && ! $rows->first()->relationLoaded('equipeServico')) {
+            $rows->load('equipeServico');
+        }
+
+        return $rows->map(static fn ($p) => [
+            'id' => $p->id,
+            'equipe_servico_id' => $p->ecc_equipe_servico_id,
+            'equipe_servico_nome' => $p->equipeServico?->nome,
+            'ordem' => $p->ordem,
+        ])->values()->all();
     }
 }

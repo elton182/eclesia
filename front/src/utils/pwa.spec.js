@@ -6,7 +6,18 @@ import {
   registerInstallPrompt,
   promptInstall,
   onInstallAvailabilityChange,
+  isInstallBannerDismissed,
+  dismissInstallBanner,
+  INSTALL_BANNER_DISMISSED_KEY,
 } from './pwa.js'
+
+const memory = new Map()
+globalThis.localStorage = {
+  getItem: (k) => (memory.has(k) ? memory.get(k) : null),
+  setItem: (k, v) => memory.set(k, String(v)),
+  removeItem: (k) => memory.delete(k),
+  clear: () => memory.clear(),
+}
 
 describe('pwa', () => {
   /** @type {Map<string, Set<EventListener>>} */
@@ -14,6 +25,7 @@ describe('pwa', () => {
 
   beforeEach(() => {
     handlers = new Map()
+    localStorage.clear()
 
     globalThis.window = /** @type {Window & typeof globalThis} */ ({
       matchMedia: (query) => ({
@@ -89,5 +101,12 @@ describe('pwa', () => {
 
   it('promptInstall retorna unavailable sem prompt pendente', async () => {
     assert.equal(await promptInstall(), 'unavailable')
+  })
+
+  it('dismissInstallBanner persiste fechamento do banner', () => {
+    assert.equal(isInstallBannerDismissed(), false)
+    dismissInstallBanner()
+    assert.equal(localStorage.getItem(INSTALL_BANNER_DISMISSED_KEY), '1')
+    assert.equal(isInstallBannerDismissed(), true)
   })
 })

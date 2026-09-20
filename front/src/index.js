@@ -6,6 +6,7 @@ export { default as InnovCalendar } from './components/base/InnovCalendar.vue'
 export { default as InnovCol } from './components/base/InnovCol.vue'
 export { default as InnovConfirm } from './components/base/InnovConfirm.vue'
 export { default as InnovCrud } from './components/base/InnovCrud.vue'
+export { default as InnovDialog } from './components/base/InnovDialog.vue'
 export { default as InnovModal } from './components/base/InnovModal.vue'
 export { default as InnovPanel } from './components/base/InnovPanel.vue'
 export { default as InnovProgressBar } from './components/base/InnovProgressBar.vue'
@@ -55,6 +56,7 @@ export { useToastStore } from './stores/toast'
 
 // Plugins
 export { innovToast } from './plugins/toast'
+export { innovConfirm, innovPrompt, innovAlert } from './plugins/dialog'
 
 // Services
 export { default as api } from './services/api'
@@ -72,6 +74,7 @@ export function install(app, options = {}) {
     InnovCol,
     InnovConfirm,
     InnovCrud,
+    InnovDialog,
     InnovModal,
     InnovPanel,
     InnovProgressBar,

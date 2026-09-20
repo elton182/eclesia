@@ -15,7 +15,7 @@ Pilares desde o dia zero:
 - **Modular**: núcleo compartilhado + módulos (primeiro: **ECC**); demais no roadmap.
 - **Spec-driven**: features passam por `docs/specs/` → OpenAPI → testes → implementação.
 
-Protótipo de UX de referência: `prototipo/`. Em decisões em aberto do brief, **perguntar** antes de assumir.
+Protótipo de UX de referência: `prototipo/`. Design system: [`docs/design/DESIGN-GUIDE.md`](docs/design/DESIGN-GUIDE.md) (obrigatório para UI no `front/`). Em decisões em aberto do brief, **perguntar** antes de assumir.
 
 ## Aplicações
 
@@ -31,6 +31,7 @@ Cada app tem `AGENTS.md` e `CLAUDE.md` na própria raiz.
 | Camada | Onde |
 |--------|------|
 | Contrato global | `AGENTS.md` (raiz) |
+| Design system / UI | [`docs/design/DESIGN-GUIDE.md`](docs/design/DESIGN-GUIDE.md) |
 | Por app | `{app}/AGENTS.md`, `{app}/CLAUDE.md` |
 | Cursor Rules | `.cursor/rules/*.mdc` |
 | Cursor Hooks (TDD) | `.cursor/hooks.json` — rodar command `/setup-tdd-hooks` |

@@ -86,13 +86,12 @@ class SitePublicTest extends TestCase
     {
         $this->asAdminTenant('PUT', '/api/v1/site/settings', [
             'publicado' => true,
-            'titulo' => 'Paróquias Unidas',
-            'subtitulo' => 'Bem-vindos',
             'seo' => ['description' => 'Site da organização'],
             'menu' => [['label' => 'Início', 'slug' => 'home']],
         ])->assertOk()
             ->assertJsonPath('data.publicado', true)
-            ->assertJsonPath('data.titulo', 'Paróquias Unidas');
+            ->assertJsonPath('data.titulo', 'Org Site')
+            ->assertJsonMissingPath('data.subtitulo');
 
         $page = $this->asAdminTenant('POST', '/api/v1/site/pages', [
             'slug' => 'home',
@@ -120,7 +119,8 @@ class SitePublicTest extends TestCase
 
         $this->publicGet('/api/v1/public/site')
             ->assertOk()
-            ->assertJsonPath('data.settings.titulo', 'Paróquias Unidas')
+            ->assertJsonPath('data.settings.titulo', 'Org Site')
+            ->assertJsonMissingPath('data.settings.subtitulo')
             ->assertJsonPath('data.page.slug', 'home')
             ->assertJsonPath('data.page.blocks.0.tipo', 'hero');
     }
@@ -129,7 +129,6 @@ class SitePublicTest extends TestCase
     {
         $this->asAdminTenant('PUT', '/api/v1/site/settings', [
             'publicado' => true,
-            'titulo' => 'Site',
         ])->assertOk();
 
         tenancy()->initialize($this->tenant);
@@ -230,7 +229,6 @@ class SitePublicTest extends TestCase
     {
         $this->asAdminTenant('PUT', '/api/v1/site/settings', [
             'publicado' => true,
-            'titulo' => 'Site',
         ])->assertOk();
 
         $this->asAdminTenant('POST', '/api/v1/site/pages', [
@@ -257,7 +255,9 @@ class SitePublicTest extends TestCase
         $this->withHeader('X-Tenant', 'org-site')
             ->getJson('/api/v1/site/settings')
             ->assertOk()
-            ->assertJsonMissingPath('data.cores');
+            ->assertJsonPath('data.titulo', 'Org Site')
+            ->assertJsonPath('data.cores', null)
+            ->assertJsonMissingPath('data.subtitulo');
 
         $this->withHeader('X-Tenant', 'org-site')
             ->getJson('/api/v1/site/comunicados')
@@ -270,14 +270,39 @@ class SitePublicTest extends TestCase
             ->assertJsonPath('data', []);
     }
 
-    public function test_settings_update_ignores_cores(): void
+    public function test_settings_identity_mirrors_tenant_name_and_app_branding(): void
     {
+        $this->asAdminTenant('PATCH', '/api/v1/app/branding', [
+            'cores' => [
+                'primary' => '#112233',
+                'secondary' => '#445566',
+                'text' => '#778899',
+                'text_muted' => '#AABBCC',
+                'on_primary' => '#DDEEFF',
+            ],
+        ])->assertOk();
+
         $this->asAdminTenant('PUT', '/api/v1/site/settings', [
-            'publicado' => false,
-            'titulo' => 'Sem cores',
-            'cores' => ['primary' => '#ff0000'],
+            'publicado' => true,
+            'titulo' => 'Ignorado',
+            'subtitulo' => 'Também ignorado',
+            'cores' => [
+                'primary' => '#AAAAAA',
+                'secondary' => '#BBBBBB',
+                'accent' => '#CCCCCC',
+            ],
         ])->assertOk()
-            ->assertJsonPath('data.titulo', 'Sem cores')
-            ->assertJsonMissingPath('data.cores');
+            ->assertJsonPath('data.titulo', 'Org Site')
+            ->assertJsonPath('data.cores.primary', '#112233')
+            ->assertJsonPath('data.cores.secondary', '#445566')
+            ->assertJsonPath('data.cores.on_primary', '#DDEEFF')
+            ->assertJsonMissingPath('data.subtitulo')
+            ->assertJsonMissingPath('data.cores.accent');
+
+        $this->publicGet('/api/v1/public/site')
+            ->assertOk()
+            ->assertJsonPath('data.settings.titulo', 'Org Site')
+            ->assertJsonPath('data.settings.cores.primary', '#112233')
+            ->assertJsonMissingPath('data.settings.subtitulo');
     }
 }

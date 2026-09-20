@@ -2,13 +2,13 @@
 
 **Status:** approved  
 **Data:** 2026-09-16  
-**Depende de:** SPEC-002 (casais), SPEC-004 (igreja), `evento_agenda` (SPEC-007 / ADR-0005)  
+**Depende de:** SPEC-002 (casais), SPEC-004 (igreja), `evento_agenda` (núcleo)  
 **Plano:** [PLAN-001](../plans/PLAN-001-fundacao-nucleo-ecc.md)  
-**ADR:** [ADR-0005](../architecture/ADR-0005-escalas-nucleo.md) (publicação em `EventoAgenda`)
+**ADR:** [ADR-0005](../architecture/ADR-0005-escalas-nucleo.md) (superseded — só o store `EventoAgenda` permanece)
 
 ## Contexto
 
-O BRIEF prevê agenda unificada no núcleo (`EventoAgenda`) e tela **Eventos (Lista | Calendário)** no ECC, com tipos `encontro`, `anual`, `servos`, `perseveranca`, `formacao`. A SPEC-007 já criou `evento_agenda` (publicada por escalas). Esta fatia faz o ECC **publicar** no mesmo store e adiciona lista de compras do evento **anual**. Caixa e recorrência ficam fora.
+O BRIEF prevê agenda unificada no núcleo (`EventoAgenda`) e tela **Eventos (Lista | Calendário)** no ECC, com tipos `encontro`, `anual`, `servos`, `perseveranca`, `formacao`. O store `evento_agenda` vive no núcleo. Esta fatia faz o ECC **publicar** nesse store e adiciona lista de compras do evento **anual**. Caixa e recorrência ficam fora.
 
 ## Objetivo
 

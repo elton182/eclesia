@@ -18,12 +18,9 @@ class UpdateSiteSettingsRequest extends FormRequest
      */
     public function rules(): array
     {
+        // Identidade (titulo/cores/logo) espelha tenants.name + app_settings — SPEC-011.
         return [
             'publicado' => ['sometimes', 'boolean'],
-            'titulo' => ['sometimes', 'required', 'string', 'max:255'],
-            'subtitulo' => ['nullable', 'string', 'max:255'],
-            'logo_path' => ['nullable', 'string', 'max:500'],
-            'favicon_path' => ['nullable', 'string', 'max:500'],
             'seo' => ['nullable', 'array'],
             'contato' => ['nullable', 'array'],
             'menu' => ['nullable', 'array'],

@@ -9,6 +9,7 @@ alwaysApply: false
 | Tipo | Caminho |
 |------|---------|
 | Brief / visão | `docs/product/BRIEF.md` |
+| Design system / UI | `docs/design/DESIGN-GUIDE.md` |
 | Spec | `docs/specs/SPEC-XXX.md` |
 | Plano | `docs/plans/PLAN-XXX.md` |
 | ADR | `docs/architecture/ADR-XXXX.md` |

@@ -26,6 +26,7 @@ class IgrejaResource extends JsonResource
             'bairro' => $this->bairro,
             'cidade' => $this->cidade,
             'uf' => $this->uf,
+            'diocese' => $this->diocese,
             'cep' => $this->cep,
             'telefone' => $this->telefone,
             'email' => $this->email,

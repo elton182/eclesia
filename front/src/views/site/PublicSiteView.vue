@@ -1,15 +1,18 @@
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import api from '@/services/api'
 import { useTenantStore } from '@/stores/tenant'
 import { normalizeBlocks, resolveMenuLinks, resolveSeo } from '@/utils/siteBlocks'
 import { rememberTenantForLogin } from '@/utils/tenantAuth'
+import { applyBrandCores } from '@/utils/branding'
+import { useBrandingStore } from '@/stores/branding'
 import SiteBlockRenderer from '@/components/site/SiteBlockRenderer.vue'
 
 const route = useRoute()
 const router = useRouter()
 const tenantStore = useTenantStore()
+const brandingStore = useBrandingStore()
 
 const loading = ref(true)
 const error = ref('')
@@ -26,7 +29,7 @@ const menuLinks = computed(() => resolveMenuLinks(settings.value?.menu, tenantSl
 const blocks = computed(() => normalizeBlocks(page.value?.blocks))
 const brandTitle = computed(() => settings.value?.titulo || 'Paróquia')
 const brandInitial = computed(() => (brandTitle.value || 'P')[0].toUpperCase())
-const brandSub = computed(() => settings.value?.subtitulo || '')
+const brandLogo = computed(() => settings.value?.logo_url || null)
 
 async function load() {
   loading.value = true
@@ -53,11 +56,16 @@ async function load() {
       page.value = pageRes.data.data
     }
 
+    if (settings.value?.titulo) {
+      tenantStore.select({ slug: tenantSlug.value, name: settings.value.titulo })
+    }
+
     const seo = resolveSeo(
       page.value?.seo || settings.value?.seo,
       page.value?.titulo || brandTitle.value,
     )
     document.title = seo.title
+    applyBrandCores(settings.value?.cores)
   } catch (e) {
     error.value = e.response?.status === 404
       ? 'Site não publicado ou página não encontrada.'
@@ -71,6 +79,10 @@ async function load() {
 
 onMounted(load)
 watch(() => [route.params.tenantSlug, route.params.pageSlug], load)
+onUnmounted(() => {
+  // Não apagar cores do app se a sessão já carregou branding (evita vinho default pós-login)
+  brandingStore.reapply()
+})
 
 function onSiteLogin() {
   rememberTenantForLogin(tenantSlug.value)
@@ -80,41 +92,45 @@ function onSiteLogin() {
 <template>
   <div
     class="min-h-screen flex flex-col"
-    style="background: #FFFDFA; color: #2A1418"
+    style="background: var(--color-surface); color: var(--color-ink)"
     data-testid="public-site"
   >
-    <!-- Nav 1g sticky -->
     <header
       class="sticky top-0 z-20 px-6 md:px-8 h-16 flex items-center justify-between gap-4"
-      style="background: rgba(255, 253, 250, 0.94); border-bottom: 1px solid rgba(42, 20, 24, 0.09)"
+      style="background: color-mix(in srgb, var(--color-surface) 94%, transparent); border-bottom: 1px solid color-mix(in srgb, var(--color-ink) 9%, transparent)"
     >
       <RouterLink
         :to="`/site/${tenantSlug}`"
         class="flex items-center gap-2.5 no-underline min-w-0"
         data-testid="site-brand"
       >
+        <img
+          v-if="brandLogo"
+          :src="brandLogo"
+          :alt="brandTitle"
+          class="w-9 h-9 rounded-full object-cover shrink-0"
+          data-testid="site-brand-logo"
+        />
         <div
-          class="w-[30px] h-[30px] rounded-full flex items-center justify-center font-serif text-[14px] font-medium shrink-0"
-          style="background: #6B1C2B; color: #F0D8C2"
+          v-else
+          class="w-9 h-9 rounded-full flex items-center justify-center font-serif text-[14px] font-medium shrink-0"
+          style="background: var(--color-primary-soft); color: var(--color-on-primary)"
+          data-testid="site-brand-initial"
         >
           {{ brandInitial }}
         </div>
         <div class="min-w-0">
-          <div class="font-serif text-[15px] font-medium leading-tight truncate" style="color: #2A1418">
-            {{ brandTitle }}
-          </div>
           <div
-            v-if="brandSub"
-            class="text-[10.5px] truncate tracking-wide"
-            style="color: rgba(42, 20, 24, 0.62)"
+            class="font-serif text-[15px] font-medium leading-tight truncate"
+            style="color: var(--color-ink)"
           >
-            {{ brandSub }}
+            {{ brandTitle }}
           </div>
         </div>
       </RouterLink>
 
       <div class="flex items-center gap-3 shrink-0">
-        <nav class="hidden md:flex items-center gap-5 text-[13px]" style="color: rgba(42, 20, 24, 0.7)">
+        <nav class="hidden md:flex items-center gap-5 text-[13px]" style="color: color-mix(in srgb, var(--color-ink) 70%, transparent)">
           <template v-for="link in menuLinks" :key="link.href">
             <a
               v-if="link.href.startsWith('#')"
@@ -130,14 +146,14 @@ function onSiteLogin() {
           <a
             href="#contato"
             class="no-underline px-3.5 py-2 rounded-md font-medium"
-            style="background: #6B1C2B; color: #FFFDFA"
+            style="background: var(--color-primary-soft); color: var(--color-surface)"
           >Fale conosco</a>
         </nav>
 
         <RouterLink
           to="/entrar"
           class="no-underline px-3.5 py-2 rounded-md font-medium text-[13px] shrink-0"
-          style="border: 1px solid #6B1C2B; color: #6B1C2B"
+          style="border: 1px solid var(--color-primary-soft); color: var(--color-primary-soft)"
           data-testid="site-login"
           @click="onSiteLogin"
         >
@@ -147,7 +163,7 @@ function onSiteLogin() {
     </header>
 
     <main class="flex-1">
-      <div v-if="loading" class="max-w-5xl mx-auto px-4 py-16 text-center" style="color: rgba(42,20,24,0.6)">
+      <div v-if="loading" class="max-w-5xl mx-auto px-4 py-16 text-center" style="color: var(--color-muted)">
         Carregando…
       </div>
       <div v-else-if="error" class="max-w-5xl mx-auto px-4 py-16 text-center" data-testid="site-error">
@@ -164,7 +180,7 @@ function onSiteLogin() {
         <div
           v-if="!blocks.length"
           class="max-w-5xl mx-auto px-4 py-16 text-center"
-          style="color: rgba(42,20,24,0.5)"
+          style="color: var(--color-muted)"
         >
           Nenhum conteúdo publicado nesta página.
         </div>
@@ -173,17 +189,17 @@ function onSiteLogin() {
 
     <footer
       class="px-6 md:px-8 py-7 flex flex-wrap items-center justify-between gap-5"
-      style="background: #2A1418"
+      style="background: var(--color-ink)"
     >
-      <div class="text-[12.5px] leading-relaxed" style="color: rgba(255, 253, 250, 0.6)">
-        {{ brandTitle }} · site publicado com Eclesias
+      <div class="text-[12.5px] leading-relaxed" style="color: color-mix(in srgb, var(--color-surface) 60%, transparent)">
+        {{ brandTitle }} · site publicado com Eclesia
       </div>
       <div class="flex gap-2">
         <span
           v-for="net in ['ig', 'fb', 'yt', 'wa']"
           :key="net"
           class="w-8 h-8 rounded-full border flex items-center justify-center text-[11.5px] font-medium"
-          style="border-color: rgba(255, 253, 250, 0.28); color: rgba(255, 253, 250, 0.8)"
+          style="border-color: color-mix(in srgb, var(--color-surface) 28%, transparent); color: color-mix(in srgb, var(--color-surface) 80%, transparent)"
         >{{ net }}</span>
       </div>
     </footer>

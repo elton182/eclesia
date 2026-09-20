@@ -47,9 +47,9 @@ function onSelect(idx) {
     <div
       class="overflow-hidden"
       :class="!compact && viewport === 'mobile' ? 'max-w-[380px] mx-auto' : 'w-full'"
-      style="background: #FFFDFA"
+      style="background: var(--color-surface)"
     >
-      <div class="select-none" style="color: #2A1418">
+      <div class="select-none" style="color: var(--color-ink)">
         <header
           class="sticky top-0 z-10 px-4 h-12 flex items-center justify-between gap-2"
           style="background: rgba(255, 253, 250, 0.94); border-bottom: 1px solid rgba(42, 20, 24, 0.09)"
@@ -57,7 +57,7 @@ function onSelect(idx) {
           <div class="flex items-center gap-2 min-w-0">
             <div
               class="w-6 h-6 rounded-full flex items-center justify-center font-serif text-[11px] shrink-0"
-              style="background: #6B1C2B; color: #F0D8C2"
+              style="background: var(--color-primary-soft); color: var(--color-on-primary)"
             >{{ brandInitial }}</div>
             <span class="font-serif text-[13px] font-medium truncate">{{ brandTitle }}</span>
           </div>
@@ -65,7 +65,7 @@ function onSelect(idx) {
             <span v-for="link in menuLinks" :key="link.href">{{ link.label }}</span>
             <span
               class="px-2 py-1 rounded-md font-medium"
-              style="border: 1px solid #6B1C2B; color: #6B1C2B"
+              style="border: 1px solid var(--color-primary-soft); color: var(--color-primary-soft)"
             >Entrar</span>
           </nav>
         </header>
@@ -84,18 +84,18 @@ function onSelect(idx) {
               class="absolute inset-0 z-[5] transition-opacity pointer-events-none"
               :class="idx === highlightIndex ? 'opacity-100' : 'opacity-0 group-hover/preview-block:opacity-100'"
               :style="idx === highlightIndex
-                ? 'box-shadow: inset 0 0 0 2px #8A2436'
+                ? 'box-shadow: inset 0 0 0 2px var(--color-primary-hover)'
                 : 'box-shadow: inset 0 0 0 2px rgba(138,36,54,0.35)'"
             />
             <span
               v-if="selectable && idx === highlightIndex"
               class="absolute top-2 right-2 z-10 text-[10px] font-medium px-2 py-0.5 rounded-full"
-              style="background: #8A2436; color: #FFFDFA"
+              style="background: var(--color-primary-hover); color: var(--color-surface)"
             >editando</span>
             <span
               v-else-if="selectable"
               class="absolute top-2 right-2 z-10 text-[10px] font-medium px-2 py-0.5 rounded-full opacity-0 group-hover/preview-block:opacity-100 transition-opacity"
-              style="background: rgba(42,20,24,0.72); color: #FFFDFA"
+              style="background: rgba(42,20,24,0.72); color: var(--color-surface)"
             >editar</span>
             <SiteBlockRenderer
               :block="block"
@@ -114,7 +114,7 @@ function onSelect(idx) {
 
         <footer
           class="px-4 py-4 text-[10px] flex justify-between gap-2"
-          style="background: #2A1418; color: rgba(255, 253, 250, 0.6)"
+          style="background: var(--color-ink); color: rgba(255, 253, 250, 0.6)"
         >
           <span>{{ brandTitle }} · Eclesias</span>
         </footer>

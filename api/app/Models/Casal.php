@@ -4,13 +4,16 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Models\Concerns\AuditsActivity;
 use ESolution\DBEncryption\Traits\EncryptedAttribute;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Casal extends Model
 {
+    use AuditsActivity;
     use EncryptedAttribute;
     use HasUlids;
 
@@ -26,8 +29,8 @@ class Casal extends Model
         'cep',
         'filhos',
         'observacoes',
-        'experiencia_servico',
-        'preferencia_funcao',
+        'engajamento_paroquial',
+        'habilidades',
         'funcao_dirigente',
     ];
 
@@ -47,16 +50,14 @@ class Casal extends Model
         'data_casamento',
         'filhos',
         'observacoes',
+        'engajamento_paroquial',
+        'habilidades',
         'piloto',
         'anos_casados',
         'ecc_origem',
-        'experiencia_servico',
-        'preferencia_funcao',
         'funcao_dirigente',
         'foi_coordenador_geral',
         'ficha_com_foto',
-        'etapa_2',
-        'etapa_3',
     ];
 
     /**
@@ -91,5 +92,20 @@ class Casal extends Model
     public function pessoaB(): BelongsTo
     {
         return $this->belongsTo(Pessoa::class, 'pessoa_b_id');
+    }
+
+    public function etapas(): HasMany
+    {
+        return $this->hasMany(EccCasalEtapa::class)->orderBy('etapa');
+    }
+
+    public function atividades(): HasMany
+    {
+        return $this->hasMany(EccCasalAtividade::class)->orderBy('ecc_numero');
+    }
+
+    public function preferencias(): HasMany
+    {
+        return $this->hasMany(EccCasalPreferencia::class)->orderBy('ordem');
     }
 }

@@ -6,7 +6,7 @@ import { innovToast } from '@/plugins/toast'
 import { useAuthStore } from '@/stores/auth'
 import { useAuthAdminStore } from '@/stores/authAdmin'
 import { userHasPermission } from '@/utils/userRoles'
-import { buildMonthGrid, groupOcorrenciasByDay, toDayKey } from '@/utils/escalas'
+import { buildMonthGrid, groupOcorrenciasByDay, toDayKey } from '@/utils/calendario'
 import {
   filterEventos,
   groupEventosByMonth,

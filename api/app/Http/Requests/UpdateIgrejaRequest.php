@@ -51,6 +51,7 @@ class UpdateIgrejaRequest extends FormRequest
             'bairro' => ['nullable', 'string', 'max:255'],
             'cidade' => ['nullable', 'string', 'max:255'],
             'uf' => ['nullable', 'string', 'size:2'],
+            'diocese' => ['nullable', 'string', 'max:255'],
             'cep' => ['nullable', 'string', 'max:20'],
             'telefone' => ['nullable', 'string', 'max:40'],
             'email' => ['nullable', 'email', 'max:255'],

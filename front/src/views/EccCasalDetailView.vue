@@ -3,12 +3,14 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '@/services/api'
 import { innovToast } from '@/plugins/toast'
+import { innovConfirm } from '@/plugins/dialog'
 import { casalEle, casalEla } from '@/utils/casalDisplay'
 import { useAuthStore } from '@/stores/auth'
 import { useAuthAdminStore } from '@/stores/authAdmin'
 import { userHasPermission } from '@/utils/userRoles'
 import PessoaFotoField from '@/components/ecc/PessoaFotoField.vue'
 import { casaisListQueryFromRoute } from '@/utils/eccFilters'
+import { atividadeStatusLabel, etapaLabel } from '@/utils/eccFicha'
 
 const route = useRoute()
 const router = useRouter()
@@ -74,11 +76,15 @@ const historico = computed(() => {
   if (casal.value?.ecc_origem) {
     items.push({ ano: '—', titulo: 'Origem no ECC', detalhe: casal.value.ecc_origem })
   }
+  for (const et of casal.value?.etapas || []) {
+    items.push({
+      ano: et.data || '—',
+      titulo: etapaLabel(et.etapa),
+      detalhe: [et.ecc_numero && `ECC ${et.ecc_numero}`, et.local].filter(Boolean).join(' · ') || '—',
+    })
+  }
   if (casal.value?.funcao_dirigente) {
     items.push({ ano: '—', titulo: 'Função dirigente', detalhe: casal.value.funcao_dirigente })
-  }
-  if (casal.value?.experiencia_servico) {
-    items.push({ ano: '—', titulo: 'Experiência de serviço', detalhe: casal.value.experiencia_servico })
   }
   return items
 })
@@ -116,7 +122,13 @@ function onElaFoto(url) {
 
 async function swapEleEla() {
   if (!casal.value || swapping.value) return
-  if (!confirm('Trocar Ele e Ela neste casal?')) return
+  const ok = await innovConfirm({
+    title: 'Trocar',
+    message: 'Trocar Ele e Ela neste casal?',
+    confirmText: 'Trocar',
+    danger: true,
+  })
+  if (!ok) return
   swapping.value = true
   try {
     const { data } = await api.post(`/ecc/casais/${casal.value.id}/swap`)
@@ -212,6 +224,7 @@ onMounted(load)
         <div
           class="rounded-[11px] p-5"
           style="background: #FFFDFA; border: 1px solid rgba(42, 20, 24, 0.1)"
+          data-testid="casal-bloco-ele"
         >
           <div class="text-[11px] font-medium tracking-wider uppercase mb-3.5" style="color: #B4703F">Ele</div>
           <PessoaFotoField
@@ -222,7 +235,12 @@ onMounted(load)
             :editable="canManage && !!ele.id"
             @update:foto-url="onEleFoto"
           />
-          <div class="text-[15px] font-medium" style="color: #2A1418">{{ ele.nome || '—' }}</div>
+          <div class="text-[15px] font-medium" style="color: #2A1418">
+            {{ ele.nome || '—' }}
+            <span v-if="ele.nome_usual" class="text-[13px] font-normal" style="color: rgba(42,20,24,0.55)">
+              ({{ ele.nome_usual }})
+            </span>
+          </div>
           <div class="flex flex-col gap-2.5 mt-3.5 text-[13px]" style="color: rgba(42, 20, 24, 0.7)">
             <div class="flex justify-between gap-3">
               <span style="color: rgba(42, 20, 24, 0.62)">Nascimento</span>
@@ -236,12 +254,29 @@ onMounted(load)
               <span style="color: rgba(42, 20, 24, 0.62)">E-mail</span>
               <span class="truncate">{{ ele.email || '—' }}</span>
             </div>
+            <div class="flex justify-between gap-3">
+              <span style="color: rgba(42, 20, 24, 0.62)">Profissão</span>
+              <span>{{ ele.profissao || '—' }}</span>
+            </div>
+            <div class="flex justify-between gap-3">
+              <span style="color: rgba(42, 20, 24, 0.62)">Religião</span>
+              <span>{{ ele.religiao || '—' }}</span>
+            </div>
+            <div class="flex justify-between gap-3">
+              <span style="color: rgba(42, 20, 24, 0.62)">End. profissional</span>
+              <span class="text-right">{{ ele.endereco_profissional || '—' }}</span>
+            </div>
+            <div class="flex justify-between gap-3">
+              <span style="color: rgba(42, 20, 24, 0.62)">Tel. profissional</span>
+              <span>{{ ele.telefone_profissional || '—' }}</span>
+            </div>
           </div>
         </div>
 
         <div
           class="rounded-[11px] p-5"
           style="background: #FFFDFA; border: 1px solid rgba(42, 20, 24, 0.1)"
+          data-testid="casal-bloco-ela"
         >
           <div class="text-[11px] font-medium tracking-wider uppercase mb-3.5" style="color: #B4703F">Ela</div>
           <PessoaFotoField
@@ -252,7 +287,12 @@ onMounted(load)
             :editable="canManage && !!ela.id"
             @update:foto-url="onElaFoto"
           />
-          <div class="text-[15px] font-medium" style="color: #2A1418">{{ ela.nome || '—' }}</div>
+          <div class="text-[15px] font-medium" style="color: #2A1418">
+            {{ ela.nome || '—' }}
+            <span v-if="ela.nome_usual" class="text-[13px] font-normal" style="color: rgba(42,20,24,0.55)">
+              ({{ ela.nome_usual }})
+            </span>
+          </div>
           <div class="flex flex-col gap-2.5 mt-3.5 text-[13px]" style="color: rgba(42, 20, 24, 0.7)">
             <div class="flex justify-between gap-3">
               <span style="color: rgba(42, 20, 24, 0.62)">Nascimento</span>
@@ -265,6 +305,22 @@ onMounted(load)
             <div class="flex justify-between gap-3">
               <span style="color: rgba(42, 20, 24, 0.62)">E-mail</span>
               <span class="truncate">{{ ela.email || '—' }}</span>
+            </div>
+            <div class="flex justify-between gap-3">
+              <span style="color: rgba(42, 20, 24, 0.62)">Profissão</span>
+              <span>{{ ela.profissao || '—' }}</span>
+            </div>
+            <div class="flex justify-between gap-3">
+              <span style="color: rgba(42, 20, 24, 0.62)">Religião</span>
+              <span>{{ ela.religiao || '—' }}</span>
+            </div>
+            <div class="flex justify-between gap-3">
+              <span style="color: rgba(42, 20, 24, 0.62)">End. profissional</span>
+              <span class="text-right">{{ ela.endereco_profissional || '—' }}</span>
+            </div>
+            <div class="flex justify-between gap-3">
+              <span style="color: rgba(42, 20, 24, 0.62)">Tel. profissional</span>
+              <span>{{ ela.telefone_profissional || '—' }}</span>
             </div>
           </div>
         </div>
@@ -297,8 +353,27 @@ onMounted(load)
         </div>
 
         <div
+          v-if="casal.engajamento_paroquial || casal.habilidades"
           class="md:col-span-2 rounded-[11px] p-5"
           style="background: #FFFDFA; border: 1px solid rgba(42, 20, 24, 0.1)"
+          data-testid="casal-engajamento-habilidades"
+        >
+          <div class="grid md:grid-cols-2 gap-4 text-[13px]" style="color: #2A1418">
+            <div v-if="casal.engajamento_paroquial">
+              <div class="font-serif text-[15px] font-medium mb-2">Engajamento paroquial</div>
+              <p class="whitespace-pre-wrap" style="color: rgba(42,20,24,0.75)">{{ casal.engajamento_paroquial }}</p>
+            </div>
+            <div v-if="casal.habilidades">
+              <div class="font-serif text-[15px] font-medium mb-2">Habilidades</div>
+              <p class="whitespace-pre-wrap" style="color: rgba(42,20,24,0.75)">{{ casal.habilidades }}</p>
+            </div>
+          </div>
+        </div>
+
+        <div
+          class="md:col-span-2 rounded-[11px] p-5"
+          style="background: #FFFDFA; border: 1px solid rgba(42, 20, 24, 0.1)"
+          data-testid="casal-historico"
         >
           <div class="font-serif text-[15px] font-medium mb-3.5" style="color: #2A1418">
             Histórico no movimento
@@ -317,6 +392,59 @@ onMounted(load)
               <div class="text-[13.5px] font-medium" style="color: #2A1418">{{ h.titulo }}</div>
               <div class="text-[12.5px] mt-0.5" style="color: rgba(42, 20, 24, 0.62)">{{ h.detalhe }}</div>
             </div>
+          </div>
+        </div>
+
+        <div
+          class="md:col-span-2 rounded-[11px] p-5"
+          style="background: #FFFDFA; border: 1px solid rgba(42, 20, 24, 0.1)"
+          data-testid="casal-atividades"
+        >
+          <div class="font-serif text-[15px] font-medium mb-3.5" style="color: #2A1418">
+            Atividades / equipes de trabalho
+          </div>
+          <div v-if="!(casal.atividades || []).length" class="text-[13px]" style="color: rgba(42, 20, 24, 0.62)">
+            Nenhum serviço registrado.
+          </div>
+          <div
+            v-for="(a, i) in casal.atividades || []"
+            :key="a.id || i"
+            class="flex flex-wrap justify-between gap-2 py-2.5 text-[13px]"
+            style="border-top: 1px solid rgba(42, 20, 24, 0.07); color: #2A1418"
+          >
+            <div>
+              <span class="font-medium">ECC {{ a.ecc_numero }}</span>
+              · {{ a.equipe_servico_nome || '—' }}
+              <span v-if="a.observacao" class="block text-[12.5px] mt-0.5" style="color: rgba(42,20,24,0.55)">
+                {{ a.observacao }}
+              </span>
+            </div>
+            <span class="text-[12px] font-medium px-2 py-1 rounded" style="background: rgba(107,28,43,0.08); color: #6B1C2B">
+              {{ a.status }} — {{ atividadeStatusLabel(a.status) }}
+            </span>
+          </div>
+        </div>
+
+        <div
+          class="md:col-span-2 rounded-[11px] p-5"
+          style="background: #FFFDFA; border: 1px solid rgba(42, 20, 24, 0.1)"
+          data-testid="casal-preferencias"
+        >
+          <div class="font-serif text-[15px] font-medium mb-3.5" style="color: #2A1418">
+            Preferências de equipe
+          </div>
+          <div v-if="!(casal.preferencias || []).length" class="text-[13px]" style="color: rgba(42, 20, 24, 0.62)">
+            Sem preferência registrada.
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <span
+              v-for="(p, i) in casal.preferencias || []"
+              :key="p.id || i"
+              class="text-[12.5px] px-2.5 py-1 rounded-full"
+              style="border: 1px solid rgba(42,20,24,0.15); color: #2A1418"
+            >
+              {{ p.ordem ? `${p.ordem}. ` : '' }}{{ p.equipe_servico_nome || '—' }}
+            </span>
           </div>
         </div>
       </div>

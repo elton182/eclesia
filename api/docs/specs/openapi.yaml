@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Eclesia API
-  version: 0.7.0
+  version: 0.8.0
   description: |
     API multi-tenant do Eclesia (gestão eclesial).
     Contexto central (landlord): `/admin/*`.
@@ -10,7 +10,6 @@ info:
     Login web resolve tenant por slug|apelido|nome no body (sem X-Tenant obrigatório).
     Dados pessoais criptografados em repouso (LGPD).
     Site público do tenant: `/public/site*` (X-Tenant, sem auth) — SPEC-005 / ADR-0003.
-    Escalas genéricas (núcleo): `/escalas*` — SPEC-007 / ADR-0005.
 servers:
   - url: http://localhost:8000/api/v1
     description: Local
@@ -30,6 +29,59 @@ components:
       name: X-Igreja
       description: ULID da igreja atual (opcional; sem header usa a primeira acessível)
   schemas:
+    AuditLog:
+      type: object
+      properties:
+        id:
+          type: string
+          description: ULID
+        action:
+          type: string
+          enum: [created, updated, deleted, login_success, login_failed, logout, roles_synced]
+        actor_type:
+          type: string
+          enum: [user, super_admin, anonymous, system]
+        actor_label:
+          type: string
+          nullable: true
+        actor_user_id:
+          type: string
+          nullable: true
+          description: ULID do usuário ator (quando aplicável)
+        auditable_type:
+          type: string
+          nullable: true
+        auditable_id:
+          type: string
+          nullable: true
+          description: ULID ou id público do recurso
+        auditable_label:
+          type: string
+          nullable: true
+        old_values:
+          type: object
+          nullable: true
+          additionalProperties: true
+        new_values:
+          type: object
+          nullable: true
+          additionalProperties: true
+        ip_address:
+          type: string
+          nullable: true
+        user_agent:
+          type: string
+          nullable: true
+        metadata:
+          type: object
+          nullable: true
+          additionalProperties: true
+        igreja_id:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
     Igreja:
       type: object
       properties:
@@ -54,6 +106,10 @@ components:
           type: string
           nullable: true
           maxLength: 2
+        diocese:
+          type: string
+          nullable: true
+          description: Nome da diocese (exibido no PDF do calendário oficial)
         cep:
           type: string
           nullable: true
@@ -85,6 +141,46 @@ components:
         updated_at:
           type: string
           format: date-time
+    AppBrandingCores:
+      type: object
+      nullable: true
+      description: Branding do app autenticado (SPEC-014). Hex #RRGGBB. Fallback vinho no front.
+      properties:
+        primary:
+          type: string
+          pattern: '^#[0-9A-Fa-f]{6}$'
+        secondary:
+          type: string
+          pattern: '^#[0-9A-Fa-f]{6}$'
+        text:
+          type: string
+          pattern: '^#[0-9A-Fa-f]{6}$'
+        text_muted:
+          type: string
+          pattern: '^#[0-9A-Fa-f]{6}$'
+        on_primary:
+          type: string
+          pattern: '^#[0-9A-Fa-f]{6}$'
+      additionalProperties: false
+    AppBranding:
+      type: object
+      properties:
+        logo_path:
+          type: string
+          nullable: true
+        logo_url:
+          type: string
+          nullable: true
+          description: URL assinada para exibir a logo da organização (direita no PDF)
+        logo_diocese_path:
+          type: string
+          nullable: true
+        logo_diocese_url:
+          type: string
+          nullable: true
+          description: URL assinada da logo da diocese (esquerda no PDF)
+        cores:
+          $ref: '#/components/schemas/AppBrandingCores'
     SiteSettings:
       type: object
       properties:
@@ -92,15 +188,20 @@ components:
           type: boolean
         titulo:
           type: string
-        subtitulo:
-          type: string
-          nullable: true
+          description: Espelho de tenants.name (somente leitura; SPEC-011)
         logo_path:
           type: string
           nullable: true
-        favicon_path:
+          description: Espelho de app_settings.logo_path (SPEC-014)
+        logo_url:
           type: string
           nullable: true
+          description: URL assinada da logo do app (SPEC-014)
+        cores:
+          allOf:
+            - $ref: '#/components/schemas/AppBrandingCores'
+          nullable: true
+          description: Espelho de app_settings.cores (SPEC-014 / SPEC-011)
         seo:
           type: object
           additionalProperties: true
@@ -112,6 +213,10 @@ components:
           items:
             type: object
             additionalProperties: true
+        updated_at:
+          type: string
+          format: date-time
+          nullable: true
     SitePage:
       type: object
       properties:
@@ -437,6 +542,95 @@ components:
           description: Derivado — true se ele ou ela possui foto cadastrada (somente leitura)
         piloto:
           type: boolean
+        engajamento_paroquial:
+          type: string
+          nullable: true
+        habilidades:
+          type: string
+          nullable: true
+        etapas:
+          type: array
+          items:
+            $ref: '#/components/schemas/EccCasalEtapa'
+        atividades:
+          type: array
+          items:
+            $ref: '#/components/schemas/EccCasalAtividade'
+        preferencias:
+          type: array
+          items:
+            $ref: '#/components/schemas/EccCasalPreferencia'
+    EccCasalEtapa:
+      type: object
+      required: [etapa]
+      properties:
+        etapa:
+          type: integer
+          enum: [1, 2, 3]
+        ecc_numero:
+          type: string
+          nullable: true
+          maxLength: 20
+        data:
+          type: string
+          format: date
+          nullable: true
+        local:
+          type: string
+          nullable: true
+          maxLength: 255
+    EccCasalAtividade:
+      type: object
+      required: [ecc_numero, equipe_servico_id, status]
+      properties:
+        id:
+          type: string
+          description: ULID (somente resposta)
+        ecc_numero:
+          type: string
+          maxLength: 20
+        equipe_servico_id:
+          type: string
+        equipe_servico_nome:
+          type: string
+          nullable: true
+          description: Somente resposta
+        status:
+          type: string
+          enum: [A, IC, C, N, NA, NN]
+        observacao:
+          type: string
+          nullable: true
+    EccCasalPreferencia:
+      type: object
+      required: [equipe_servico_id]
+      properties:
+        id:
+          type: string
+          description: ULID (somente resposta)
+        equipe_servico_id:
+          type: string
+        equipe_servico_nome:
+          type: string
+          nullable: true
+          description: Somente resposta
+        ordem:
+          type: integer
+          nullable: true
+          description: 1 = mais preferida
+    EccEquipeServico:
+      type: object
+      properties:
+        id:
+          type: string
+        nome:
+          type: string
+        slug:
+          type: string
+        ordem:
+          type: integer
+        ativo:
+          type: boolean
     PessoaResumo:
       type: object
       properties:
@@ -465,6 +659,21 @@ components:
           description: >
             URL assinada temporária de GET /pessoas/{id}/foto (query tenant + signature).
             Adequada para <img src>; não usa /storage do symlink central.
+        nome_usual:
+          type: string
+          nullable: true
+        profissao:
+          type: string
+          nullable: true
+        religiao:
+          type: string
+          nullable: true
+        endereco_profissional:
+          type: string
+          nullable: true
+        telefone_profissional:
+          type: string
+          nullable: true
     Pessoa:
       type: object
       properties:
@@ -489,121 +698,23 @@ components:
           type: string
           nullable: true
           description: URL assinada temporária para GET /pessoas/{id}/foto
+        nome_usual:
+          type: string
+          nullable: true
+        profissao:
+          type: string
+          nullable: true
+        religiao:
+          type: string
+          nullable: true
+        endereco_profissional:
+          type: string
+          nullable: true
+        telefone_profissional:
+          type: string
+          nullable: true
         igreja_id:
           type: string
-    EscalaTipo:
-      type: object
-      properties:
-        id:
-          type: string
-          description: ULID
-        nome:
-          type: string
-        descricao:
-          type: string
-          nullable: true
-        unidade_preferida:
-          type: string
-          enum: [pessoa, casal, ambos]
-        recorrencia:
-          type: string
-          enum: [avulsa, semanal, mensal]
-        equipes_count:
-          type: integer
-        ocorrencias_count:
-          type: integer
-        created_at:
-          type: string
-          format: date-time
-        updated_at:
-          type: string
-          format: date-time
-    EscalaEquipe:
-      type: object
-      properties:
-        id:
-          type: string
-        escala_tipo_id:
-          type: string
-        nome:
-          type: string
-        cor:
-          type: string
-          nullable: true
-        ordem:
-          type: integer
-        vagas_sugeridas:
-          type: integer
-          nullable: true
-        created_at:
-          type: string
-          format: date-time
-        updated_at:
-          type: string
-          format: date-time
-    EscalaOcorrencia:
-      type: object
-      properties:
-        id:
-          type: string
-        escala_tipo_id:
-          type: string
-        titulo:
-          type: string
-          nullable: true
-        inicia_em:
-          type: string
-          format: date-time
-        termina_em:
-          type: string
-          format: date-time
-          nullable: true
-        local:
-          type: string
-          nullable: true
-        evento_agenda_id:
-          type: string
-          nullable: true
-        tipo_nome:
-          type: string
-          nullable: true
-        atribuicoes:
-          type: array
-          items:
-            $ref: '#/components/schemas/EscalaAtribuicao'
-        created_at:
-          type: string
-          format: date-time
-        updated_at:
-          type: string
-          format: date-time
-    EscalaAtribuicao:
-      type: object
-      properties:
-        id:
-          type: string
-        escala_ocorrencia_id:
-          type: string
-        escala_equipe_id:
-          type: string
-        equipe_nome:
-          type: string
-          nullable: true
-        pessoa_id:
-          type: string
-          nullable: true
-        casal_id:
-          type: string
-          nullable: true
-        pessoa_nome:
-          type: string
-          nullable: true
-        casal_rotulo:
-          type: string
-          nullable: true
-        created_at:
-          type: string
-          format: date-time
     EventoAgenda:
       type: object
       properties:
@@ -854,6 +965,8 @@ paths:
       description: |
         Resolve a organização por `tenant` (slug, apelido ou nome único) sem exigir X-Tenant.
         E-mail via whereEncrypted (LGPD). Retorna cookies + slug canônico.
+        Não revoga sessões web existentes (SPEC-010): múltiplos dispositivos/site+app convivem.
+        Cada par access/refresh compartilha ability `session:{ulid}`.
       requestBody:
         required: true
         content:
@@ -873,7 +986,29 @@ paths:
                   format: password
       responses:
         '200':
-          description: Login OK (access_token + cookies + tenant.slug)
+          description: Login OK (access_token + cookies + tenant.slug + branding SPEC-014)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  access_token:
+                    type: string
+                  tenant:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      name:
+                        type: string
+                      slug:
+                        type: string
+                  user:
+                    type: object
+                  branding:
+                    $ref: '#/components/schemas/AppBranding'
         '403':
           description: Credenciais inválidas
         '404':
@@ -907,9 +1042,173 @@ paths:
         - tenantHeader: []
       responses:
         '200':
-          description: Dados do usuário (roles/permissions)
+          description: Dados do usuário (roles/permissions) + branding do app (SPEC-014)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  branding:
+                    $ref: '#/components/schemas/AppBranding'
         '401':
           description: Não autenticado
+  /app/branding:
+    get:
+      summary: Branding do app (cores + logo)
+      description: SPEC-014. Independente de site_settings.
+      security:
+        - tenantHeader: []
+          bearerAuth: []
+      responses:
+        '200':
+          description: Branding atual
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AppBranding'
+        '401':
+          description: Não autenticado
+    patch:
+      summary: Atualizar cores do branding do app
+      security:
+        - tenantHeader: []
+          bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                cores:
+                  $ref: '#/components/schemas/AppBrandingCores'
+      responses:
+        '200':
+          description: Branding atualizado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AppBranding'
+        '401':
+          description: Não autenticado
+        '403':
+          description: Sem permissão (requer admin-tenant)
+        '422':
+          description: Hex inválido ou chaves extras
+  /app/branding/logo:
+    post:
+      summary: Upload da logo do app
+      security:
+        - tenantHeader: []
+          bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Logo atualizada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AppBranding'
+        '401':
+          description: Não autenticado
+        '403':
+          description: Sem permissão
+    delete:
+      summary: Remover logo do app
+      security:
+        - tenantHeader: []
+          bearerAuth: []
+      responses:
+        '204':
+          description: Logo removida
+        '401':
+          description: Não autenticado
+        '403':
+          description: Sem permissão
+    get:
+      summary: Servir logo do app (URL assinada)
+      description: Usado por img; query `tenant` + assinatura. Sem Bearer.
+      parameters:
+        - name: tenant
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: expires
+          in: query
+          schema:
+            type: string
+        - name: signature
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Imagem
+        '404':
+          description: Sem logo
+  /app/branding/logo-diocese:
+    post:
+      summary: Upload da logo da diocese (esquerda no PDF)
+      security:
+        - tenantHeader: []
+          bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Logo da diocese atualizada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AppBranding'
+        '401':
+          description: Não autenticado
+        '403':
+          description: Sem permissão
+    delete:
+      summary: Remover logo da diocese
+      security:
+        - tenantHeader: []
+          bearerAuth: []
+      responses:
+        '204':
+          description: Removida
+        '401':
+          description: Não autenticado
+        '403':
+          description: Sem permissão
   /web/logout:
     post:
       summary: Logout web (tenant)
@@ -972,6 +1271,9 @@ paths:
                   type: string
                   nullable: true
                   maxLength: 2
+                diocese:
+                  type: string
+                  nullable: true
                 cep:
                   type: string
                   nullable: true
@@ -1043,6 +1345,9 @@ paths:
                   type: string
                   nullable: true
                 uf:
+                  type: string
+                  nullable: true
+                diocese:
                   type: string
                   nullable: true
                 cep:
@@ -1191,7 +1496,7 @@ paths:
       summary: Sincronizar papéis do usuário (N papéis)
       description: |
         Substitui papéis do escopo igreja (e admin-tenant se o ator for SuperAdmin).
-        Papéis canônicos: admin-tenant, gestor-site, admin-igreja, cadastros-usuarios, cadastros-equipes, cadastros-casais, cadastros-eventos, cadastros-escalas, lider-equipe.
+        Papéis canônicos: admin-tenant, gestor-site, admin-igreja, cadastros-usuarios, cadastros-equipes, cadastros-casais, cadastros-eventos, cadastros-calendario, lider-equipe.
         lider-equipe exige equipe_ids (min 1).
       security:
         - tenantHeader: []
@@ -1221,7 +1526,7 @@ paths:
                     properties:
                       name:
                         type: string
-                        enum: [admin-tenant, gestor-site, admin-igreja, cadastros-usuarios, cadastros-equipes, cadastros-casais, cadastros-eventos, cadastros-escalas, lider-equipe]
+                        enum: [admin-tenant, gestor-site, admin-igreja, cadastros-usuarios, cadastros-equipes, cadastros-casais, cadastros-eventos, cadastros-calendario, lider-equipe]
                       equipe_ids:
                         type: array
                         items:
@@ -1292,6 +1597,70 @@ paths:
       responses:
         '200':
           description: Papel removido
+  /audit-logs:
+    get:
+      summary: Listar trilha de auditoria do tenant
+      description: |
+        SPEC-013 / ADR-0007. Create/update/delete de cadastros sensíveis e eventos de auth (login/logout).
+        Requer permissão `auditoria.view` (admin-tenant, admin-igreja; SuperAdmin bypass).
+      security:
+        - tenantHeader: []
+        - bearerAuth: []
+      parameters:
+        - name: action
+          in: query
+          schema:
+            type: string
+            enum: [created, updated, deleted, login_success, login_failed, logout, roles_synced]
+        - name: auditable_type
+          in: query
+          schema:
+            type: string
+            description: Classe curta ou FQCN (ex. User, Pessoa, Igreja)
+        - name: actor_user_ulid
+          in: query
+          schema:
+            type: string
+        - name: desde
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: ate
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: q
+          in: query
+          schema:
+            type: string
+            description: Busca em actor_label / auditable_label
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            maximum: 100
+      responses:
+        '200':
+          description: Lista paginada de AuditLog
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AuditLog'
+        '401':
+          description: Não autenticado
+        '403':
+          description: Sem permissão
   /roles:
     get:
       summary: Catálogo de papéis (somente leitura)
@@ -1344,6 +1713,31 @@ paths:
       responses:
         '201':
           description: Criada
+  /ecc/equipes-servico:
+    get:
+      summary: Listar equipes de serviço (catálogo)
+      description: >
+        Catálogo de equipes de trabalho do ECC (Cozinha, Sala, etc.), distinto das
+        equipes de perseverança em /ecc/equipes. Requer visualização de casais ou equipes.
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      responses:
+        '200':
+          description: Lista de equipes ativas da igreja atual
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/EccEquipeServico'
+        '401':
+          description: Não autenticado
+        '403':
+          description: Sem permissão
   /ecc/equipes/{id}:
     get:
       summary: Detalhe equipe
@@ -2035,388 +2429,6 @@ paths:
           description: Lista
         '403':
           description: Sem permissão
-  /escalas/tipos:
-    get:
-      summary: Listar tipos de escala
-      description: Requer escalas.view ou escalas.manage.
-      security:
-        - bearerAuth: []
-          tenantHeader: []
-      responses:
-        '200':
-          description: Lista
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  data:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/EscalaTipo'
-        '403':
-          description: Sem permissão
-    post:
-      summary: Criar tipo de escala
-      description: Requer escalas.manage.
-      security:
-        - bearerAuth: []
-          tenantHeader: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [nome]
-              properties:
-                nome:
-                  type: string
-                descricao:
-                  type: string
-                unidade_preferida:
-                  type: string
-                  enum: [pessoa, casal, ambos]
-                recorrencia:
-                  type: string
-                  enum: [avulsa, semanal, mensal]
-      responses:
-        '201':
-          description: Criado
-        '422':
-          description: Validação
-  /escalas/tipos/{id}:
-    get:
-      summary: Detalhe do tipo (com equipes)
-      security:
-        - bearerAuth: []
-          tenantHeader: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Tipo
-        '404':
-          description: Não encontrado
-    put:
-      summary: Atualizar tipo
-      security:
-        - bearerAuth: []
-          tenantHeader: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Atualizado
-    delete:
-      summary: Remover tipo (cascade equipes/ocorrências)
-      security:
-        - bearerAuth: []
-          tenantHeader: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '204':
-          description: Removido
-  /escalas/tipos/{tipoId}/equipes:
-    get:
-      summary: Listar equipes/funções do tipo
-      security:
-        - bearerAuth: []
-          tenantHeader: []
-      parameters:
-        - name: tipoId
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Lista
-    post:
-      summary: Criar equipe/função no tipo
-      security:
-        - bearerAuth: []
-          tenantHeader: []
-      parameters:
-        - name: tipoId
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [nome]
-              properties:
-                nome:
-                  type: string
-                cor:
-                  type: string
-                ordem:
-                  type: integer
-                vagas_sugeridas:
-                  type: integer
-      responses:
-        '201':
-          description: Criada
-  /escalas/equipes/{id}:
-    put:
-      summary: Atualizar equipe/função
-      security:
-        - bearerAuth: []
-          tenantHeader: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Atualizada
-    delete:
-      summary: Remover equipe/função
-      security:
-        - bearerAuth: []
-          tenantHeader: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '204':
-          description: Removida
-  /escalas/tipos/{tipoId}/ocorrencias:
-    get:
-      summary: Listar ocorrências do tipo
-      security:
-        - bearerAuth: []
-          tenantHeader: []
-      parameters:
-        - name: tipoId
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Lista
-    post:
-      summary: Criar ocorrência avulsa (sincroniza EventoAgenda)
-      security:
-        - bearerAuth: []
-          tenantHeader: []
-      parameters:
-        - name: tipoId
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [inicia_em]
-              properties:
-                titulo:
-                  type: string
-                inicia_em:
-                  type: string
-                  format: date-time
-                termina_em:
-                  type: string
-                  format: date-time
-                local:
-                  type: string
-      responses:
-        '201':
-          description: Criada
-  /escalas/tipos/{tipoId}/ocorrencias/gerar:
-    post:
-      summary: Gerar ocorrências em lote (semanal ou mensal)
-      security:
-        - bearerAuth: []
-          tenantHeader: []
-      parameters:
-        - name: tipoId
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [inicio, fim, frequencia]
-              properties:
-                inicio:
-                  type: string
-                  format: date-time
-                fim:
-                  type: string
-                  format: date-time
-                frequencia:
-                  type: string
-                  enum: [semanal, mensal]
-                local:
-                  type: string
-                titulo:
-                  type: string
-      responses:
-        '201':
-          description: Lista das ocorrências criadas
-  /escalas/ocorrencias/{id}:
-    get:
-      summary: Detalhe da ocorrência com atribuições
-      security:
-        - bearerAuth: []
-          tenantHeader: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Ocorrência
-    put:
-      summary: Atualizar ocorrência (resync EventoAgenda)
-      security:
-        - bearerAuth: []
-          tenantHeader: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Atualizada
-    delete:
-      summary: Remover ocorrência e EventoAgenda
-      security:
-        - bearerAuth: []
-          tenantHeader: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '204':
-          description: Removida
-  /escalas/ocorrencias/{id}/atribuicoes:
-    post:
-      summary: Escalar pessoa ou casal em uma equipe da ocorrência
-      description: >
-        Exige exatamente um de pessoa_id ou casal_id.
-        Mesma pessoa/casal em equipes diferentes na ocorrência é permitido.
-      security:
-        - bearerAuth: []
-          tenantHeader: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [escala_equipe_id]
-              properties:
-                escala_equipe_id:
-                  type: string
-                pessoa_id:
-                  type: string
-                casal_id:
-                  type: string
-      responses:
-        '201':
-          description: Criada
-        '422':
-          description: Validação (XOR ou duplicata)
-  /escalas/atribuicoes/{id}:
-    delete:
-      summary: Remover atribuição
-      security:
-        - bearerAuth: []
-          tenantHeader: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '204':
-          description: Removida
-  /escalas/agenda:
-    get:
-      summary: Agenda de ocorrências (lista para calendário)
-      security:
-        - bearerAuth: []
-          tenantHeader: []
-      parameters:
-        - name: from
-          in: query
-          schema:
-            type: string
-            format: date-time
-        - name: to
-          in: query
-          schema:
-            type: string
-            format: date-time
-        - name: tipo_id
-          in: query
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Lista de ocorrências no período
-  /escalas/candidatos:
-    get:
-      summary: Busca pessoas e casais para montagem da escala
-      security:
-        - bearerAuth: []
-          tenantHeader: []
-      parameters:
-        - name: q
-          in: query
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Listas de candidatos
   /ecc/eventos:
     get:
       summary: Listar eventos ECC
@@ -2826,3 +2838,322 @@ paths:
           description: Doação registrada
         '422':
           description: Validação
+
+  /calendario/locais:
+    get:
+      summary: Listar locais de celebração
+      security: [{bearerAuth: [], tenantHeader: []}]
+      responses:
+        '200': {description: OK}
+    post:
+      summary: Criar local de celebração
+      security: [{bearerAuth: [], tenantHeader: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nome]
+              properties:
+                nome: {type: string}
+                ordem: {type: integer}
+                ativo: {type: boolean}
+      responses:
+        '201': {description: Created}
+  /calendario/slots-padrao:
+    get:
+      summary: Listar slots padrão
+      security: [{bearerAuth: [], tenantHeader: []}]
+      responses:
+        '200': {description: OK}
+    post:
+      summary: Criar slot padrão
+      security: [{bearerAuth: [], tenantHeader: []}]
+      responses:
+        '201': {description: Created}
+  /calendario/locais:
+    get:
+      summary: Listar locais de celebração
+      security: [{bearerAuth: [], tenantHeader: []}]
+      responses:
+        '200': {description: OK}
+  /calendario/evento-tipos:
+    get:
+      summary: Listar tipos de evento (Missa, Celebração, Casamento, Batismo, Festa, Outro)
+      security: [{bearerAuth: [], tenantHeader: []}]
+      parameters:
+        - {name: todos, in: query, required: false, schema: {type: boolean}, description: Inclui inativos (gerir)}
+      responses:
+        '200': {description: OK}
+    post:
+      summary: Criar tipo de evento customizado
+      security: [{bearerAuth: [], tenantHeader: []}]
+      responses:
+        '201': {description: Created}
+  /calendario/evento-tipos/{id}:
+    put:
+      summary: Atualizar tipo de evento
+      security: [{bearerAuth: [], tenantHeader: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      responses:
+        '200': {description: OK}
+    delete:
+      summary: Excluir tipo customizado (não sistema)
+      security: [{bearerAuth: [], tenantHeader: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      responses:
+        '204': {description: No Content}
+  /calendario/mensais:
+    get:
+      summary: Listar calendários mensais
+      security: [{bearerAuth: [], tenantHeader: []}]
+      responses:
+        '200': {description: OK}
+    post:
+      summary: Criar calendário mensal (rascunho)
+      security: [{bearerAuth: [], tenantHeader: []}]
+      responses:
+        '201': {description: Created}
+  /calendario/mensais/{id}:
+    get:
+      summary: Detalhe do calendário mensal
+      security: [{bearerAuth: [], tenantHeader: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      responses:
+        '200': {description: OK}
+    put:
+      summary: Atualizar metadados do mês
+      security: [{bearerAuth: [], tenantHeader: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      responses:
+        '200': {description: OK}
+    delete:
+      summary: Excluir calendário mensal (itens, observações, coleta, etc.)
+      security: [{bearerAuth: [], tenantHeader: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      responses:
+        '204': {description: No Content}
+  /calendario/mensais/{id}/copiar-proximo:
+    post:
+      summary: Copiar calendário para o mês seguinte (rascunho)
+      description: |
+        Cria o mês seguinte com título/subtítulo, observações fixas e celebrantes da grade
+        (mapeados por dia da semana + índice da semana). Eventos datados (festa/casamento/obs_movel)
+        copiam o mesmo dia do mês quando existir. Não copia coleta nem indisponibilidades.
+        Falha 422 se o mês destino já existir.
+      security: [{bearerAuth: [], tenantHeader: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      responses:
+        '201': {description: Calendário do próximo mês criado}
+        '422': {description: Mês destino já existe}
+  /calendario/mensais/{id}/status:
+    post:
+      summary: Transicionar status do calendário
+      security: [{bearerAuth: [], tenantHeader: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: {type: string, enum: [rascunho, coleta, montagem, fechado]}
+      responses:
+        '200': {description: OK}
+  /calendario/mensais/{id}/itens:
+    post:
+      summary: Adicionar evento (tipo_id, local, hora, celebrante, notas, observacao_id; título se Outro)
+      security: [{bearerAuth: [], tenantHeader: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data, tipo_id]
+              properties:
+                data: {type: string, format: date}
+                tipo_id: {type: string}
+                local_id: {type: string, nullable: true}
+                hora: {type: string, example: '09:30'}
+                titulo: {type: string, nullable: true}
+                pessoa_id: {type: string, nullable: true}
+                celebrante_nome: {type: string, nullable: true}
+                notas: {type: string, nullable: true}
+                observacao_id: {type: string, nullable: true, description: Observação fixa referenciada na célula (PDF gera N)}
+                ordem: {type: integer}
+      responses:
+        '201': {description: Created}
+  /calendario/itens/{itemId}:
+    put:
+      summary: Atualizar item (celebrante, notas, observacao_id, …)
+      security: [{bearerAuth: [], tenantHeader: []}]
+      parameters:
+        - {name: itemId, in: path, required: true, schema: {type: string}}
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                celebrante_nome: {type: string, nullable: true}
+                notas: {type: string, nullable: true}
+                observacao_id: {type: string, nullable: true}
+                titulo: {type: string, nullable: true}
+                local_id: {type: string, nullable: true}
+                hora: {type: string, nullable: true}
+                data: {type: string, format: date}
+                ordem: {type: integer}
+      responses:
+        '200': {description: OK}
+    delete:
+      summary: Remover item
+      security: [{bearerAuth: [], tenantHeader: []}]
+      parameters:
+        - {name: itemId, in: path, required: true, schema: {type: string}}
+      responses:
+        '204': {description: No Content}
+  /calendario/mensais/{id}/observacoes:
+    post:
+      summary: Criar observação fixa do mês (título + descrição)
+      security: [{bearerAuth: [], tenantHeader: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [titulo, descricao]
+              properties:
+                titulo: {type: string, maxLength: 255}
+                descricao: {type: string}
+                ordem: {type: integer, minimum: 0}
+      responses:
+        '201': {description: Created}
+  /calendario/observacoes/{id}:
+    put:
+      summary: Atualizar observação fixa
+      security: [{bearerAuth: [], tenantHeader: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                titulo: {type: string, maxLength: 255}
+                descricao: {type: string}
+                ordem: {type: integer, minimum: 0}
+      responses:
+        '200': {description: OK}
+    delete:
+      summary: Excluir observação fixa (desvincula itens)
+      security: [{bearerAuth: [], tenantHeader: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      responses:
+        '204': {description: No Content}
+  /calendario/tempos-liturgicos/{id}:
+    put:
+      summary: Atualizar rótulo do tempo litúrgico (por domingo)
+      security: [{bearerAuth: [], tenantHeader: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                rotulo: {type: string, nullable: true, maxLength: 255, description: Ex. "23º Domingo do Tempo Comum"}
+      responses:
+        '200': {description: OK}
+  /calendario/mensais/{id}/coleta-links:
+    post:
+      summary: Gerar link público de coleta
+      security: [{bearerAuth: [], tenantHeader: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      responses:
+        '201':
+          description: Created ou reexibido (idempotente se já houver link ativo)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      id: {type: string}
+                      token: {type: string, description: Token completo para montar URL pública}
+                      token_preview: {type: string}
+                      rotulo: {type: string, nullable: true}
+                      expira_em: {type: string, format: date-time, nullable: true}
+                      ativo: {type: boolean}
+                  token: {type: string, description: Mesmo token em claro (atalho)}
+
+  /calendario/mensais/{id}/indisponibilidades:
+    post:
+      summary: Registrar indisponibilidades (autenticado)
+      security: [{bearerAuth: [], tenantHeader: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      responses:
+        '201': {description: Created}
+  /calendario/mensais/{id}/pdf:
+    get:
+      summary: Exportar PDF do calendário oficial
+      security: [{bearerAuth: [], tenantHeader: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      responses:
+        '200':
+          description: PDF
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+  /public/calendario/coleta/{token}:
+    get:
+      summary: Dados públicos do link de coleta
+      parameters:
+        - {name: token, in: path, required: true, schema: {type: string}}
+      responses:
+        '200': {description: OK}
+    post:
+      summary: Registrar indisponibilidades via link público
+      parameters:
+        - {name: token, in: path, required: true, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nome_exibicao, datas]
+              properties:
+                nome_exibicao: {type: string}
+                datas:
+                  type: array
+                  items: {type: string, format: date}
+                motivo: {type: string}
+      responses:
+        '201': {description: Created}

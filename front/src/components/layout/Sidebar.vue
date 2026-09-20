@@ -9,15 +9,18 @@ import {
   faHouse,
   faChurch,
   faGlobe,
+  faClipboardList,
+  faPalette,
 } from '@fortawesome/free-solid-svg-icons'
 import { library } from '@fortawesome/fontawesome-svg-core'
 import { useTenantStore } from '@/stores/tenant'
 import { useAuthAdminStore } from '@/stores/authAdmin'
 import { useAuthStore } from '@/stores/auth'
+import { useBrandingStore } from '@/stores/branding'
 import { userHasPermission, canSeeEccCasaisNav } from '@/utils/userRoles'
-import logoUrl from '@/assets/logo-icon.png'
+import fallbackLogo from '@/assets/logo-icon.png'
 
-library.add(faBuilding, faHeart, faUserShield, faHouse, faChurch, faGlobe)
+library.add(faBuilding, faHeart, faUserShield, faHouse, faChurch, faGlobe, faClipboardList, faPalette)
 
 defineProps({
   isOpen: { type: Boolean, default: true },
@@ -27,6 +30,7 @@ const route = useRoute()
 const tenantStore = useTenantStore()
 const authAdmin = useAuthAdminStore()
 const authTenant = useAuthStore()
+const branding = useBrandingStore()
 
 const isActive = (path) => route.path === path || route.path.startsWith(path + '/')
 
@@ -36,10 +40,23 @@ const inTenantContext = computed(
   () => !!tenantStore.slug && (authTenant.isAuthenticated || authAdmin.isAuthenticated),
 )
 
+const brandLogo = computed(() => branding.logoUrl || fallbackLogo)
+const brandAlt = computed(() =>
+  branding.logoUrl
+    ? tenantStore.name || tenantStore.slug || 'Logo'
+    : 'Eclésia',
+)
+
 const can = (permission) =>
   userHasPermission(authTenant.user, permission, {
     isSuperAdmin: authAdmin.isAuthenticated && !authTenant.isAuthenticated,
   })
+
+const canManageBranding = computed(() => {
+  if (authAdmin.isAuthenticated && !authTenant.isAuthenticated) return true
+  const roles = (authTenant.user?.roles || []).map((r) => r.name)
+  return roles.includes('admin-tenant')
+})
 
 const platformItems = ref([
   { label: 'Tenants', icon: faBuilding, path: '/admin/tenants' },
@@ -54,6 +71,12 @@ const tenantItems = computed(() => {
   }
   if (can('telas.usuarios') || (authAdmin.isAuthenticated && !authTenant.isAuthenticated)) {
     items.push({ label: 'Usuários', icon: faUserShield, path: '/usuarios' })
+  }
+  if (can('telas.auditoria') || (authAdmin.isAuthenticated && !authTenant.isAuthenticated)) {
+    items.push({ label: 'Auditoria', icon: faClipboardList, path: '/auditoria' })
+  }
+  if (canManageBranding.value) {
+    items.push({ label: 'Marca', icon: faPalette, path: '/configuracoes/marca' })
   }
   if (can('telas.site') || (authAdmin.isAuthenticated && !authTenant.isAuthenticated)) {
     items.push({ label: 'Site', icon: faGlobe, path: '/site' })
@@ -79,15 +102,20 @@ const eccItems = computed(() => {
       'transition-all duration-300 ease-in-out overflow-y-auto hidden md:flex flex-col',
       isOpen ? 'w-60' : 'w-20',
     ]"
-    style="background: var(--color-primary); color: #F7EDE0"
+    style="background: var(--color-primary); color: var(--color-on-primary, #F7EDE0)"
   >
     <div class="px-4 pt-5 pb-4 flex items-center gap-3 border-b border-white/10">
-      <img :src="logoUrl" alt="Eclésia" class="h-10 w-10 rounded-xl object-contain bg-white p-0.5" />
+      <img
+        :src="brandLogo"
+        :alt="brandAlt"
+        class="h-12 w-12 rounded-xl object-cover bg-white"
+        data-testid="sidebar-brand-logo"
+      />
       <div v-if="isOpen" class="min-w-0">
         <div class="font-semibold text-[17px] leading-tight" style="font-family: Fraunces, serif">
-          Eclésia
+          {{ branding.logoUrl ? (tenantStore.name || 'Organização') : 'Eclésia' }}
         </div>
-        <div class="text-[10px] uppercase tracking-[0.14em] text-[#E7C9A0] font-semibold">
+        <div class="text-[10px] uppercase tracking-[0.14em] font-semibold opacity-80">
           Gestão eclesial
         </div>
       </div>

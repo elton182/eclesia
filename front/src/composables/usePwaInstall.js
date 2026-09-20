@@ -1,6 +1,8 @@
-import { onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import {
   canPromptInstall,
+  dismissInstallBanner,
+  isInstallBannerDismissed,
   isRunningStandalone,
   onInstallAvailabilityChange,
   promptInstall,
@@ -13,11 +15,15 @@ export function usePwaInstall() {
   const canInstall = ref(false)
   const isInstalled = ref(isRunningStandalone())
   const installing = ref(false)
+  const bannerDismissed = ref(isInstallBannerDismissed())
+
+  const showBanner = computed(() => canInstall.value && !bannerDismissed.value)
 
   let unsubscribe = () => {}
 
   onMounted(() => {
     isInstalled.value = isRunningStandalone()
+    bannerDismissed.value = isInstallBannerDismissed()
     unsubscribe = onInstallAvailabilityChange((available) => {
       canInstall.value = available && !isRunningStandalone()
     })
@@ -27,6 +33,11 @@ export function usePwaInstall() {
   onUnmounted(() => {
     unsubscribe()
   })
+
+  function dismissBanner() {
+    dismissInstallBanner()
+    bannerDismissed.value = true
+  }
 
   async function install() {
     if (!canInstall.value || installing.value) {
@@ -47,8 +58,10 @@ export function usePwaInstall() {
 
   return {
     canInstall,
+    showBanner,
     isInstalled,
     installing,
     install,
+    dismissBanner,
   }
 }

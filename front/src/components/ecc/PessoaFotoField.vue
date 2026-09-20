@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import api from '@/services/api'
 import { innovToast } from '@/plugins/toast'
+import { innovConfirm } from '@/plugins/dialog'
 import {
   deletePessoaFoto,
   fileFromInputEvent,
@@ -78,7 +79,13 @@ async function removeFoto() {
     return
   }
 
-  if (!confirm('Remover esta foto?')) return
+  const ok = await innovConfirm({
+    title: 'Remover',
+    message: 'Remover esta foto?',
+    confirmText: 'Remover',
+    danger: true,
+  })
+  if (!ok) return
 
   busy.value = true
   try {

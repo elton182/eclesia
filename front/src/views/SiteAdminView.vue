@@ -14,6 +14,7 @@ import { useTenantStore } from '@/stores/tenant'
 import { useAuthStore } from '@/stores/auth'
 import { useAuthAdminStore } from '@/stores/authAdmin'
 import { innovToast } from '@/plugins/toast'
+import { innovConfirm } from '@/plugins/dialog'
 import { userHasPermission } from '@/utils/userRoles'
 import {
   BLOCK_LIBRARY,
@@ -26,6 +27,7 @@ import {
   reindexBlocks,
 } from '@/utils/siteBlocks'
 import { normalizeFields, validateFields } from '@/utils/siteForms'
+import { applyBrandCores, DEFAULT_BRAND_COLORS, normalizeBrandCores } from '@/utils/branding'
 import SiteBlockEditor from '@/components/site/admin/SiteBlockEditor.vue'
 import SiteBlockIcon from '@/components/site/admin/SiteBlockIcon.vue'
 import SiteFormFieldsEditor from '@/components/site/admin/SiteFormFieldsEditor.vue'
@@ -52,12 +54,17 @@ const dragFrom = ref(null)
 const settings = ref({
   publicado: false,
   titulo: '',
-  subtitulo: '',
+  logo_path: null,
+  logo_url: null,
+  cores: { ...DEFAULT_BRAND_COLORS },
   menu: [],
   seo: {},
   contato: {},
 })
 const menuItems = ref([])
+
+const brandPreview = computed(() => normalizeBrandCores(settings.value.cores))
+const brandInitial = computed(() => (settings.value.titulo || 'O')[0].toUpperCase())
 
 const pages = ref([])
 const pageForm = ref(null)
@@ -137,10 +144,12 @@ const loadSettings = async () => {
   settings.value = {
     ...settings.value,
     ...loaded,
+    cores: normalizeBrandCores(loaded.cores),
     seo: asObject(loaded.seo),
     contato: asObject(loaded.contato),
   }
   menuItems.value = normalizeMenuItems(settings.value.menu)
+  applyBrandCores(settings.value.cores)
 }
 
 const loadPages = async () => {
@@ -204,8 +213,6 @@ const saveSettings = async () => {
   try {
     const { data } = await api.put('/site/settings', {
       publicado: settings.value.publicado,
-      titulo: settings.value.titulo,
-      subtitulo: settings.value.subtitulo,
       menu: menuItemsToPayload(menuItems.value),
       seo: settings.value.seo,
       contato: settings.value.contato,
@@ -214,10 +221,12 @@ const saveSettings = async () => {
     settings.value = {
       ...settings.value,
       ...saved,
+      cores: normalizeBrandCores(saved.cores ?? settings.value.cores),
       seo: asObject(saved.seo),
       contato: asObject(saved.contato),
     }
     menuItems.value = normalizeMenuItems(settings.value.menu)
+    applyBrandCores(settings.value.cores)
     innovToast('success', 'Site', 'Configurações salvas')
   } catch (e) {
     innovToast('error', 'Erro', e.response?.data?.message || 'Falha ao salvar')
@@ -345,13 +354,8 @@ const publishPage = async () => {
   try {
     // Publicar a página E o site (settings.publicado) — o público exige os dois
     if (!settings.value.publicado) {
-      if (!settings.value.titulo) {
-        settings.value.titulo = pageForm.value.titulo || 'Site'
-      }
       await api.put('/site/settings', {
         publicado: true,
-        titulo: settings.value.titulo,
-        subtitulo: settings.value.subtitulo,
         menu: menuItemsToPayload(menuItems.value),
         seo: settings.value.seo,
         contato: settings.value.contato,
@@ -415,7 +419,13 @@ const savePage = async () => {
 }
 
 const removePage = async (p) => {
-  if (!confirm(`Remover a página "${p.titulo}"?`)) return
+  const ok = await innovConfirm({
+    title: 'Remover',
+    message: `Remover a página "${p.titulo}"?`,
+    confirmText: 'Remover',
+    danger: true,
+  })
+  if (!ok) return
   await api.delete(`/site/pages/${p.id}`)
   await loadPages()
 }
@@ -459,7 +469,13 @@ const saveCom = async () => {
 }
 
 const removeCom = async (item) => {
-  if (!confirm(`Remover "${item.titulo}"?`)) return
+  const ok = await innovConfirm({
+    title: 'Remover',
+    message: `Remover "${item.titulo}"?`,
+    confirmText: 'Remover',
+    danger: true,
+  })
+  if (!ok) return
   await api.delete(`/site/comunicados/${item.id}`)
   await loadComunicados()
 }
@@ -498,7 +514,13 @@ const savePast = async () => {
 }
 
 const removePast = async (item) => {
-  if (!confirm(`Remover "${item.nome}"?`)) return
+  const ok = await innovConfirm({
+    title: 'Remover',
+    message: `Remover "${item.nome}"?`,
+    confirmText: 'Remover',
+    danger: true,
+  })
+  if (!ok) return
   await api.delete(`/site/pastorais/${item.id}`)
   await loadPastorais()
 }
@@ -694,16 +716,54 @@ const showLegacyChrome = computed(() => tab.value !== 'pages')
         </p>
       </div>
 
-      <div class="card p-6 space-y-4">
-        <h3 class="text-xl">Identidade</h3>
-        <div class="grid gap-4 md:grid-cols-2">
+      <div class="card p-6 space-y-4" data-testid="site-identidade">
+        <div class="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <label class="fld" for="st-titulo">Título do site</label>
-            <input id="st-titulo" v-model="settings.titulo" class="input" data-testid="site-titulo" />
+            <h3 class="text-xl">Identidade visual</h3>
+            <p class="mt-1 text-sm" style="color: var(--color-muted)">
+              Espelha o nome da organização e a marca do sistema. Edição em Marca.
+            </p>
           </div>
-          <div>
-            <label class="fld" for="st-subtitulo">Subtítulo</label>
-            <input id="st-subtitulo" v-model="settings.subtitulo" class="input" />
+          <button
+            type="button"
+            class="btn btn-secondary text-sm"
+            data-testid="site-identidade-ir-marca"
+            @click="router.push('/configuracoes/marca')"
+          >
+            Editar marca
+          </button>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <img
+            v-if="settings.logo_url"
+            :src="settings.logo_url"
+            alt=""
+            class="h-14 w-14 rounded-full object-cover"
+            data-testid="site-logo-preview"
+          />
+          <div
+            v-else
+            class="h-14 w-14 rounded-full flex items-center justify-center font-serif text-sm font-medium"
+            style="background: var(--color-primary-soft); color: var(--color-on-primary)"
+            data-testid="site-logo-fallback"
+          >
+            {{ brandInitial }}
+          </div>
+          <div class="min-w-0">
+            <div class="font-medium truncate" data-testid="site-titulo">{{ settings.titulo || '—' }}</div>
+            <div class="text-xs" style="color: var(--color-muted)">Nome da organização</div>
+          </div>
+        </div>
+
+        <div class="grid gap-3 sm:grid-cols-5">
+          <div v-for="key in ['primary', 'secondary', 'text', 'text_muted', 'on_primary']" :key="key">
+            <div
+              class="h-10 rounded-lg border"
+              :style="{ background: brandPreview[key], borderColor: 'rgba(42,20,24,0.12)' }"
+              :data-testid="`site-cor-${key}`"
+            />
+            <div class="mt-1 text-[11px] font-mono" style="color: var(--color-muted)">{{ key }}</div>
           </div>
         </div>
       </div>

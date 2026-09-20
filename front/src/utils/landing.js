@@ -14,7 +14,7 @@ export const HERO = {
   eyebrow: 'Plataforma de gestão eclesial',
   titulo: 'Toda a vida da sua paróquia organizada em um só lugar',
   descricao:
-    'O Eclésias reúne pessoas, equipes, escalas, eventos e finanças da sua ' +
+    'O Eclésias reúne pessoas, equipes, eventos, calendário e finanças da sua ' +
     'comunidade em uma plataforma web modular. Sua organização ativa apenas ' +
     'os módulos que usa — e cada igreja enxerga só o que é dela.',
   destaques: [
@@ -90,7 +90,7 @@ export const RECURSOS = [
     titulo: 'Funciona no celular',
     descricao:
       'Interface responsiva com navegação inferior no celular: dá para conferir ' +
-      'a escala e marcar presença no corredor da igreja.',
+      'a agenda e marcar presença no corredor da igreja.',
   },
 ]
 
@@ -227,11 +227,11 @@ export const PORTAL_PREVIEW = {
       cor: '#6B1C2B',
     },
     {
-      chave: 'escalas',
-      letra: 'E',
-      nome: 'Escalas',
-      descricao: 'Liturgia, equipes de apoio e agenda da igreja.',
-      meta: '4 tipos',
+      chave: 'calendario',
+      letra: 'A',
+      nome: 'Calendário',
+      descricao: 'Calendário oficial e horários da igreja.',
+      meta: 'mês atual',
       badge: 'ativo',
       cor: '#8A2436',
     },

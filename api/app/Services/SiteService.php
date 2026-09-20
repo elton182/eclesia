@@ -35,12 +35,21 @@ class SiteService
     }
 
     /**
+     * Identidade (titulo/cores/logo) não é gravada aqui — espelha tenant + app_settings (SPEC-011).
+     *
      * @param  array<string, mixed>  $data
      */
     public function updateSettings(array $data): SiteSetting
     {
+        $allowed = array_intersect_key($data, array_flip([
+            'publicado',
+            'seo',
+            'contato',
+            'menu',
+        ]));
+
         $settings = $this->settings();
-        $settings->fill($data);
+        $settings->fill($allowed);
         $settings->save();
 
         return $settings->refresh();

@@ -7,6 +7,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useAuthAdminStore } from '@/stores/authAdmin'
 import { useIgrejaStore } from '@/stores/igreja'
 import { innovToast } from '@/plugins/toast'
+import { innovConfirm } from '@/plugins/dialog'
 import { userHasPermission } from '@/utils/userRoles'
 import { igrejaTipoLabel } from '@/utils/igrejaContext'
 
@@ -31,6 +32,7 @@ function emptyForm() {
     bairro: '',
     cidade: '',
     uf: '',
+    diocese: '',
     cep: '',
     telefone: '',
     email: '',
@@ -95,6 +97,7 @@ const openEdit = (item) => {
     bairro: item.bairro || '',
     cidade: item.cidade || '',
     uf: item.uf || '',
+    diocese: item.diocese || '',
     cep: item.cep || '',
     telefone: item.telefone || '',
     email: item.email || '',
@@ -123,6 +126,7 @@ const save = async () => {
       bairro: form.value.bairro || null,
       cidade: form.value.cidade || null,
       uf: form.value.uf || null,
+      diocese: form.value.diocese || null,
       cep: form.value.cep || null,
       telefone: form.value.telefone || null,
       email: form.value.email || null,
@@ -146,7 +150,13 @@ const save = async () => {
 }
 
 const remove = async (item) => {
-  if (!confirm(`Remover "${item.nome}"?`)) return
+  const ok = await innovConfirm({
+    title: 'Remover',
+    message: `Remover "${item.nome}"?`,
+    confirmText: 'Remover',
+    danger: true,
+  })
+  if (!ok) return
   try {
     await api.delete(`/igrejas/${item.id}`)
     if (igrejaStore.currentId === item.id) {
@@ -211,8 +221,9 @@ onMounted(load)
             {{ igrejaTipoLabel(item.tipo) }}
           </p>
           <h3 class="text-xl mt-1" style="color: var(--color-ink)">{{ item.nome }}</h3>
-          <p v-if="item.cidade || item.uf" class="mt-2 text-sm" style="color: var(--color-muted)">
+          <p v-if="item.cidade || item.uf || item.diocese" class="mt-2 text-sm" style="color: var(--color-muted)">
             {{ [item.cidade, item.uf].filter(Boolean).join(' / ') }}
+            <span v-if="item.diocese">{{ (item.cidade || item.uf) ? ' · ' : '' }}{{ item.diocese }}</span>
           </p>
           <p v-if="item.telefone || item.email" class="mt-1 text-sm" style="color: var(--color-muted)">
             {{ [item.telefone, item.email].filter(Boolean).join(' · ') }}
@@ -258,14 +269,24 @@ onMounted(load)
           <label class="fld" for="ig-endereco">Endereço</label>
           <input id="ig-endereco" v-model="form.endereco" class="input" />
         </div>
+        <div>
+          <label class="fld" for="ig-bairro">Bairro</label>
+          <input id="ig-bairro" v-model="form.bairro" class="input" />
+        </div>
         <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="fld" for="ig-bairro">Bairro</label>
-            <input id="ig-bairro" v-model="form.bairro" class="input" />
-          </div>
           <div>
             <label class="fld" for="ig-cidade">Cidade</label>
             <input id="ig-cidade" v-model="form.cidade" class="input" />
+          </div>
+          <div>
+            <label class="fld" for="ig-diocese">Diocese</label>
+            <input
+              id="ig-diocese"
+              v-model="form.diocese"
+              class="input"
+              placeholder="Ex.: Diocese de Jundiaí"
+              data-testid="igreja-diocese"
+            />
           </div>
         </div>
         <div class="grid grid-cols-2 gap-3">

@@ -2,11 +2,14 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Api\AppBrandingController;
+use App\Http\Controllers\Api\AuditLogController;
+use App\Http\Controllers\Api\CalendarioController;
 use App\Http\Controllers\Api\AuthWebController;
 use App\Http\Controllers\Api\EccCasalController;
 use App\Http\Controllers\Api\EccEquipeController;
+use App\Http\Controllers\Api\EccEquipeServicoController;
 use App\Http\Controllers\Api\EccEventoController;
-use App\Http\Controllers\Api\EscalaController;
 use App\Http\Controllers\Api\EventoTipoController;
 use App\Http\Controllers\Api\IgrejaController;
 use App\Http\Controllers\Api\PastoralController;
@@ -62,10 +65,24 @@ Route::middleware([
             ->middleware('throttle:10,1');
     });
 
+    Route::prefix('public/calendario')->group(function () {
+        Route::get('coleta/{token}', [CalendarioController::class, 'showColetaPublica']);
+        Route::post('coleta/{token}', [CalendarioController::class, 'storeColetaPublica'])
+            ->middleware('throttle:30,1');
+    });
+
     // Foto: URL assinada + ?tenant= (img não envia X-Tenant/Bearer). Spec SPEC-006 / ADR-0002.
     Route::get('pessoas/{id}/foto', [PessoaFotoController::class, 'show'])
         ->middleware('signed')
         ->name('pessoas.foto.show');
+
+    // Logo do app: URL assinada + ?tenant= (SPEC-014).
+    Route::get('app/branding/logo', [AppBrandingController::class, 'showLogo'])
+        ->middleware('signed')
+        ->name('app.branding.logo.show');
+    Route::get('app/branding/logo-diocese', [AppBrandingController::class, 'showLogoDiocese'])
+        ->middleware('signed')
+        ->name('app.branding.logo-diocese.show');
 
     // Só usuário do tenant (token no DB do tenant)
     Route::post('web/refresh', [AuthWebController::class, 'refresh']);
@@ -81,6 +98,7 @@ Route::middleware([
 ])->prefix('api/v1')->group(function () {
     Route::get('roles', [RolePermissionController::class, 'roles']);
     Route::get('permissions', [RolePermissionController::class, 'permissions']);
+    Route::get('audit-logs', [AuditLogController::class, 'index']);
     Route::apiResource('igrejas', IgrejaController::class);
 
     Route::post('users/{user}/roles', [UserController::class, 'assignRole']);
@@ -89,6 +107,7 @@ Route::middleware([
     Route::apiResource('users', UserController::class);
 
     Route::apiResource('ecc/equipes', EccEquipeController::class)->names('ecc.equipes');
+    Route::get('ecc/equipes-servico', [EccEquipeServicoController::class, 'index']);
     Route::post('ecc/casais/import', [EccCasalController::class, 'import']);
     Route::post('ecc/casais/{id}/swap', [EccCasalController::class, 'swap']);
     Route::apiResource('ecc/casais', EccCasalController::class)->names('ecc.casais');
@@ -124,28 +143,45 @@ Route::middleware([
     Route::post('eventos/{id}/caixa/doacoes', [EccEventoController::class, 'doarDinheiro']);
     Route::apiResource('eventos', EccEventoController::class)->names('eventos');
 
-    Route::get('escalas/agenda', [EscalaController::class, 'agenda']);
-    Route::get('escalas/candidatos', [EscalaController::class, 'candidatos']);
-    Route::get('escalas/tipos', [EscalaController::class, 'indexTipos']);
-    Route::post('escalas/tipos', [EscalaController::class, 'storeTipo']);
-    Route::get('escalas/tipos/{id}', [EscalaController::class, 'showTipo']);
-    Route::put('escalas/tipos/{id}', [EscalaController::class, 'updateTipo']);
-    Route::delete('escalas/tipos/{id}', [EscalaController::class, 'destroyTipo']);
-    Route::get('escalas/tipos/{tipoId}/equipes', [EscalaController::class, 'indexEquipes']);
-    Route::post('escalas/tipos/{tipoId}/equipes', [EscalaController::class, 'storeEquipe']);
-    Route::put('escalas/equipes/{id}', [EscalaController::class, 'updateEquipe']);
-    Route::delete('escalas/equipes/{id}', [EscalaController::class, 'destroyEquipe']);
-    Route::get('escalas/tipos/{tipoId}/ocorrencias', [EscalaController::class, 'indexOcorrencias']);
-    Route::post('escalas/tipos/{tipoId}/ocorrencias', [EscalaController::class, 'storeOcorrencia']);
-    Route::post('escalas/tipos/{tipoId}/ocorrencias/gerar', [EscalaController::class, 'gerarOcorrencias']);
-    Route::get('escalas/ocorrencias/{id}', [EscalaController::class, 'showOcorrencia']);
-    Route::put('escalas/ocorrencias/{id}', [EscalaController::class, 'updateOcorrencia']);
-    Route::delete('escalas/ocorrencias/{id}', [EscalaController::class, 'destroyOcorrencia']);
-    Route::post('escalas/ocorrencias/{id}/atribuicoes', [EscalaController::class, 'storeAtribuicao']);
-    Route::delete('escalas/atribuicoes/{id}', [EscalaController::class, 'destroyAtribuicao']);
+    Route::get('calendario/locais', [CalendarioController::class, 'indexLocais']);
+    Route::get('calendario/evento-tipos', [CalendarioController::class, 'indexEventoTipos']);
+    Route::post('calendario/evento-tipos', [CalendarioController::class, 'storeEventoTipo']);
+    Route::put('calendario/evento-tipos/{id}', [CalendarioController::class, 'updateEventoTipo']);
+    Route::delete('calendario/evento-tipos/{id}', [CalendarioController::class, 'destroyEventoTipo']);
+    Route::post('calendario/locais', [CalendarioController::class, 'storeLocal']);
+    Route::put('calendario/locais/{id}', [CalendarioController::class, 'updateLocal']);
+    Route::delete('calendario/locais/{id}', [CalendarioController::class, 'destroyLocal']);
+    Route::get('calendario/slots-padrao', [CalendarioController::class, 'indexSlots']);
+    Route::post('calendario/slots-padrao', [CalendarioController::class, 'storeSlot']);
+    Route::put('calendario/slots-padrao/{id}', [CalendarioController::class, 'updateSlot']);
+    Route::delete('calendario/slots-padrao/{id}', [CalendarioController::class, 'destroySlot']);
+    Route::get('calendario/mensais', [CalendarioController::class, 'indexMensais']);
+    Route::post('calendario/mensais', [CalendarioController::class, 'storeMensal']);
+    Route::get('calendario/mensais/{id}', [CalendarioController::class, 'showMensal']);
+    Route::put('calendario/mensais/{id}', [CalendarioController::class, 'updateMensal']);
+    Route::delete('calendario/mensais/{id}', [CalendarioController::class, 'destroyMensal']);
+    Route::post('calendario/mensais/{id}/copiar-proximo', [CalendarioController::class, 'copiarProximo']);
+    Route::post('calendario/mensais/{id}/status', [CalendarioController::class, 'transitionStatus']);
+    Route::post('calendario/mensais/{id}/itens', [CalendarioController::class, 'storeItem']);
+    Route::put('calendario/itens/{itemId}', [CalendarioController::class, 'updateItem']);
+    Route::delete('calendario/itens/{itemId}', [CalendarioController::class, 'destroyItem']);
+    Route::post('calendario/mensais/{id}/observacoes', [CalendarioController::class, 'storeObservacao']);
+    Route::put('calendario/observacoes/{id}', [CalendarioController::class, 'updateObservacao']);
+    Route::delete('calendario/observacoes/{id}', [CalendarioController::class, 'destroyObservacao']);
+    Route::put('calendario/tempos-liturgicos/{id}', [CalendarioController::class, 'updateTempoLiturgico']);
+    Route::post('calendario/mensais/{id}/coleta-links', [CalendarioController::class, 'storeColetaLink']);
+    Route::post('calendario/mensais/{id}/indisponibilidades', [CalendarioController::class, 'storeIndisponibilidades']);
+    Route::get('calendario/mensais/{id}/pdf', [CalendarioController::class, 'pdf']);
 
     Route::post('pessoas/{id}/foto', [PessoaFotoController::class, 'store']);
     Route::delete('pessoas/{id}/foto', [PessoaFotoController::class, 'destroy']);
+
+    Route::get('app/branding', [AppBrandingController::class, 'show']);
+    Route::patch('app/branding', [AppBrandingController::class, 'update']);
+    Route::post('app/branding/logo', [AppBrandingController::class, 'storeLogo']);
+    Route::delete('app/branding/logo', [AppBrandingController::class, 'destroyLogo']);
+    Route::post('app/branding/logo-diocese', [AppBrandingController::class, 'storeLogoDiocese']);
+    Route::delete('app/branding/logo-diocese', [AppBrandingController::class, 'destroyLogoDiocese']);
 
     Route::get('site/settings', [SiteAdminController::class, 'settings']);
     Route::put('site/settings', [SiteAdminController::class, 'updateSettings']);

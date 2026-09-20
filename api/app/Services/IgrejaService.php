@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Models\EccEquipeServico;
 use App\Models\Igreja;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
@@ -38,7 +39,10 @@ class IgrejaService
      */
     public function create(array $data): Igreja
     {
-        return Igreja::query()->create($this->normalize($data));
+        $igreja = Igreja::query()->create($this->normalize($data));
+        EccEquipeServico::seedDefaultsForIgreja($igreja->id);
+
+        return $igreja;
     }
 
     /**

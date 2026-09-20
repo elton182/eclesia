@@ -69,26 +69,26 @@ function formatComDate(item) {
     <span
       v-if="highlight"
       class="absolute top-0 left-3 z-10 text-[9px] font-medium px-2 py-0.5 rounded-full -translate-y-1/2"
-      style="background: #8A2436; color: #FFFDFA"
+      style="background: var(--color-primary-hover); color: var(--color-surface)"
     >editando</span>
 
     <!-- HERO 1g -->
     <div
       v-if="tipo === 'hero'"
       class="px-6 md:px-8 py-16 md:py-[74px]"
-      style="background: #4E1220"
+      style="background: var(--color-primary)"
     >
       <div class="max-w-6xl mx-auto grid md:grid-cols-[1.15fr_.85fr] gap-10 items-center">
         <div>
           <div
             class="text-[11px] font-medium tracking-[0.14em] uppercase mb-4"
-            style="color: #C88A5E"
+            style="color: var(--color-secondary)"
           >
             {{ payload.eyebrow || 'Bem-vindo à nossa casa' }}
           </div>
           <h1
             class="font-serif font-normal text-[36px] md:text-[46px] leading-[1.14] text-pretty mb-4"
-            style="color: #FFFDFA"
+            style="color: var(--color-surface)"
           >
             {{ payload.headline || 'Uma comunidade de fé a serviço das famílias.' }}
           </h1>
@@ -104,13 +104,13 @@ function formatComDate(item) {
               v-if="payload.cta_label"
               :href="payload.cta_href || '#missas'"
               class="inline-block px-5 py-3 rounded-lg text-[13.5px] font-medium no-underline"
-              style="background: #FFFDFA; color: #4E1220"
+              style="background: var(--color-surface); color: var(--color-primary)"
             >{{ payload.cta_label }}</a>
             <a
               v-if="payload.cta2_label"
               :href="payload.cta2_href || '#pastorais'"
               class="inline-block px-5 py-3 rounded-lg text-[13.5px] font-medium no-underline"
-              style="border: 1px solid rgba(255, 253, 250, 0.35); color: #FFFDFA"
+              style="border: 1px solid rgba(255, 253, 250, 0.35); color: var(--color-surface)"
             >{{ payload.cta2_label }}</a>
           </div>
         </div>
@@ -140,10 +140,10 @@ function formatComDate(item) {
     >
       <div class="max-w-6xl mx-auto grid md:grid-cols-[280px_1fr] gap-9">
         <div>
-          <div class="text-[11px] font-medium tracking-[0.14em] uppercase mb-3" style="color: #B4703F">
+          <div class="text-[11px] font-medium tracking-[0.14em] uppercase mb-3" style="color: var(--color-secondary)">
             {{ payload.eyebrow || 'Missas' }}
           </div>
-          <h2 class="font-serif text-[28px] leading-tight mb-3" style="color: #2A1418">
+          <h2 class="font-serif text-[28px] leading-tight mb-3" style="color: var(--color-ink)">
             {{ payload.titulo || 'Horários da semana' }}
           </h2>
           <p class="text-[13.5px] leading-relaxed" style="color: rgba(42, 20, 24, 0.62)">
@@ -155,10 +155,10 @@ function formatComDate(item) {
             v-for="(m, i) in missas"
             :key="i"
             class="rounded-[10px] p-4"
-            style="border: 1px solid rgba(42, 20, 24, 0.1); background: #FBF8F4"
+            style="border: 1px solid rgba(42, 20, 24, 0.1); background: var(--color-surface-2)"
           >
-            <div class="text-[12.5px] font-medium mb-2" style="color: #8A2436">{{ m.dia }}</div>
-            <div class="font-serif text-[22px] leading-none" style="color: #2A1418">{{ m.hora }}</div>
+            <div class="text-[12.5px] font-medium mb-2" style="color: var(--color-primary-hover)">{{ m.dia }}</div>
+            <div class="font-serif text-[22px] leading-none" style="color: var(--color-ink)">{{ m.hora }}</div>
             <div class="text-[12px] mt-2" style="color: rgba(42, 20, 24, 0.62)">{{ m.local }}</div>
           </div>
         </div>
@@ -186,10 +186,10 @@ function formatComDate(item) {
           </span>
         </div>
         <div>
-          <div class="text-[11px] font-medium tracking-[0.14em] uppercase mb-3" style="color: #B4703F">
+          <div class="text-[11px] font-medium tracking-[0.14em] uppercase mb-3" style="color: var(--color-secondary)">
             {{ payload.eyebrow || 'Sobre nós' }}
           </div>
-          <h2 class="font-serif text-[28px] leading-snug mb-4" style="color: #2A1418">
+          <h2 class="font-serif text-[28px] leading-snug mb-4" style="color: var(--color-ink)">
             {{ payload.titulo || 'Nossa história' }}
           </h2>
           <p class="text-[14px] leading-[1.75] mb-5" style="color: rgba(42, 20, 24, 0.7)">
@@ -197,7 +197,7 @@ function formatComDate(item) {
           </p>
           <div class="flex gap-8">
             <div v-for="(s, i) in stats" :key="i">
-              <div class="font-serif text-[25px]" style="color: #6B1C2B">{{ s.valor }}</div>
+              <div class="font-serif text-[25px]" style="color: var(--color-primary-soft)">{{ s.valor }}</div>
               <div class="text-[12px] mt-1" style="color: rgba(42, 20, 24, 0.62)">{{ s.rotulo }}</div>
             </div>
           </div>
@@ -209,15 +209,15 @@ function formatComDate(item) {
     <div
       v-else-if="tipo === 'pastorais_list'"
       class="px-6 md:px-8 py-12 md:py-14"
-      style="background: #F7F4EF; border-bottom: 1px solid rgba(42, 20, 24, 0.08)"
+      style="background: var(--color-surface-2); border-bottom: 1px solid rgba(42, 20, 24, 0.08)"
     >
       <div class="max-w-6xl mx-auto">
         <div class="flex items-end justify-between mb-6 gap-4">
           <div>
-            <div class="text-[11px] font-medium tracking-[0.14em] uppercase mb-3" style="color: #B4703F">
+            <div class="text-[11px] font-medium tracking-[0.14em] uppercase mb-3" style="color: var(--color-secondary)">
               {{ payload.eyebrow || 'Pastorais e movimentos' }}
             </div>
-            <h2 class="font-serif text-[28px]" style="color: #2A1418">
+            <h2 class="font-serif text-[28px]" style="color: var(--color-ink)">
               {{ payload.titulo || 'Onde servir' }}
             </h2>
           </div>
@@ -228,15 +228,15 @@ function formatComDate(item) {
             v-for="item in listItems"
             :key="item.id"
             class="rounded-[10px] p-[18px] flex flex-col gap-2"
-            style="background: #FFFDFA; border: 1px solid rgba(42, 20, 24, 0.1)"
+            style="background: var(--color-surface); border: 1px solid rgba(42, 20, 24, 0.1)"
           >
             <div
               class="w-8 h-8 rounded-lg flex items-center justify-center font-serif text-[14px] font-medium"
-              style="background: #F3EDE6; color: #6B1C2B"
+              style="background: var(--color-surface-2); color: var(--color-primary-soft)"
             >
               {{ (item.nome || '?')[0] }}
             </div>
-            <div class="text-[14px] font-medium" style="color: #2A1418">{{ item.nome }}</div>
+            <div class="text-[14px] font-medium" style="color: var(--color-ink)">{{ item.nome }}</div>
             <div class="text-[12px] leading-relaxed" style="color: rgba(42, 20, 24, 0.62)">
               {{ item.descricao_publica || item.contato_publico || '' }}
             </div>
@@ -259,10 +259,10 @@ function formatComDate(item) {
       style="border-bottom: 1px solid rgba(42, 20, 24, 0.08)"
     >
       <div class="max-w-6xl mx-auto">
-        <div class="text-[11px] font-medium tracking-[0.14em] uppercase mb-3" style="color: #B4703F">
+        <div class="text-[11px] font-medium tracking-[0.14em] uppercase mb-3" style="color: var(--color-secondary)">
           {{ payload.eyebrow || 'Comunicados' }}
         </div>
-        <h2 class="font-serif text-[28px] mb-5" style="color: #2A1418">
+        <h2 class="font-serif text-[28px] mb-5" style="color: var(--color-ink)">
           {{ payload.titulo || 'Avisos da paróquia' }}
         </h2>
         <p v-if="listLoading" class="text-sm" style="color: rgba(42, 20, 24, 0.5)">Carregando…</p>
@@ -280,10 +280,10 @@ function formatComDate(item) {
               <span
                 v-if="item.categoria || item.tag"
                 class="text-[10.5px] font-medium tracking-wide uppercase px-2 py-0.5 rounded-full"
-                style="color: #8A2436; background: #F6E9EB"
+                style="color: var(--color-primary-hover); background: color-mix(in srgb, var(--color-primary) 12%, white)"
               >{{ item.categoria || item.tag }}</span>
             </div>
-            <div class="font-serif text-[16px] font-medium mb-1" style="color: #2A1418">
+            <div class="font-serif text-[16px] font-medium mb-1" style="color: var(--color-ink)">
               {{ item.titulo }}
             </div>
             <div class="text-[13.5px] leading-relaxed" style="color: rgba(42, 20, 24, 0.65)">
@@ -304,10 +304,10 @@ function formatComDate(item) {
       style="border-bottom: 1px solid rgba(42, 20, 24, 0.08)"
     >
       <div class="max-w-6xl mx-auto">
-        <div class="text-[11px] font-medium tracking-[0.14em] uppercase mb-3" style="color: #B4703F">
+        <div class="text-[11px] font-medium tracking-[0.14em] uppercase mb-3" style="color: var(--color-secondary)">
           {{ payload.eyebrow || 'Agenda' }}
         </div>
-        <h2 class="font-serif text-[28px] mb-5" style="color: #2A1418">
+        <h2 class="font-serif text-[28px] mb-5" style="color: var(--color-ink)">
           {{ payload.titulo || 'Próximos eventos' }}
         </h2>
         <div class="flex flex-col gap-2.5 max-w-lg">
@@ -315,17 +315,17 @@ function formatComDate(item) {
             v-for="(a, i) in agenda"
             :key="i"
             class="flex gap-3.5 items-center rounded-[10px] px-4 py-3"
-            style="background: #FBF8F4; border: 1px solid rgba(42, 20, 24, 0.09)"
+            style="background: var(--color-surface-2); border: 1px solid rgba(42, 20, 24, 0.09)"
           >
             <div class="w-12 text-center shrink-0">
-              <div class="font-serif text-[21px] leading-none" style="color: #6B1C2B">{{ a.dia }}</div>
+              <div class="font-serif text-[21px] leading-none" style="color: var(--color-primary-soft)">{{ a.dia }}</div>
               <div class="text-[10.5px] font-medium tracking-wide uppercase mt-1" style="color: rgba(42, 20, 24, 0.62)">
                 {{ a.mes }}
               </div>
             </div>
             <div class="w-px self-stretch" style="background: rgba(42, 20, 24, 0.1)" />
             <div class="min-w-0">
-              <div class="text-[13.5px] font-medium" style="color: #2A1418">{{ a.titulo }}</div>
+              <div class="text-[13.5px] font-medium" style="color: var(--color-ink)">{{ a.titulo }}</div>
               <div class="text-[12px] mt-0.5" style="color: rgba(42, 20, 24, 0.62)">{{ a.info }}</div>
             </div>
           </div>
@@ -337,13 +337,13 @@ function formatComDate(item) {
     <div
       v-else-if="tipo === 'equipe_clero'"
       class="px-6 md:px-8 py-12 md:py-14"
-      style="background: #F7F4EF; border-bottom: 1px solid rgba(42, 20, 24, 0.08)"
+      style="background: var(--color-surface-2); border-bottom: 1px solid rgba(42, 20, 24, 0.08)"
     >
       <div class="max-w-6xl mx-auto">
-        <div class="text-[11px] font-medium tracking-[0.14em] uppercase mb-3" style="color: #B4703F">
+        <div class="text-[11px] font-medium tracking-[0.14em] uppercase mb-3" style="color: var(--color-secondary)">
           {{ payload.eyebrow || 'Clero e equipe' }}
         </div>
-        <h2 class="font-serif text-[28px] mb-6" style="color: #2A1418">
+        <h2 class="font-serif text-[28px] mb-6" style="color: var(--color-ink)">
           {{ payload.titulo || 'Quem caminha com você' }}
         </h2>
         <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -351,7 +351,7 @@ function formatComDate(item) {
             v-for="(q, i) in equipe"
             :key="i"
             class="rounded-[10px] overflow-hidden"
-            style="background: #FFFDFA; border: 1px solid rgba(42, 20, 24, 0.1)"
+            style="background: var(--color-surface); border: 1px solid rgba(42, 20, 24, 0.1)"
           >
             <div
               class="h-[150px] flex items-end p-2.5 bg-cover bg-center"
@@ -365,7 +365,7 @@ function formatComDate(item) {
               <span v-if="!q.foto_url" class="font-mono text-[10px]" style="color: rgba(42, 20, 24, 0.62)">retrato</span>
             </div>
             <div class="px-4 py-3.5">
-              <div class="font-serif text-[14.5px] font-medium" style="color: #2A1418">{{ q.nome || '—' }}</div>
+              <div class="font-serif text-[14.5px] font-medium" style="color: var(--color-ink)">{{ q.nome || '—' }}</div>
               <div class="text-[12px] mt-1" style="color: rgba(42, 20, 24, 0.58)">{{ q.papel }}</div>
             </div>
           </div>
@@ -380,10 +380,10 @@ function formatComDate(item) {
     >
       <div class="max-w-6xl mx-auto grid md:grid-cols-2 gap-9">
         <div>
-          <div class="text-[11px] font-medium tracking-[0.14em] uppercase mb-3" style="color: #B4703F">
+          <div class="text-[11px] font-medium tracking-[0.14em] uppercase mb-3" style="color: var(--color-secondary)">
             {{ payload.eyebrow || 'Onde estamos' }}
           </div>
-          <h2 class="font-serif text-[28px] leading-tight mb-4" style="color: #2A1418">
+          <h2 class="font-serif text-[28px] leading-tight mb-4" style="color: var(--color-ink)">
             {{ payload.titulo || payload.endereco || 'Endereço da paróquia' }}
           </h2>
           <div
@@ -408,8 +408,8 @@ function formatComDate(item) {
             </div>
           </div>
         </div>
-        <div class="rounded-xl p-7" style="background: #4E1220">
-          <div class="font-serif text-[24px] mb-2" style="color: #FFFDFA">
+        <div class="rounded-xl p-7" style="background: var(--color-primary)">
+          <div class="font-serif text-[24px] mb-2" style="color: var(--color-surface)">
             {{ payload.form_titulo || 'Fale conosco' }}
           </div>
           <p class="text-[13px] leading-relaxed mb-5" style="color: rgba(255, 253, 250, 0.7)">
@@ -425,20 +425,20 @@ function formatComDate(item) {
               disabled
               placeholder="Seu nome"
               class="w-full rounded-lg px-3 py-3 text-[13.5px] border"
-              style="border-color: rgba(255,253,250,.25); background: rgba(255,253,250,.07); color: #FFFDFA"
+              style="border-color: rgba(255,253,250,.25); background: rgba(255,253,250,.07); color: var(--color-surface)"
             >
             <input
               disabled
               placeholder="E-mail ou telefone"
               class="w-full rounded-lg px-3 py-3 text-[13.5px] border"
-              style="border-color: rgba(255,253,250,.25); background: rgba(255,253,250,.07); color: #FFFDFA"
+              style="border-color: rgba(255,253,250,.25); background: rgba(255,253,250,.07); color: var(--color-surface)"
             >
             <textarea
               disabled
               rows="4"
               placeholder="Como podemos ajudar?"
               class="w-full rounded-lg px-3 py-3 text-[13.5px] border resize-y"
-              style="border-color: rgba(255,253,250,.25); background: rgba(255,253,250,.07); color: #FFFDFA"
+              style="border-color: rgba(255,253,250,.25); background: rgba(255,253,250,.07); color: var(--color-surface)"
             />
             <p class="text-[12px]" style="color: rgba(255,253,250,0.55)">
               Vincule um formulário no editor para ativar o envio.
@@ -451,7 +451,7 @@ function formatComDate(item) {
     <!-- LEGACY / EXTRAS -->
     <div v-else-if="tipo === 'banner'" class="w-full">
       <img v-if="bannerUrl" :src="bannerUrl" :alt="payload.alt || ''" class="w-full max-h-[420px] object-cover">
-      <div v-else class="h-40" style="background: #F3EDE6" />
+      <div v-else class="h-40" style="background: var(--color-surface-2)" />
     </div>
 
     <div
@@ -469,7 +469,7 @@ function formatComDate(item) {
     </div>
 
     <div v-else-if="tipo === 'igrejas_list'" class="max-w-5xl mx-auto px-6 py-12">
-      <h2 class="font-serif text-2xl mb-6" style="color: #2A1418">{{ payload.titulo || 'Nossas igrejas' }}</h2>
+      <h2 class="font-serif text-2xl mb-6" style="color: var(--color-ink)">{{ payload.titulo || 'Nossas igrejas' }}</h2>
       <ul class="space-y-4">
         <li v-for="item in listItems" :key="item.id" class="pb-4" style="border-bottom: 1px solid rgba(42,20,24,0.1)">
           <div class="font-medium text-lg">{{ item.nome }}</div>
@@ -479,7 +479,7 @@ function formatComDate(item) {
     </div>
 
     <div v-else-if="tipo === 'form'" class="max-w-xl mx-auto px-6 py-12">
-      <h2 class="font-serif text-2xl mb-4" style="color: #2A1418">{{ payload.titulo || 'Fale conosco' }}</h2>
+      <h2 class="font-serif text-2xl mb-4" style="color: var(--color-ink)">{{ payload.titulo || 'Fale conosco' }}</h2>
       <SitePublicForm v-if="payload.form_slug" :slug="payload.form_slug" :tenant-slug="tenantSlug" />
     </div>
   </section>
@@ -487,7 +487,7 @@ function formatComDate(item) {
 
 <style scoped>
 .site-block--editing {
-  outline: 2px solid #8A2436;
+  outline: 2px solid var(--color-primary-hover);
   outline-offset: -2px;
 }
 </style>

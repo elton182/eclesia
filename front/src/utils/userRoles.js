@@ -10,7 +10,7 @@ export const ROLE_LABELS = {
   'cadastros-equipes': 'Cadastros · Equipes',
   'cadastros-casais': 'Cadastros · Casais',
   'cadastros-eventos': 'Cadastros · Eventos',
-  'cadastros-escalas': 'Cadastros · Escalas',
+  'cadastros-calendario': 'Cadastros · Calendário',
   'lider-equipe': 'Líder de Equipe',
 }
 
@@ -47,6 +47,12 @@ export function userHasPermission(user, permission, opts = {}) {
     if (!permission.startsWith('site.')) return true
   }
   if (permission === 'telas.usuarios' && roleNames.includes('cadastros-usuarios')) return true
+  if (
+    (permission === 'telas.auditoria' || permission === 'auditoria.view') &&
+    (roleNames.includes('admin-tenant') || roleNames.includes('admin-igreja'))
+  ) {
+    return true
+  }
   if (permission === 'telas.igrejas' && roleNames.includes('admin-igreja')) return true
   if (permission === 'igrejas.update' && roleNames.includes('admin-igreja')) return true
   if (permission === 'telas.equipes' && (roleNames.includes('cadastros-equipes') || roleNames.includes('lider-equipe'))) {
@@ -77,10 +83,13 @@ export function userHasPermission(user, permission, opts = {}) {
     return true
   }
   if (
-    (permission === 'telas.escalas' ||
-      permission === 'escalas.view' ||
-      permission === 'escalas.manage') &&
-    (roleNames.includes('admin-igreja') || roleNames.includes('cadastros-escalas'))
+    (permission === 'telas.calendario' ||
+      permission === 'calendario.gerir' ||
+      permission === 'calendario.colaborar') &&
+    (roleNames.includes('admin-igreja') ||
+      roleNames.includes('cadastros-calendario') ||
+      (permission === 'calendario.colaborar' && roleNames.includes('lider-equipe')) ||
+      (permission === 'telas.calendario' && roleNames.includes('lider-equipe')))
   ) {
     return true
   }
@@ -88,15 +97,15 @@ export function userHasPermission(user, permission, opts = {}) {
 }
 
 /**
- * Nav / launcher Escalas (núcleo).
+ * Nav / launcher Calendário oficial.
  * @param {{ permissions?: string[], roles?: Array<{ name: string }> }|null|undefined} user
  * @param {{ isSuperAdmin?: boolean }} [opts]
  */
-export function canSeeEscalasNav(user, opts = {}) {
+export function canSeeCalendarioNav(user, opts = {}) {
   return (
-    userHasPermission(user, 'telas.escalas', opts) ||
-    userHasPermission(user, 'escalas.view', opts) ||
-    userHasPermission(user, 'escalas.manage', opts)
+    userHasPermission(user, 'telas.calendario', opts) ||
+    userHasPermission(user, 'calendario.gerir', opts) ||
+    userHasPermission(user, 'calendario.colaborar', opts)
   )
 }
 

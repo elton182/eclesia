@@ -14,7 +14,7 @@ const pwaPlugin = VitePWA({
     name: 'Eclésias',
     short_name: 'Eclésias',
     description:
-      'Plataforma modular de gestão eclesial: pessoas, equipes, escalas, eventos e finanças da sua paróquia.',
+      'Plataforma modular de gestão eclesial: pessoas, equipes, eventos, calendário e finanças da sua paróquia.',
     lang: 'pt-BR',
     dir: 'ltr',
     start_url: '/',

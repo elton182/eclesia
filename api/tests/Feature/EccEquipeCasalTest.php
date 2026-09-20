@@ -214,10 +214,13 @@ class EccEquipeCasalTest extends TestCase
                     'Em qual função você gostaria de trabalhar?' => 'Café',
                     'Casal dirigente? Qual função' => 'Não',
                     'Já foi Cordenador Geral?' => 'Não',
+                    'Já foi circulo? Tem mais Equipes?' => 'Sim',
                     'Ficha Com foto:' => 'Sim',
                     'Tem 2ª Etapa' => '11º',
                     'Tem 3ª Etapa' => 'Não',
                     'Indicação para 2025' => 'Acolhida',
+                    'Função_1' => '',
+                    'Aceitou_1' => '',
                 ],
                 [
                     'Equipe' => 'Nossa Senhora da Glória',
@@ -244,11 +247,29 @@ class EccEquipeCasalTest extends TestCase
         $this->assertTrue($primeiro['piloto']);
         $this->assertSame(40, $primeiro['anos_casados']);
         $this->assertSame('8º', $primeiro['ecc_origem']);
-        $this->assertSame('Sim, Coordenou Cozinha', $primeiro['experiencia_servico']);
-        $this->assertSame('Café', $primeiro['preferencia_funcao']);
         $this->assertFalse($primeiro['ficha_com_foto']);
-        $this->assertSame('11º', $primeiro['etapa_2']);
-        $this->assertStringContainsString('Indicação para 2025', (string) $primeiro['observacoes']);
+        $this->assertStringContainsString('Já foi circulo', (string) $primeiro['observacoes']);
+        $this->assertStringNotContainsString('Indicação para 2025', (string) $primeiro['observacoes']);
         $this->assertStringNotContainsString('Piloto:', (string) $primeiro['observacoes']);
+
+        // SPEC-015: planilha enriquece etapas / atividades / preferências
+        $etapas = collect($primeiro['etapas'] ?? []);
+        $this->assertSame('8º', $etapas->firstWhere('etapa', 1)['ecc_numero'] ?? null);
+        $this->assertSame('11º', $etapas->firstWhere('etapa', 2)['ecc_numero'] ?? null);
+
+        $prefs = collect($primeiro['preferencias'] ?? []);
+        $this->assertTrue($prefs->contains(fn ($p) => ($p['equipe_servico_nome'] ?? '') === 'Café e Minimercado'
+            || str_contains(mb_strtolower((string) ($p['equipe_servico_nome'] ?? '')), 'café')));
+
+        $ativ = collect($primeiro['atividades'] ?? []);
+        $histCozinha = $ativ->first(fn ($a) => ($a['ecc_numero'] ?? '') === 'hist'
+            && str_contains(mb_strtolower((string) ($a['equipe_servico_nome'] ?? '')), 'cozinha'));
+        $this->assertNotNull($histCozinha);
+        $this->assertSame('C', $histCozinha['status']);
+
+        $ind2025 = $ativ->first(fn ($a) => ($a['ecc_numero'] ?? '') === '2025'
+            && str_contains(mb_strtolower((string) ($a['equipe_servico_nome'] ?? '')), 'acolhida'));
+        $this->assertNotNull($ind2025);
+        $this->assertSame('IC', $ind2025['status']);
     }
 }

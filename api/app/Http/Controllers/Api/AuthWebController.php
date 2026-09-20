@@ -9,12 +9,14 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\AuthRequest;
 use App\Http\Resources\UserResource;
 use App\Models\User;
+use App\Services\AuditLogger;
 use App\Services\AuthTokenService;
 use App\Services\CookieManager;
 use App\Services\IgrejaContext;
 use App\Services\TenantResolver;
 use App\Services\UserService;
 use App\Services\WebAuthService;
+use App\Services\AppBrandingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -32,6 +34,8 @@ class AuthWebController extends Controller
         protected Tenancy $tenancy,
         protected UserService $userService,
         protected IgrejaContext $igrejaContext,
+        protected AuditLogger $auditLogger,
+        protected AppBrandingService $appBranding,
     ) {}
 
     public function auth(AuthRequest $request): JsonResponse
@@ -59,6 +63,15 @@ class AuthWebController extends Controller
                 CookieManager::REFRESH_TOKEN_EXPIRY
             );
 
+            $this->auditLogger->log(
+                action: AuditLogger::ACTION_LOGIN_SUCCESS,
+                auditable: $user,
+                metadata: ['email_hint' => $this->auditLogger->emailHint($data['email'])],
+                auditableLabel: $user->name,
+                request: $request,
+                actor: $user,
+            );
+
             return response()->json([
                 'success' => true,
                 'message' => 'Login efetuado com sucesso!',
@@ -69,10 +82,22 @@ class AuthWebController extends Controller
                     'slug' => $tenant->slug,
                 ],
                 'user' => (new UserResource($user))->resolve(),
+                // SPEC-014: branding no login evita SPA sem cores até o próximo F5/checkAuth
+                'branding' => $this->tenantBranding(),
             ])
                 ->withCookie($this->cookieManager->createAccessTokenCookie($tokens['access']))
                 ->withCookie($this->cookieManager->createRefreshTokenCookie($tokens['refresh']));
         }
+
+        $this->auditLogger->log(
+            action: AuditLogger::ACTION_LOGIN_FAILED,
+            metadata: [
+                'email_hint' => $this->auditLogger->emailHint($data['email']),
+                'reason' => $user === null ? 'unknown_user' : ($user->is_active ? 'bad_password' : 'inactive'),
+            ],
+            request: $request,
+            actor: null,
+        );
 
         return response()->json([
             'message' => 'E-mail ou senha incorretos.',
@@ -110,15 +135,37 @@ class AuthWebController extends Controller
             ...(new UserResource($user))->resolve(),
             'permissions' => $permissions,
             'igreja_id' => $igrejaId,
+            'branding' => $this->tenantBranding(),
         ]);
+    }
+
+    /**
+     * @return array{logo_path: ?string, logo_url: ?string, cores: ?array<string, string>}
+     */
+    private function tenantBranding(): array
+    {
+        return $this->appBranding->brandingPayload();
     }
 
     public function logout(Request $request): JsonResponse
     {
         $user = auth('sanctum')->user();
 
-        if ($user) {
-            $this->authTokenService->revokeTokensForLogout($user, AuthTokenService::CHANNEL_WEB);
+        if ($user instanceof User) {
+            $this->auditLogger->log(
+                action: AuditLogger::ACTION_LOGOUT,
+                auditable: $user,
+                auditableLabel: $user->name,
+                request: $request,
+                actor: $user,
+            );
+
+            $sessionId = $this->resolveSessionIdFromRequest($request, $user);
+            $this->authTokenService->revokeTokensForLogout(
+                $user,
+                AuthTokenService::CHANNEL_WEB,
+                $sessionId
+            );
         }
 
         $this->forgetWebSession($request);
@@ -126,6 +173,38 @@ class AuthWebController extends Controller
         return response()->json(['message' => 'Logout efetuado.'])
             ->withCookie($this->cookieManager->forgetAccessTokenCookie())
             ->withCookie($this->cookieManager->forgetRefreshTokenCookie());
+    }
+
+    private function resolveSessionIdFromRequest(Request $request, User $user): ?string
+    {
+        $bearer = $request->bearerToken();
+        if (is_string($bearer) && $bearer !== '') {
+            $access = \Laravel\Sanctum\PersonalAccessToken::findToken($bearer);
+            $fromBearer = $this->authTokenService->sessionIdFromToken($access);
+            if ($fromBearer !== null) {
+                return $fromBearer;
+            }
+        }
+
+        $current = $user->currentAccessToken();
+        if ($current instanceof \Laravel\Sanctum\PersonalAccessToken) {
+            $fromCurrent = $this->authTokenService->sessionIdFromToken($current);
+            if ($fromCurrent !== null) {
+                return $fromCurrent;
+            }
+        }
+
+        $refreshPlain = $this->cookieManager->getRefreshTokenFromRequest($request);
+        if (is_string($refreshPlain) && str_contains($refreshPlain, '|')) {
+            [$id] = explode('|', $refreshPlain, 2);
+            if (is_numeric($id)) {
+                $refresh = \Laravel\Sanctum\PersonalAccessToken::query()->find($id);
+
+                return $this->authTokenService->sessionIdFromToken($refresh);
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -165,15 +244,24 @@ class AuthWebController extends Controller
             return response()->json(['message' => 'Sessão expirada. Faça login novamente.'], 401);
         }
 
-        $user->tokens()->where('name', WebAuthService::ACCESS_TOKEN_NAME)->delete();
+        $sessionId = $this->authTokenService->sessionIdFromToken($record);
+        if ($sessionId === null) {
+            // Refresh legado sem session: cria nova sessão sem apagar outras.
+            $sessionId = $this->authTokenService->newSessionId();
+            $record->forceFill([
+                'abilities' => $this->authTokenService->abilitiesForSession($sessionId),
+                'last_used_at' => now(),
+            ])->save();
+        } else {
+            $this->authTokenService->revokeCurrentAccessAndSessionAccessTokens($user, $sessionId);
+            $record->forceFill(['last_used_at' => now()])->save();
+        }
 
         $accessToken = $user->createToken(
             WebAuthService::ACCESS_TOKEN_NAME,
-            ['*'],
+            $this->authTokenService->abilitiesForSession($sessionId),
             now()->addMinutes(CookieManager::ACCESS_TOKEN_EXPIRY)
         );
-
-        $record->forceFill(['last_used_at' => now()])->save();
 
         $plainAccess = $accessToken->plainTextToken;
 

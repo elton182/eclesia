@@ -8,7 +8,7 @@ import {
   equipesLideradasIds,
   canSeeEccCasaisNav,
   canSeeEccEventosNav,
-  canSeeEscalasNav,
+  canSeeCalendarioNav,
 } from './userRoles.js'
 
 describe('userRoles', () => {
@@ -17,7 +17,7 @@ describe('userRoles', () => {
     assert.equal(roleLabel('cadastros-equipes'), 'Cadastros · Equipes')
     assert.equal(roleLabel('cadastros-casais'), 'Cadastros · Casais')
     assert.equal(roleLabel('cadastros-eventos'), 'Cadastros · Eventos')
-    assert.equal(roleLabel('cadastros-escalas'), 'Cadastros · Escalas')
+    assert.equal(roleLabel('cadastros-calendario'), 'Cadastros · Calendário')
     assert.equal(roleLabel('lider-equipe'), 'Líder de Equipe')
     assert.equal(roleLabel('admin-tenant'), 'Admin Organização')
   })
@@ -66,6 +66,21 @@ describe('userRoles', () => {
       igreja_id: null,
       roles: [{ name: 'admin-tenant' }],
     })
+  })
+
+  it('userHasPermission reconhece telas.auditoria para admin-igreja', () => {
+    assert.equal(
+      userHasPermission({ roles: [{ name: 'admin-igreja' }] }, 'telas.auditoria'),
+      true,
+    )
+    assert.equal(
+      userHasPermission({ roles: [{ name: 'admin-igreja' }] }, 'auditoria.view'),
+      true,
+    )
+    assert.equal(
+      userHasPermission({ roles: [{ name: 'cadastros-usuarios' }] }, 'telas.auditoria'),
+      false,
+    )
   })
 
   it('userHasPermission respeita telas por papel de cadastros', () => {
@@ -161,27 +176,10 @@ describe('userRoles', () => {
     )
   })
 
-  it('canSeeEscalasNav para admin-igreja, cadastros-escalas e permissões explícitas', () => {
-    assert.equal(
-      canSeeEscalasNav({ roles: [{ name: 'admin-igreja' }] }),
-      true,
-    )
-    assert.equal(
-      canSeeEscalasNav({ roles: [{ name: 'cadastros-escalas' }] }),
-      true,
-    )
-    assert.equal(
-      userHasPermission({ roles: [{ name: 'cadastros-escalas' }] }, 'escalas.manage'),
-      true,
-    )
-    assert.equal(
-      canSeeEscalasNav({ permissions: ['telas.escalas'], roles: [] }),
-      true,
-    )
-    assert.equal(
-      canSeeEscalasNav({ roles: [{ name: 'gestor-site' }] }),
-      false,
-    )
-    assert.equal(canSeeEscalasNav(null, { isSuperAdmin: true }), true)
+  it('canSeeCalendarioNav para admin-igreja e cadastros-calendario', () => {
+    assert.equal(canSeeCalendarioNav({ roles: [{ name: 'admin-igreja' }] }), true)
+    assert.equal(canSeeCalendarioNav({ roles: [{ name: 'cadastros-calendario' }] }), true)
+    assert.equal(canSeeCalendarioNav({ roles: [{ name: 'lider-equipe' }] }), true)
+    assert.equal(canSeeCalendarioNav({ roles: [{ name: 'cadastros-usuarios' }] }), false)
   })
 })

@@ -22,7 +22,7 @@ class RolesAndPermissionsSeeder extends Seeder
         'cadastros-equipes',
         'cadastros-casais',
         'cadastros-eventos',
-        'cadastros-escalas',
+        'cadastros-calendario',
         'lider-equipe',
     ];
 
@@ -34,7 +34,7 @@ class RolesAndPermissionsSeeder extends Seeder
         'cadastros-equipes',
         'cadastros-casais',
         'cadastros-eventos',
-        'cadastros-escalas',
+        'cadastros-calendario',
         'lider-equipe',
     ];
 
@@ -54,6 +54,11 @@ class RolesAndPermissionsSeeder extends Seeder
         'permissions.view',
     ];
 
+    /** @var list<string> */
+    public const AUDITORIA_PERMISSIONS = [
+        'auditoria.view',
+    ];
+
     /** Uma permissão por tela do shell (menu + rota). */
     /** @var list<string> */
     public const SCREEN_PERMISSIONS = [
@@ -63,13 +68,14 @@ class RolesAndPermissionsSeeder extends Seeder
         'telas.eventos',
         'telas.igrejas',
         'telas.site',
-        'telas.escalas',
+        'telas.calendario',
+        'telas.auditoria',
     ];
 
     /** @var list<string> */
-    public const ESCALAS_PERMISSIONS = [
-        'escalas.view',
-        'escalas.manage',
+    public const CALENDARIO_PERMISSIONS = [
+        'calendario.gerir',
+        'calendario.colaborar',
     ];
 
     /** @var list<string> */
@@ -117,9 +123,10 @@ class RolesAndPermissionsSeeder extends Seeder
         foreach ([
             ...self::MANAGEMENT_PERMISSIONS,
             ...self::SCREEN_PERMISSIONS,
+            ...self::AUDITORIA_PERMISSIONS,
             ...self::IGREJA_PERMISSIONS,
             ...self::ECC_STUB_PERMISSIONS,
-            ...self::ESCALAS_PERMISSIONS,
+            ...self::CALENDARIO_PERMISSIONS,
             ...self::SITE_PERMISSIONS,
         ] as $name) {
             Permission::findOrCreate($name, self::GUARD);
@@ -141,8 +148,9 @@ class RolesAndPermissionsSeeder extends Seeder
         $adminIgreja->syncPermissions([
             ...self::MANAGEMENT_PERMISSIONS,
             ...self::SCREEN_PERMISSIONS,
+            ...self::AUDITORIA_PERMISSIONS,
             ...self::ECC_STUB_PERMISSIONS,
-            ...self::ESCALAS_PERMISSIONS,
+            ...self::CALENDARIO_PERMISSIONS,
             'igrejas.view',
             'igrejas.update',
             'telas.site',
@@ -179,10 +187,10 @@ class RolesAndPermissionsSeeder extends Seeder
             'ecc.eventos.manage',
         ]);
 
-        Role::findByName('cadastros-escalas', self::GUARD)->syncPermissions([
-            'telas.escalas',
-            'escalas.view',
-            'escalas.manage',
+        Role::findByName('cadastros-calendario', self::GUARD)->syncPermissions([
+            'telas.calendario',
+            'calendario.gerir',
+            'calendario.colaborar',
         ]);
 
         Role::findByName('lider-equipe', self::GUARD)->syncPermissions([
@@ -193,6 +201,8 @@ class RolesAndPermissionsSeeder extends Seeder
             'ecc.casais.view',
             'ecc.eventos.view',
             'ecc.escala.editar',
+            'telas.calendario',
+            'calendario.colaborar',
         ]);
 
         app()[PermissionRegistrar::class]->forgetCachedPermissions();

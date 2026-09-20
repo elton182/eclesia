@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import api from '@/services/api'
 import { innovToast } from '@/plugins/toast'
+import { innovConfirm } from '@/plugins/dialog'
 import { buildSyncRolesPayload, roleLabel } from '@/utils/userRoles'
 import { filterEquipesBySearch } from '@/utils/eccFilters'
 import { useIgrejaStore } from '@/stores/igreja'
@@ -146,7 +147,13 @@ const save = async () => {
 }
 
 const remove = async (user) => {
-  if (!confirm(`Remover o usuário "${user.name}"?`)) return
+  const ok = await innovConfirm({
+    title: 'Remover',
+    message: `Remover o usuário "${user.name}"?`,
+    confirmText: 'Remover',
+    danger: true,
+  })
+  if (!ok) return
   try {
     await api.delete(`/users/${user.id}`)
     innovToast('success', 'OK', 'Usuário removido')

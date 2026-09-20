@@ -3,12 +3,14 @@ import { h } from 'vue'
 import { useAuthAdminStore } from '../stores/authAdmin'
 import { useAuthStore } from '../stores/auth'
 import { useTenantStore } from '../stores/tenant'
+import { useBrandingStore } from '../stores/branding'
 import LandingView from '../views/LandingView.vue'
 import TenantLoginView from '../views/TenantLoginView.vue'
 import LoginView from '../views/LoginView.vue'
 import WelcomeView from '../views/WelcomeView.vue'
 import TenantsView from '../views/TenantsView.vue'
 import UsersView from '../views/UsersView.vue'
+import AuditoriaView from '../views/AuditoriaView.vue'
 import IgrejasView from '../views/IgrejasView.vue'
 import EccCasaisView from '../views/EccCasaisView.vue'
 import EccCasalDetailView from '../views/EccCasalDetailView.vue'
@@ -16,11 +18,13 @@ import EccEventosView from '../views/EccEventosView.vue'
 import EccEventoDetailView from '../views/EccEventoDetailView.vue'
 import EventosView from '../views/EventosView.vue'
 import EventoDetailView from '../views/EventoDetailView.vue'
-import EscalasTiposView from '../views/EscalasTiposView.vue'
-import EscalasTipoDetailView from '../views/EscalasTipoDetailView.vue'
-import EscalasOcorrenciaView from '../views/EscalasOcorrenciaView.vue'
-import EscalasAgendaView from '../views/EscalasAgendaView.vue'
+import CalendarioMensaisView from '../views/CalendarioMensaisView.vue'
+import CalendarioMensalDetailView from '../views/CalendarioMensalDetailView.vue'
+import CalendarioLocaisView from '../views/CalendarioLocaisView.vue'
+import CalendarioTiposView from '../views/CalendarioTiposView.vue'
+import CalendarioColetaPublicView from '../views/CalendarioColetaPublicView.vue'
 import SiteAdminView from '../views/SiteAdminView.vue'
+import ConfiguracoesMarcaView from '../views/ConfiguracoesMarcaView.vue'
 import PublicSiteView from '../views/site/PublicSiteView.vue'
 import AdminLayout from '../layouts/AdminLayout.vue'
 import AuthLayout from '../layouts/AuthLayout.vue'
@@ -45,10 +49,10 @@ const ModuleLayoutSiteWrapper = {
   },
 }
 
-const ModuleLayoutEscalasWrapper = {
-  name: 'ModuleLayoutEscalas',
+const ModuleLayoutCalendarioWrapper = {
+  name: 'ModuleLayoutCalendario',
   setup() {
-    return () => h(ModuleLayout, { moduleKey: 'escalas' })
+    return () => h(ModuleLayout, { moduleKey: 'calendario' })
   },
 }
 
@@ -83,6 +87,12 @@ const router = createRouter({
       path: '/site/:tenantSlug/:pageSlug',
       name: 'public-site-page',
       component: PublicSiteView,
+      meta: { publicSite: true },
+    },
+    {
+      path: '/calendario/coleta/:token',
+      name: 'calendario-coleta-publica',
+      component: CalendarioColetaPublicView,
       meta: { publicSite: true },
     },
     {
@@ -144,6 +154,16 @@ const router = createRouter({
           name: 'usuarios',
           component: UsersView,
         },
+        {
+          path: 'auditoria',
+          name: 'auditoria',
+          component: AuditoriaView,
+        },
+        {
+          path: 'configuracoes/marca',
+          name: 'configuracoes-marca',
+          component: ConfiguracoesMarcaView,
+        },
       ],
     },
     {
@@ -191,28 +211,28 @@ const router = createRouter({
     },
     {
       path: '/',
-      component: ModuleLayoutEscalasWrapper,
+      component: ModuleLayoutCalendarioWrapper,
       meta: { requiresAuthTenantOrAdmin: true },
       children: [
         {
-          path: 'escalas',
-          name: 'escalas-tipos',
-          component: EscalasTiposView,
+          path: 'calendario',
+          name: 'calendario-mensais',
+          component: CalendarioMensaisView,
         },
         {
-          path: 'escalas/agenda',
-          name: 'escalas-agenda',
-          component: EscalasAgendaView,
+          path: 'calendario/locais',
+          name: 'calendario-locais',
+          component: CalendarioLocaisView,
         },
         {
-          path: 'escalas/tipos/:id',
-          name: 'escalas-tipo-detail',
-          component: EscalasTipoDetailView,
+          path: 'calendario/tipos',
+          name: 'calendario-tipos',
+          component: CalendarioTiposView,
         },
         {
-          path: 'escalas/ocorrencias/:id',
-          name: 'escalas-ocorrencia',
-          component: EscalasOcorrenciaView,
+          path: 'calendario/:id',
+          name: 'calendario-mensal-detail',
+          component: CalendarioMensalDetailView,
         },
       ],
     },
@@ -254,15 +274,23 @@ router.beforeEach(async (to, from, next) => {
   }
 
   if (to.matched.some((r) => r.meta.requiresAuthTenantOrAdmin)) {
+    const branding = useBrandingStore()
     const hasTenantSession =
       !!localStorage.getItem('tenant_token') && !!tenantStore.slug
 
     if (hasTenantSession) {
       if (authTenant.isAuthenticated && authTenant.user) {
+        // Sessão já hidratada (ex.: pós-login SPA): ainda assim garantir cores
+        if (tenantStore.slug) {
+          await branding.ensureLoaded()
+        }
         next()
         return
       }
       const tenantOk = await authTenant.checkAuth()
+      if (tenantOk && tenantStore.slug) {
+        await branding.ensureLoaded()
+      }
       next(tenantOk ? undefined : LOGIN_TENANT_PATH)
       return
     }
@@ -273,6 +301,7 @@ router.beforeEach(async (to, from, next) => {
         next('/admin/tenants')
         return
       }
+      await branding.ensureLoaded()
       next()
       return
     }

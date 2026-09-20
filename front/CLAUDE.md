@@ -25,6 +25,7 @@ src/i18n/locales/pt-BR.js
 
 - Composition API com `<script setup>`
 - Reutilizar componentes `Innov*` antes de criar novos
+- Design system: [`../docs/design/DESIGN-GUIDE.md`](../docs/design/DESIGN-GUIDE.md)
 - Stores Pinia para estado compartilhado
 - API com `withCredentials` + CSRF Sanctum
 - Alinhar endpoints ao contrato OpenAPI da API (`web/login`, `web/me`, `web/logout`)

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
+use App\Models\CalendarioEventoTipo;
+use App\Models\EccEquipeServico;
 use App\Models\Igreja;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
@@ -31,11 +33,17 @@ class SeedTenantDefaults implements ShouldQueue
         $this->tenant->run(function (): void {
             (new RolesAndPermissionsSeeder)->run();
 
+            CalendarioEventoTipo::seedDefaults();
+
             if (! Igreja::query()->exists()) {
                 Igreja::query()->create([
                     'nome' => $this->tenant->name ?? 'Igreja principal',
                     'tipo' => 'paroquia',
                 ]);
+            }
+
+            foreach (Igreja::query()->pluck('id') as $igrejaId) {
+                EccEquipeServico::seedDefaultsForIgreja((string) $igrejaId);
             }
 
             if (User::query()->count() === 0) {
