@@ -8,6 +8,7 @@ import {
   equipesLideradasIds,
   canSeeEccCasaisNav,
   canSeeEccEventosNav,
+  canSeeEccFinanceiroNav,
   canSeeCalendarioNav,
 } from './userRoles.js'
 
@@ -174,6 +175,26 @@ describe('userRoles', () => {
       canSeeEccEventosNav({ roles: [{ name: 'gestor-site' }] }),
       false,
     )
+  })
+
+  it('canSeeEccFinanceiroNav só para admin (não líder)', () => {
+    assert.equal(
+      canSeeEccFinanceiroNav({ roles: [{ name: 'admin-igreja' }] }),
+      true,
+    )
+    assert.equal(
+      canSeeEccFinanceiroNav({ roles: [{ name: 'admin-tenant' }] }),
+      true,
+    )
+    assert.equal(
+      canSeeEccFinanceiroNav({ roles: [{ name: 'lider-equipe' }] }),
+      false,
+    )
+    assert.equal(
+      canSeeEccFinanceiroNav({ permissions: ['ecc.financeiro.view'], roles: [] }),
+      true,
+    )
+    assert.equal(canSeeEccFinanceiroNav(null, { isSuperAdmin: true }), true)
   })
 
   it('canSeeCalendarioNav para admin-igreja e cadastros-calendario', () => {
