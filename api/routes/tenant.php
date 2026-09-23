@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\EccCasalController;
 use App\Http\Controllers\Api\EccEquipeController;
 use App\Http\Controllers\Api\EccEquipeServicoController;
 use App\Http\Controllers\Api\EccEventoController;
+use App\Http\Controllers\Api\EccFinanceiroController;
 use App\Http\Controllers\Api\EventoTipoController;
 use App\Http\Controllers\Api\IgrejaController;
 use App\Http\Controllers\Api\PastoralController;
@@ -125,6 +126,17 @@ Route::middleware([
     Route::post('ecc/eventos/{id}/caixa/doacoes', [EccEventoController::class, 'doarDinheiro']);
     // Prefixo URI "ecc/" não entra no nome — sem ->names(), colide com apiResource('eventos').
     Route::apiResource('ecc/eventos', EccEventoController::class)->names('ecc.eventos');
+
+    Route::get('ecc/financeiro', [EccFinanceiroController::class, 'index']);
+    Route::get('ecc/financeiro/contas', [EccFinanceiroController::class, 'listContas']);
+    Route::post('ecc/financeiro/contas', [EccFinanceiroController::class, 'storeConta']);
+    Route::put('ecc/financeiro/contas/{id}', [EccFinanceiroController::class, 'updateConta']);
+    Route::delete('ecc/financeiro/contas/{id}', [EccFinanceiroController::class, 'destroyConta']);
+    Route::post('ecc/financeiro/lancamentos', [EccFinanceiroController::class, 'storeLancamento']);
+    Route::put('ecc/financeiro/lancamentos/{id}', [EccFinanceiroController::class, 'updateLancamento']);
+    Route::delete('ecc/financeiro/lancamentos/{id}', [EccFinanceiroController::class, 'destroyLancamento']);
+    Route::post('ecc/financeiro/transferencias', [EccFinanceiroController::class, 'transferir']);
+    Route::post('ecc/financeiro/transportar', [EccFinanceiroController::class, 'transportar']);
 
     Route::get('eventos/tipos', [EventoTipoController::class, 'index']);
     Route::post('eventos/tipos', [EventoTipoController::class, 'store']);

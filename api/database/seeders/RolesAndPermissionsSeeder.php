@@ -70,6 +70,7 @@ class RolesAndPermissionsSeeder extends Seeder
         'telas.site',
         'telas.calendario',
         'telas.auditoria',
+        'telas.financeiro',
     ];
 
     /** @var list<string> */
@@ -94,6 +95,8 @@ class RolesAndPermissionsSeeder extends Seeder
         'ecc.casais.manage',
         'ecc.eventos.view',
         'ecc.eventos.manage',
+        'ecc.financeiro.view',
+        'ecc.financeiro.manage',
         'ecc.escala.editar',
         'pessoas.manage',
     ];

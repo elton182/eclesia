@@ -83,6 +83,16 @@ export function userHasPermission(user, permission, opts = {}) {
     return true
   }
   if (
+    permission === 'telas.financeiro' ||
+    permission === 'ecc.financeiro.view' ||
+    permission === 'ecc.financeiro.manage'
+  ) {
+    // só admin-igreja / admin-tenant (já cobertos acima); líder não
+    if (roleNames.includes('lider-equipe') && !roleNames.includes('admin-igreja')) {
+      return false
+    }
+  }
+  if (
     (permission === 'telas.calendario' ||
       permission === 'calendario.gerir' ||
       permission === 'calendario.colaborar') &&
@@ -131,6 +141,19 @@ export function canSeeEccEventosNav(user, opts = {}) {
     userHasPermission(user, 'telas.eventos', opts) ||
     userHasPermission(user, 'ecc.eventos.view', opts) ||
     userHasPermission(user, 'ecc.eventos.manage', opts)
+  )
+}
+
+/**
+ * Nav Financeiro ECC (livro-caixa anual). Líder de equipe não vê.
+ * @param {{ permissions?: string[], roles?: Array<{ name: string }> }|null|undefined} user
+ * @param {{ isSuperAdmin?: boolean }} [opts]
+ */
+export function canSeeEccFinanceiroNav(user, opts = {}) {
+  return (
+    userHasPermission(user, 'telas.financeiro', opts) ||
+    userHasPermission(user, 'ecc.financeiro.view', opts) ||
+    userHasPermission(user, 'ecc.financeiro.manage', opts)
   )
 }
 

@@ -37,6 +37,8 @@ return [
         'document_number',
         'payload', // site_form_submissions (JSON criptografado)
         'foto_path', // caminho da foto da pessoa (arquivo no storage do tenant)
+        'historico', // ecc_financeiro_lancamentos (pode citar casal)
+        'doador_nome', // ecc_evento_lancamentos
     ],
 
     /*
