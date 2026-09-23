@@ -2839,6 +2839,252 @@ paths:
         '422':
           description: Validação
 
+  /ecc/financeiro:
+    get:
+      summary: Livro-caixa anual do ECC
+      description: >
+        Contas, lançamentos agrupados por mês, totais por conta, total mensal,
+        acumulado e saldo final. Independente do caixa por evento.
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: ano
+          in: query
+          required: true
+          schema:
+            type: integer
+            minimum: 2000
+            maximum: 2100
+      responses:
+        '200':
+          description: Livro do ano
+        '422':
+          description: Ano inválido
+  /ecc/financeiro/contas:
+    get:
+      summary: Listar contas do financeiro ECC
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      responses:
+        '200':
+          description: Lista de contas
+    post:
+      summary: Criar conta
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nome, tipo]
+              properties:
+                nome:
+                  type: string
+                  maxLength: 255
+                tipo:
+                  type: string
+                  enum: [banco, especie]
+                ordem:
+                  type: integer
+                ativa:
+                  type: boolean
+      responses:
+        '201':
+          description: Conta criada
+        '422':
+          description: Validação
+  /ecc/financeiro/contas/{id}:
+    put:
+      summary: Atualizar conta
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nome:
+                  type: string
+                tipo:
+                  type: string
+                  enum: [banco, especie]
+                ordem:
+                  type: integer
+                ativa:
+                  type: boolean
+      responses:
+        '200':
+          description: Conta atualizada
+        '422':
+          description: Validação
+    delete:
+      summary: Excluir conta (somente sem lançamentos)
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Removida
+        '422':
+          description: Conta com lançamentos — desative em vez de excluir
+  /ecc/financeiro/lancamentos:
+    post:
+      summary: Registrar entrada ou saída
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [conta_id, data, historico, tipo, valor]
+              properties:
+                conta_id:
+                  type: string
+                data:
+                  type: string
+                  format: date
+                historico:
+                  type: string
+                tipo:
+                  type: string
+                  enum: [entrada, saida]
+                valor:
+                  type: number
+                  minimum: 0.01
+      responses:
+        '201':
+          description: Lançamento criado
+        '422':
+          description: Validação
+  /ecc/financeiro/lancamentos/{id}:
+    put:
+      summary: Atualizar lançamento (par de transferência junto)
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: string
+                  format: date
+                historico:
+                  type: string
+                tipo:
+                  type: string
+                  enum: [entrada, saida]
+                valor:
+                  type: number
+                  minimum: 0.01
+                conta_id:
+                  type: string
+      responses:
+        '200':
+          description: Atualizado
+        '422':
+          description: Validação
+    delete:
+      summary: Excluir lançamento (par de transferência junto)
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Removido
+  /ecc/financeiro/transferencias:
+    post:
+      summary: Transferir valor entre contas (par vinculado)
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [conta_origem_id, conta_destino_id, data, historico, valor]
+              properties:
+                conta_origem_id:
+                  type: string
+                conta_destino_id:
+                  type: string
+                data:
+                  type: string
+                  format: date
+                historico:
+                  type: string
+                valor:
+                  type: number
+                  minimum: 0.01
+      responses:
+        '201':
+          description: Par de lançamentos criado
+        '422':
+          description: Origem=destino ou valor inválido
+  /ecc/financeiro/transportar:
+    post:
+      summary: Transportar saldo do ano anterior para 1/1 do ano alvo
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ano]
+              properties:
+                ano:
+                  type: integer
+                  minimum: 2000
+                  maximum: 2100
+      responses:
+        '201':
+          description: Lançamentos de abertura criados
+        '422':
+          description: Ano já possui abertura
+
   /calendario/locais:
     get:
       summary: Listar locais de celebração
