@@ -431,4 +431,41 @@ class EccFinanceiroTest extends TestCase
             ->json('data');
         $this->assertEqualsWithDelta(10.0, $livro2['saldo_final'], 0.01);
     }
+
+    public function test_zerar_financeiro_exige_confirmacao_e_apaga_lancamentos(): void
+    {
+        $contas = $this->tenantJson('GET', '/api/v1/ecc/financeiro/contas')
+            ->assertOk()
+            ->json('data');
+        $banco = collect($contas)->firstWhere('tipo', 'banco');
+
+        $this->tenantJson('POST', '/api/v1/ecc/financeiro/lancamentos', [
+            'conta_id' => $banco['id'],
+            'data' => '2025-02-01',
+            'historico' => 'Entrada',
+            'tipo' => 'entrada',
+            'valor' => 99,
+        ])->assertCreated();
+
+        $this->tenantJson('POST', '/api/v1/ecc/financeiro/zerar', [
+            'confirmacao' => 'nao',
+        ])->assertStatus(422);
+
+        $result = $this->tenantJson('POST', '/api/v1/ecc/financeiro/zerar', [
+            'confirmacao' => 'zerar',
+        ])->assertOk()->json('data');
+
+        $this->assertSame(1, $result['deleted']);
+
+        $livro = $this->tenantJson('GET', '/api/v1/ecc/financeiro?ano=2025')
+            ->assertOk()
+            ->json('data');
+        $this->assertEqualsWithDelta(0.0, $livro['saldo_final'], 0.01);
+        $this->assertSame([], $this->tenantJson('GET', '/api/v1/ecc/financeiro/anos')->json('data'));
+
+        // Contas permanecem
+        $this->tenantJson('GET', '/api/v1/ecc/financeiro/contas')
+            ->assertOk()
+            ->assertJsonCount(2, 'data');
+    }
 }

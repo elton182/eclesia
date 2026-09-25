@@ -12,6 +12,7 @@ use App\Http\Requests\StoreEccFinanceiroTransferenciaRequest;
 use App\Http\Requests\TransportarEccFinanceiroRequest;
 use App\Http\Requests\UpdateEccFinanceiroContaRequest;
 use App\Http\Requests\UpdateEccFinanceiroLancamentoRequest;
+use App\Http\Requests\ZerarEccFinanceiroRequest;
 use App\Services\EccFinanceiroService;
 use App\Services\EccVisibilityScope;
 use Illuminate\Http\JsonResponse;
@@ -163,6 +164,13 @@ class EccFinanceiroController extends Controller
         $result = $this->financeiro->importFromPlanilha($request->validated());
 
         return response()->json($result);
+    }
+
+    public function zerar(ZerarEccFinanceiroRequest $request): JsonResponse
+    {
+        $result = $this->financeiro->zerarTudo();
+
+        return response()->json(['data' => $result]);
     }
 
     private function assertCanView(): void

@@ -634,6 +634,21 @@ class EccFinanceiroService
             ->all();
     }
 
+    /**
+     * Remove todos os lançamentos do financeiro da igreja atual.
+     * Contas cadastradas são mantidas.
+     *
+     * @return array{deleted: int}
+     */
+    public function zerarTudo(): array
+    {
+        $deleted = EccFinanceiroLancamento::query()
+            ->where('igreja_id', $this->igrejaId())
+            ->delete();
+
+        return ['deleted' => (int) $deleted];
+    }
+
     private function apagarLancamentosDoAno(int $ano): void
     {
         EccFinanceiroLancamento::query()

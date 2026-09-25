@@ -10,6 +10,7 @@ import {
   chartSeriesFromLivro,
   chartMaxAbs,
   buildFinanceiroChartConfig,
+  canConfirmZerarFinanceiro,
 } from './eccFinanceiro.js'
 
 describe('eccFinanceiro', () => {
@@ -92,5 +93,12 @@ describe('eccFinanceiro', () => {
     assert.equal(cfg.data.datasets[2].label, 'Acumulado')
     assert.equal(cfg.data.datasets[0].data[2], 110)
     assert.equal(cfg.data.datasets[2].data[2], 150)
+  })
+
+  it('canConfirmZerarFinanceiro exige digitar zerar', () => {
+    assert.equal(canConfirmZerarFinanceiro('zerar'), true)
+    assert.equal(canConfirmZerarFinanceiro(' Zerar '), true)
+    assert.equal(canConfirmZerarFinanceiro('deletar'), false)
+    assert.equal(canConfirmZerarFinanceiro(''), false)
   })
 })
