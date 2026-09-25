@@ -128,6 +128,8 @@ Route::middleware([
     Route::apiResource('ecc/eventos', EccEventoController::class)->names('ecc.eventos');
 
     Route::get('ecc/financeiro', [EccFinanceiroController::class, 'index']);
+    Route::get('ecc/financeiro/anos', [EccFinanceiroController::class, 'anos']);
+    Route::post('ecc/financeiro/import', [EccFinanceiroController::class, 'import']);
     Route::get('ecc/financeiro/contas', [EccFinanceiroController::class, 'listContas']);
     Route::post('ecc/financeiro/contas', [EccFinanceiroController::class, 'storeConta']);
     Route::put('ecc/financeiro/contas/{id}', [EccFinanceiroController::class, 'updateConta']);
