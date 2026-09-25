@@ -58,15 +58,21 @@ const meses = computed(() => livro.value?.meses || [])
 const saldoFinal = computed(() => livro.value?.saldo_final ?? 0)
 
 async function load() {
+  const anoAlvo = ano.value
   loading.value = true
   try {
-    const { data } = await api.get('/ecc/financeiro', { params: { ano: ano.value } })
+    const { data } = await api.get('/ecc/financeiro', { params: { ano: anoAlvo } })
+    // Ignora resposta atrasada se o usuário já trocou o ano.
+    if (ano.value !== anoAlvo) return
     livro.value = data.data
   } catch (e) {
+    if (ano.value !== anoAlvo) return
     innovToast('error', 'Erro', e?.response?.data?.message || 'Não foi possível carregar o financeiro.')
     livro.value = null
   } finally {
-    loading.value = false
+    if (ano.value === anoAlvo) {
+      loading.value = false
+    }
   }
 }
 
@@ -379,9 +385,17 @@ onMounted(load)
       />
     </div>
 
-    <div v-if="loading" class="text-sm" style="color: var(--color-muted)">Carregando…</div>
+    <div v-if="loading && !livro" class="text-sm" style="color: var(--color-muted)">Carregando…</div>
 
-    <template v-else-if="livro">
+    <template v-if="livro">
+      <p
+        v-if="loading"
+        class="text-sm mb-3"
+        style="color: var(--color-muted)"
+        data-testid="ecc-financeiro-atualizando"
+      >
+        Atualizando {{ ano }}…
+      </p>
       <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 mb-8" data-testid="ecc-financeiro-contas">
         <div
           v-for="c in contas"
@@ -401,11 +415,11 @@ onMounted(load)
         </div>
       </div>
 
-      <EccFinanceiroChart :livro="livro" />
+      <EccFinanceiroChart :key="livro.ano" :livro="livro" />
 
       <section
         v-for="bloco in meses"
-        :key="bloco.mes"
+        :key="`${livro.ano}-${bloco.mes}`"
         class="mb-8"
         :data-testid="`ecc-financeiro-mes-${bloco.mes}`"
       >
