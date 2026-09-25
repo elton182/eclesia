@@ -7,7 +7,7 @@ import { innovConfirm } from '@/plugins/dialog'
 import { useAuthStore } from '@/stores/auth'
 import { useAuthAdminStore } from '@/stores/authAdmin'
 import { userHasPermission } from '@/utils/userRoles'
-import { formatMoney, nomeMes } from '@/utils/eccFinanceiro'
+import { formatMoney, nomeMes, canConfirmZerarFinanceiro } from '@/utils/eccFinanceiro'
 import { parseFluxoCaixaWorkbook } from '@/utils/eccFinanceiroImport'
 import { buildFluxoCaixaWorkbook } from '@/utils/eccFinanceiroExport'
 import EccFinanceiroChart from '@/components/ecc/EccFinanceiroChart.vue'
@@ -31,6 +31,11 @@ const fileInput = ref(null)
 const showLancamento = ref(false)
 const showTransferencia = ref(false)
 const showConta = ref(false)
+const showZerar = ref(false)
+const confirmaZerar = ref('')
+const zerando = ref(false)
+
+const podeZerar = computed(() => canConfirmZerarFinanceiro(confirmaZerar.value))
 
 const formLanc = ref({
   conta_id: '',
@@ -296,6 +301,37 @@ async function exportarExcel() {
   }
 }
 
+function mudarAno(delta) {
+  const next = Number(ano.value) + delta
+  if (next < 2000 || next > 2100) return
+  ano.value = next
+}
+
+function openZerar() {
+  confirmaZerar.value = ''
+  showZerar.value = true
+}
+
+async function confirmarZerar() {
+  if (!podeZerar.value || zerando.value) return
+  zerando.value = true
+  try {
+    const { data } = await api.post('/ecc/financeiro/zerar', { confirmacao: 'zerar' })
+    showZerar.value = false
+    confirmaZerar.value = ''
+    innovToast(
+      'success',
+      'OK',
+      `${data?.data?.deleted ?? 0} lançamento(s) removido(s).`,
+    )
+    await load()
+  } catch (e) {
+    innovToast('error', 'Erro', e?.response?.data?.message || 'Falha ao zerar.')
+  } finally {
+    zerando.value = false
+  }
+}
+
 function saldoClass(v) {
   if (v < 0) return 'text-red-700'
   return ''
@@ -319,18 +355,36 @@ onMounted(load)
     </header>
 
     <div class="flex flex-wrap items-center gap-3 mb-6">
-      <label class="text-sm font-medium" style="color: var(--color-ink)">
-        Ano
+      <div class="flex items-center gap-1.5" data-testid="ecc-financeiro-ano-nav">
+        <span class="text-sm font-medium" style="color: var(--color-ink)">Ano</span>
+        <button
+          type="button"
+          class="btn btn-ghost px-2 py-1.5 min-w-[36px]"
+          aria-label="Ano anterior"
+          data-testid="ecc-financeiro-ano-prev"
+          @click="mudarAno(-1)"
+        >
+          ‹
+        </button>
         <input
           v-model.number="ano"
           type="number"
           min="2000"
           max="2100"
-          class="ml-2 border rounded-lg px-3 py-1.5 text-sm w-24"
+          class="border rounded-lg px-3 py-1.5 text-sm w-24 text-center"
           style="border-color: var(--color-line); background: var(--color-surface)"
           data-testid="ecc-financeiro-ano"
         />
-      </label>
+        <button
+          type="button"
+          class="btn btn-ghost px-2 py-1.5 min-w-[36px]"
+          aria-label="Próximo ano"
+          data-testid="ecc-financeiro-ano-next"
+          @click="mudarAno(1)"
+        >
+          ›
+        </button>
+      </div>
       <span
         class="text-sm font-semibold ml-auto"
         :class="saldoClass(saldoFinal)"
@@ -374,6 +428,15 @@ onMounted(load)
         @click="exportarExcel"
       >
         {{ exporting ? 'Gerando…' : 'Exportar Excel' }}
+      </button>
+      <button
+        type="button"
+        class="btn btn-ghost"
+        style="color: var(--color-danger)"
+        data-testid="ecc-financeiro-zerar"
+        @click="openZerar"
+      >
+        Zerar financeiro
       </button>
       <input
         ref="fileInput"
@@ -597,6 +660,47 @@ onMounted(load)
           <button type="button" class="btn btn-ghost" @click="showConta = false">Cancelar</button>
           <button type="button" class="btn btn-primary" :disabled="saving" data-testid="ecc-financeiro-salvar-conta" @click="salvarConta">
             Criar
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal zerar -->
+    <div
+      v-if="showZerar"
+      class="fixed inset-0 z-40 flex items-center justify-center p-4"
+      style="background: rgba(42, 20, 24, 0.45)"
+      data-testid="ecc-financeiro-modal-zerar"
+      @click.self="showZerar = false"
+    >
+      <div class="card p-5 w-full max-w-md" style="background: var(--color-surface)">
+        <h3 class="font-serif text-xl mb-2" style="color: var(--color-danger)">
+          Zerar financeiro
+        </h3>
+        <p class="text-sm mb-4" style="color: var(--color-muted)">
+          Remove todos os lançamentos de todos os anos. As contas cadastradas são mantidas.
+          Digite <strong style="color: var(--color-ink)">zerar</strong> para confirmar.
+        </p>
+        <input
+          v-model="confirmaZerar"
+          type="text"
+          autocomplete="off"
+          class="w-full border rounded-lg px-3 py-2 text-sm mb-4"
+          style="border-color: var(--color-line)"
+          placeholder="digite zerar"
+          data-testid="ecc-financeiro-zerar-confirma"
+          @keyup.enter="confirmarZerar"
+        />
+        <div class="flex justify-end gap-2">
+          <button type="button" class="btn btn-ghost" @click="showZerar = false">Cancelar</button>
+          <button
+            type="button"
+            class="btn btn-primary"
+            :disabled="!podeZerar || zerando"
+            data-testid="ecc-financeiro-zerar-submit"
+            @click="confirmarZerar"
+          >
+            {{ zerando ? 'Zerando…' : 'Zerar tudo' }}
           </button>
         </div>
       </div>
