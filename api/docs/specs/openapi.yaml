@@ -3147,6 +3147,31 @@ paths:
           description: Resultado da importação
         '422':
           description: Validação
+  /ecc/financeiro/zerar:
+    post:
+      summary: Zerar todo o financeiro (remove lançamentos)
+      description: >
+        Apaga todos os lançamentos da igreja. Contas são mantidas.
+        Exige confirmacao="zerar".
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [confirmacao]
+              properties:
+                confirmacao:
+                  type: string
+                  enum: [zerar]
+      responses:
+        '200':
+          description: Lançamentos removidos
+        '422':
+          description: Confirmação inválida
 
   /calendario/locais:
     get:

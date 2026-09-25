@@ -268,6 +268,14 @@ export function buildFinanceiroChartConfig(series, opts = {}) {
   }
 }
 
+/**
+ * Confirmação para zerar o financeiro: digitar "zerar".
+ * @param {string} texto
+ */
+export function canConfirmZerarFinanceiro(texto) {
+  return String(texto || '').trim().toLowerCase() === 'zerar'
+}
+
 /** @param {number} n */
 function round2(n) {
   return Math.round((Number(n) + Number.EPSILON) * 100) / 100

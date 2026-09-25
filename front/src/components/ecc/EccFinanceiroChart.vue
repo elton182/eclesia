@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import {
   Chart,
   BarController,
@@ -40,39 +40,57 @@ const props = defineProps({
 })
 
 const canvasRef = ref(null)
-/** @type {import('vue').ShallowRef<Chart|null>} */
-const chart = ref(null)
+/** @type {Chart | null} */
+let chartInstance = null
+let renderSeq = 0
 
-function render() {
-  if (!canvasRef.value) return
-  const series = chartSeriesFromLivro(props.livro)
-  const config = buildFinanceiroChartConfig(series, { formatMoney })
+function destroy() {
+  if (chartInstance) {
+    chartInstance.destroy()
+    chartInstance = null
+  }
+}
 
-  if (chart.value) {
-    chart.value.data = config.data
-    chart.value.options = config.options
-    chart.value.update()
+async function render() {
+  const seq = ++renderSeq
+  await nextTick()
+  if (seq !== renderSeq) return
+  if (!canvasRef.value || !props.livro) {
+    destroy()
     return
   }
 
-  chart.value = new Chart(canvasRef.value, config)
-}
+  const series = chartSeriesFromLivro(props.livro)
+  const config = buildFinanceiroChartConfig(series, { formatMoney })
 
-function destroy() {
-  if (chart.value) {
-    chart.value.destroy()
-    chart.value = null
-  }
+  // Recriar sempre: update() + troca de options falha com frequência ao mudar o ano.
+  destroy()
+  if (seq !== renderSeq || !canvasRef.value) return
+  chartInstance = new Chart(canvasRef.value, config)
 }
 
 watch(
-  () => props.livro,
-  () => render(),
-  { deep: true },
+  () => props.livro?.ano,
+  () => {
+    render()
+  },
 )
 
-onMounted(render)
-onBeforeUnmount(destroy)
+watch(
+  () => props.livro,
+  () => {
+    render()
+  },
+)
+
+onMounted(() => {
+  render()
+})
+
+onBeforeUnmount(() => {
+  renderSeq += 1
+  destroy()
+})
 </script>
 
 <template>
