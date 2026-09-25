@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
+import * as XLSX from 'xlsx'
 import api from '@/services/api'
 import { innovToast } from '@/plugins/toast'
 import { innovConfirm } from '@/plugins/dialog'
@@ -7,6 +8,8 @@ import { useAuthStore } from '@/stores/auth'
 import { useAuthAdminStore } from '@/stores/authAdmin'
 import { userHasPermission } from '@/utils/userRoles'
 import { formatMoney, nomeMes } from '@/utils/eccFinanceiro'
+import { parseFluxoCaixaWorkbook } from '@/utils/eccFinanceiroImport'
+import { buildFluxoCaixaWorkbook } from '@/utils/eccFinanceiroExport'
 
 const authStore = useAuthStore()
 const authAdminStore = useAuthAdminStore()
@@ -20,6 +23,9 @@ const ano = ref(new Date().getFullYear())
 const livro = ref(null)
 const loading = ref(false)
 const saving = ref(false)
+const importing = ref(false)
+const exporting = ref(false)
+const fileInput = ref(null)
 
 const showLancamento = ref(false)
 const showTransferencia = ref(false)
@@ -195,9 +201,96 @@ async function excluirLancamento(id) {
   }
 }
 
+async function onImportFile(event) {
+  const file = event.target.files?.[0]
+  if (!file) return
+
+  const ok = await innovConfirm({
+    title: 'Importar planilha',
+    message:
+      'Importar FLUXO CAIXA ECC? Os anos presentes na planilha serão substituídos (modo replace).',
+    confirmText: 'Importar',
+  })
+  if (!ok) {
+    if (fileInput.value) fileInput.value.value = ''
+    return
+  }
+
+  importing.value = true
+  try {
+    const buffer = await file.arrayBuffer()
+    const workbook = XLSX.read(buffer, { type: 'array', cellDates: true })
+    const { anos, errors: parseErrors } = parseFluxoCaixaWorkbook(workbook, XLSX)
+
+    if (!anos.length) {
+      innovToast('error', 'Importação', 'Nenhuma aba de ano válida encontrada.')
+      return
+    }
+
+    const { data } = await api.post('/ecc/financeiro/import', {
+      modo: 'replace',
+      anos,
+    })
+
+    const msg =
+      `${data.imported} lançamentos importados` +
+      (data.anos?.length ? ` · anos ${data.anos.join(', ')}` : '') +
+      (data.errors?.length ? ` · ${data.errors.length} com erro` : '') +
+      (parseErrors?.length ? ` · ${parseErrors.length} aba(s) ignorada(s)` : '')
+
+    innovToast(data.imported > 0 ? 'success' : 'error', 'Importação', msg)
+
+    if (data.anos?.length) {
+      ano.value = data.anos[data.anos.length - 1]
+    }
+    await load()
+  } catch (e) {
+    innovToast('error', 'Importação', e?.response?.data?.message || e.message || 'Falha')
+  } finally {
+    importing.value = false
+    if (fileInput.value) fileInput.value.value = ''
+  }
+}
+
+async function exportarExcel() {
+  exporting.value = true
+  try {
+    const { data: anosData } = await api.get('/ecc/financeiro/anos')
+    let anos = Array.isArray(anosData.data) ? [...anosData.data] : []
+    if (!anos.includes(ano.value)) anos.push(ano.value)
+    anos = [...new Set(anos)].sort((a, b) => a - b)
+
+    if (!anos.length) {
+      innovToast('error', 'Exportação', 'Não há anos com movimento.')
+      return
+    }
+
+    const livrosPorAno = []
+    for (const a of anos) {
+      const { data } = await api.get('/ecc/financeiro', { params: { ano: a } })
+      livrosPorAno.push({ ano: a, livro: data.data })
+    }
+
+    const buffer = buildFluxoCaixaWorkbook(XLSX, livrosPorAno)
+    const blob = new Blob([buffer], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `fluxo-caixa-ecc-${anos[0]}-${anos[anos.length - 1]}.xlsx`
+    link.click()
+    URL.revokeObjectURL(url)
+    innovToast('success', 'Exportação', `Planilha gerada (${anos.length} aba(s)).`)
+  } catch (e) {
+    innovToast('error', 'Exportação', e?.response?.data?.message || e.message || 'Falha')
+  } finally {
+    exporting.value = false
+  }
+}
+
 function saldoClass(v) {
   if (v < 0) return 'text-red-700'
-  if (v > 0) return ''
   return ''
 }
 
@@ -214,6 +307,7 @@ onMounted(load)
       </h1>
       <p class="text-[14px] mt-1" style="color: var(--color-muted)">
         Livro-caixa anual da comunidade — contas, lançamentos e fechamento mensal.
+        Importe ou exporte a planilha no modelo FLUXO CAIXA ECC (uma aba por ano).
       </p>
     </header>
 
@@ -256,6 +350,32 @@ onMounted(load)
       <button type="button" class="btn btn-ghost" data-testid="ecc-financeiro-nova-conta" @click="openConta">
         Nova conta
       </button>
+      <button
+        type="button"
+        class="btn btn-accent"
+        :disabled="importing"
+        data-testid="ecc-financeiro-importar"
+        @click="fileInput?.click()"
+      >
+        {{ importing ? 'Importando…' : 'Importar Excel' }}
+      </button>
+      <button
+        type="button"
+        class="btn btn-ghost"
+        :disabled="exporting"
+        data-testid="ecc-financeiro-exportar"
+        @click="exportarExcel"
+      >
+        {{ exporting ? 'Gerando…' : 'Exportar Excel' }}
+      </button>
+      <input
+        ref="fileInput"
+        type="file"
+        accept=".xlsx,.xls"
+        class="hidden"
+        data-testid="ecc-financeiro-import-input"
+        @change="onImportFile"
+      />
     </div>
 
     <div v-if="loading" class="text-sm" style="color: var(--color-muted)">Carregando…</div>

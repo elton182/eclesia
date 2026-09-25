@@ -3084,6 +3084,69 @@ paths:
           description: Lançamentos de abertura criados
         '422':
           description: Ano já possui abertura
+  /ecc/financeiro/anos:
+    get:
+      summary: Anos com movimento no financeiro ECC
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      responses:
+        '200':
+          description: Lista de anos (inteiros)
+  /ecc/financeiro/import:
+    post:
+      summary: Importar planilha FLUXO CAIXA ECC (JSON já parseado)
+      description: >
+        Recebe anos/lançamentos extraídos no front (SheetJS) a partir do
+        modelo de planilha com uma aba por ano. modo=replace apaga o ano
+        antes de gravar; merge ignora duplicatas.
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [anos]
+              properties:
+                modo:
+                  type: string
+                  enum: [replace, merge]
+                anos:
+                  type: array
+                  items:
+                    type: object
+                    required: [ano, lancamentos]
+                    properties:
+                      ano:
+                        type: integer
+                      contas:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            nome: { type: string }
+                            tipo: { type: string, enum: [banco, especie] }
+                      lancamentos:
+                        type: array
+                        items:
+                          type: object
+                          required: [data, historico, conta_tipo, tipo, valor]
+                          properties:
+                            data: { type: string, format: date }
+                            historico: { type: string }
+                            conta_tipo: { type: string, enum: [banco, especie] }
+                            tipo: { type: string, enum: [entrada, saida] }
+                            valor: { type: number }
+                            abertura: { type: boolean }
+                            transferencia_key: { type: string, nullable: true }
+      responses:
+        '200':
+          description: Resultado da importação
+        '422':
+          description: Validação
 
   /calendario/locais:
     get:

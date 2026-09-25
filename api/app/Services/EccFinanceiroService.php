@@ -471,6 +471,196 @@ class EccFinanceiroService
         return $this->igrejaContext->current()->id;
     }
 
+    /**
+     * Importa lançamentos parseados da planilha FLUXO CAIXA ECC.
+     *
+     * @param  array{
+     *     modo?: string,
+     *     anos: list<array{
+     *         ano: int,
+     *         contas?: list<array{nome?: string, tipo: string}>,
+     *         lancamentos: list<array{
+     *             data: string,
+     *             historico: string,
+     *             conta_tipo: string,
+     *             tipo: string,
+     *             valor: float|int|string,
+     *             abertura?: bool,
+     *             transferencia_key?: string|null
+     *         }>
+     *     }>
+     * }  $payload
+     * @return array{imported: int, skipped: int, anos: list<int>, errors: list<array{line: int, message: string}>}
+     */
+    public function importFromPlanilha(array $payload): array
+    {
+        $this->ensureContasPadrao();
+
+        $modo = $payload['modo'] ?? 'replace';
+        $imported = 0;
+        $skipped = 0;
+        $errors = [];
+        $anosProcessados = [];
+
+        $contasPorTipo = $this->listContas()->keyBy('tipo');
+
+        return DB::transaction(function () use (
+            $payload,
+            $modo,
+            &$imported,
+            &$skipped,
+            &$errors,
+            &$anosProcessados,
+            $contasPorTipo
+        ): array {
+            foreach ($payload['anos'] as $anoIdx => $blocoAno) {
+                $ano = (int) ($blocoAno['ano'] ?? 0);
+                if ($ano < 2000 || $ano > 2100) {
+                    $errors[] = ['line' => $anoIdx + 1, 'message' => 'Ano inválido.'];
+                    continue;
+                }
+
+                $anosProcessados[] = $ano;
+
+                if ($modo === 'replace') {
+                    $this->apagarLancamentosDoAno($ano);
+                }
+
+                // Atualiza nomes das contas padrão se a planilha trouxer
+                foreach ($blocoAno['contas'] ?? [] as $meta) {
+                    $tipo = (string) ($meta['tipo'] ?? '');
+                    $nome = trim((string) ($meta['nome'] ?? ''));
+                    if ($nome !== '' && isset($contasPorTipo[$tipo])) {
+                        $contasPorTipo[$tipo]->nome = $nome;
+                        $contasPorTipo[$tipo]->save();
+                    }
+                }
+
+                /** @var array<string, string> $transferMap key → transferencia_id */
+                $transferMap = [];
+                $lineBase = ($anoIdx + 1) * 1000;
+
+                foreach ($blocoAno['lancamentos'] ?? [] as $i => $row) {
+                    $line = $lineBase + $i + 1;
+                    try {
+                        $tipoConta = (string) ($row['conta_tipo'] ?? '');
+                        $conta = $contasPorTipo[$tipoConta] ?? null;
+                        if ($conta === null) {
+                            throw new \InvalidArgumentException("Conta tipo '{$tipoConta}' não encontrada.");
+                        }
+
+                        $tipo = (string) ($row['tipo'] ?? '');
+                        if (! in_array($tipo, [EccFinanceiroLancamento::TIPO_ENTRADA, EccFinanceiroLancamento::TIPO_SAIDA], true)) {
+                            throw new \InvalidArgumentException('Tipo inválido.');
+                        }
+
+                        $valor = round((float) $row['valor'], 2);
+                        if ($valor < 0) {
+                            throw new \InvalidArgumentException('Valor inválido.');
+                        }
+
+                        $historico = trim((string) ($row['historico'] ?? ''));
+                        if ($historico === '') {
+                            throw new \InvalidArgumentException('Histórico obrigatório.');
+                        }
+
+                        $data = (string) ($row['data'] ?? '');
+                        if ($data === '') {
+                            throw new \InvalidArgumentException('Data obrigatória.');
+                        }
+
+                        $abertura = (bool) ($row['abertura'] ?? false);
+                        $tKey = $row['transferencia_key'] ?? null;
+                        $transferenciaId = null;
+                        if (is_string($tKey) && $tKey !== '') {
+                            if (! isset($transferMap[$tKey])) {
+                                $transferMap[$tKey] = (string) Str::ulid();
+                            }
+                            $transferenciaId = $transferMap[$tKey];
+                        }
+
+                        if ($modo === 'merge' && $this->lancamentoDuplicado(
+                            $conta->id,
+                            $data,
+                            $historico,
+                            $tipo,
+                            $valor,
+                            $abertura
+                        )) {
+                            $skipped++;
+                            continue;
+                        }
+
+                        EccFinanceiroLancamento::query()->create([
+                            'igreja_id' => $this->igrejaId(),
+                            'ecc_financeiro_conta_id' => $conta->id,
+                            'data' => $data,
+                            'historico' => $historico,
+                            'tipo' => $tipo,
+                            'valor' => $valor,
+                            'transferencia_id' => $transferenciaId,
+                            'abertura' => $abertura,
+                        ]);
+                        $imported++;
+                    } catch (\Throwable $e) {
+                        $errors[] = ['line' => $line, 'message' => $e->getMessage()];
+                    }
+                }
+            }
+
+            return [
+                'imported' => $imported,
+                'skipped' => $skipped,
+                'anos' => array_values(array_unique($anosProcessados)),
+                'errors' => $errors,
+            ];
+        });
+    }
+
+    /**
+     * @return list<int>
+     */
+    public function anosComMovimento(): array
+    {
+        $this->ensureContasPadrao();
+
+        return EccFinanceiroLancamento::query()
+            ->where('igreja_id', $this->igrejaId())
+            ->get(['data'])
+            ->map(static fn (EccFinanceiroLancamento $l): int => (int) $l->data->format('Y'))
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
+    }
+
+    private function apagarLancamentosDoAno(int $ano): void
+    {
+        EccFinanceiroLancamento::query()
+            ->where('igreja_id', $this->igrejaId())
+            ->whereBetween('data', [sprintf('%04d-01-01', $ano), sprintf('%04d-12-31', $ano)])
+            ->delete();
+    }
+
+    private function lancamentoDuplicado(
+        string $contaId,
+        string $data,
+        string $historico,
+        string $tipo,
+        float $valor,
+        bool $abertura,
+    ): bool {
+        return EccFinanceiroLancamento::query()
+            ->where('igreja_id', $this->igrejaId())
+            ->where('ecc_financeiro_conta_id', $contaId)
+            ->whereDate('data', $data)
+            ->where('tipo', $tipo)
+            ->where('valor', $valor)
+            ->where('abertura', $abertura)
+            ->get()
+            ->contains(static fn (EccFinanceiroLancamento $l): bool => $l->historico === $historico);
+    }
+
     private function assertAno(int $ano): void
     {
         if ($ano < 2000 || $ano > 2100) {

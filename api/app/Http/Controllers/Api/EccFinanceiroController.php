@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\ImportEccFinanceiroRequest;
 use App\Http\Requests\StoreEccFinanceiroContaRequest;
 use App\Http\Requests\StoreEccFinanceiroLancamentoRequest;
 use App\Http\Requests\StoreEccFinanceiroTransferenciaRequest;
@@ -148,6 +149,20 @@ class EccFinanceiroController extends Controller
                 $criados
             ),
         ], 201);
+    }
+
+    public function anos(): JsonResponse
+    {
+        $this->assertCanView();
+
+        return response()->json(['data' => $this->financeiro->anosComMovimento()]);
+    }
+
+    public function import(ImportEccFinanceiroRequest $request): JsonResponse
+    {
+        $result = $this->financeiro->importFromPlanilha($request->validated());
+
+        return response()->json($result);
     }
 
     private function assertCanView(): void

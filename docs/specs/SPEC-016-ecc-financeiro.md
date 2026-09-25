@@ -35,23 +35,24 @@ Regras:
 
 ## Critérios de aceite
 
-- [ ] Migrations `ecc_financeiro_contas` e `ecc_financeiro_lancamentos`.
-- [ ] Seed de duas contas padrão no primeiro acesso.
-- [ ] CRUD de contas; desativar em vez de excluir com movimento.
-- [ ] `GET /ecc/financeiro?ano=` — livro do ano.
-- [ ] `POST /ecc/financeiro/lancamentos` — entrada/saída.
-- [ ] `POST /ecc/financeiro/transferencias` — par vinculado.
-- [ ] `PUT|DELETE /ecc/financeiro/lancamentos/{id}` — transferência em par.
-- [ ] `POST /ecc/financeiro/transportar` — aberturas em 1/1.
-- [ ] Permissões `ecc.financeiro.view|manage`, `telas.financeiro` (admin igreja/tenant; líder não vê).
-- [ ] Front: item Financeiro + tela `/ecc/financeiro`.
-- [ ] Testes API + util de totais no front.
+- [x] Migrations `ecc_financeiro_contas` e `ecc_financeiro_lancamentos`.
+- [x] Seed de duas contas padrão no primeiro acesso.
+- [x] CRUD de contas; desativar em vez de excluir com movimento.
+- [x] `GET /ecc/financeiro?ano=` — livro do ano.
+- [x] `POST /ecc/financeiro/lancamentos` — entrada/saída.
+- [x] `POST /ecc/financeiro/transferencias` — par vinculado.
+- [x] `PUT|DELETE /ecc/financeiro/lancamentos/{id}` — transferência em par.
+- [x] `POST /ecc/financeiro/transportar` — aberturas em 1/1.
+- [x] Permissões `ecc.financeiro.view|manage`, `telas.financeiro` (admin igreja/tenant; líder não vê).
+- [x] Front: item Financeiro + tela `/ecc/financeiro`.
+- [x] Testes API + util de totais no front.
+- [x] Importação da planilha FLUXO CAIXA ECC (aba por ano) via `POST /ecc/financeiro/import`.
+- [x] Exportação Excel no mesmo modelo (aba por ano).
 
 ## Fora de escopo
 
 - Ligação automática com caixa do evento (SPEC-009).
 - Contribuição mensal por casal.
-- Importação da planilha histórica.
 - Integração bancária / PIX / módulo Financeiro da igreja no launcher.
 
 ## Contrato

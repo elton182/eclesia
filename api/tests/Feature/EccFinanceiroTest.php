@@ -332,4 +332,103 @@ class EccFinanceiroTest extends TestCase
         $this->assertSame('Caixinha', $caixinha['nome']);
         $this->assertSame('especie', $caixinha['tipo']);
     }
+
+    public function test_import_planilha_replace_e_transferencia(): void
+    {
+        $result = $this->tenantJson('POST', '/api/v1/ecc/financeiro/import', [
+            'modo' => 'replace',
+            'anos' => [
+                [
+                    'ano' => 2025,
+                    'contas' => [
+                        ['nome' => 'Conta ECC (paróquia)', 'tipo' => 'banco'],
+                        ['nome' => 'Conta particular/espécie', 'tipo' => 'especie'],
+                    ],
+                    'lancamentos' => [
+                        [
+                            'data' => '2025-01-02',
+                            'historico' => 'Saldo Transportado de 2024',
+                            'conta_tipo' => 'especie',
+                            'tipo' => 'entrada',
+                            'valor' => 5734.69,
+                            'abertura' => true,
+                        ],
+                        [
+                            'data' => '2025-04-05',
+                            'historico' => 'Transferência bancária',
+                            'conta_tipo' => 'especie',
+                            'tipo' => 'saida',
+                            'valor' => 5956.36,
+                            'transferencia_key' => 't-2025-1',
+                        ],
+                        [
+                            'data' => '2025-04-05',
+                            'historico' => 'Transferência bancária',
+                            'conta_tipo' => 'banco',
+                            'tipo' => 'entrada',
+                            'valor' => 5956.36,
+                            'transferencia_key' => 't-2025-1',
+                        ],
+                        [
+                            'data' => '2025-04-06',
+                            'historico' => 'Arrecadação Abril PIX',
+                            'conta_tipo' => 'banco',
+                            'tipo' => 'entrada',
+                            'valor' => 2930,
+                        ],
+                    ],
+                ],
+            ],
+        ])->assertOk()->json();
+
+        $this->assertSame(4, $result['imported']);
+        $this->assertContains(2025, $result['anos']);
+
+        $anos = $this->tenantJson('GET', '/api/v1/ecc/financeiro/anos')
+            ->assertOk()
+            ->json('data');
+        $this->assertContains(2025, $anos);
+
+        $livro = $this->tenantJson('GET', '/api/v1/ecc/financeiro?ano=2025')
+            ->assertOk()
+            ->json('data');
+
+        $abril = collect($livro['meses'])->firstWhere('mes', 4);
+        // Transferência se anula; sobra arrecadação 2930
+        $this->assertEqualsWithDelta(2930.0, $abril['total_mensal'], 0.01);
+
+        $transf = collect($abril['lancamentos'])->filter(
+            static fn (array $l): bool => ($l['transferencia_id'] ?? null) !== null
+        );
+        $this->assertCount(2, $transf);
+        $this->assertSame(
+            $transf->first()['transferencia_id'],
+            $transf->last()['transferencia_id']
+        );
+
+        // replace limpa e reimporta
+        $again = $this->tenantJson('POST', '/api/v1/ecc/financeiro/import', [
+            'modo' => 'replace',
+            'anos' => [
+                [
+                    'ano' => 2025,
+                    'lancamentos' => [
+                        [
+                            'data' => '2025-06-01',
+                            'historico' => 'Só junho',
+                            'conta_tipo' => 'banco',
+                            'tipo' => 'entrada',
+                            'valor' => 10,
+                        ],
+                    ],
+                ],
+            ],
+        ])->assertOk()->json();
+
+        $this->assertSame(1, $again['imported']);
+        $livro2 = $this->tenantJson('GET', '/api/v1/ecc/financeiro?ano=2025')
+            ->assertOk()
+            ->json('data');
+        $this->assertEqualsWithDelta(10.0, $livro2['saldo_final'], 0.01);
+    }
 }

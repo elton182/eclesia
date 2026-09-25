@@ -46,6 +46,8 @@ jobs:
           php artisan key:generate
           mkdir -p database
           touch database/database.sqlite
+          # Central only. Tenant DBs recebem migrations em TenantCreated (MigrateDatabase).
+          # Em produção o deploy roda também: php artisan tenants:migrate --force
           php artisan migrate --force --no-interaction
 
       - name: Run tests
