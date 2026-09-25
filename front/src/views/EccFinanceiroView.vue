@@ -10,6 +10,7 @@ import { userHasPermission } from '@/utils/userRoles'
 import { formatMoney, nomeMes } from '@/utils/eccFinanceiro'
 import { parseFluxoCaixaWorkbook } from '@/utils/eccFinanceiroImport'
 import { buildFluxoCaixaWorkbook } from '@/utils/eccFinanceiroExport'
+import EccFinanceiroChart from '@/components/ecc/EccFinanceiroChart.vue'
 
 const authStore = useAuthStore()
 const authAdminStore = useAuthAdminStore()
@@ -399,6 +400,8 @@ onMounted(load)
           </p>
         </div>
       </div>
+
+      <EccFinanceiroChart :livro="livro" />
 
       <section
         v-for="bloco in meses"

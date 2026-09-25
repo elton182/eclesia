@@ -7,6 +7,9 @@ import {
   groupByMes,
   formatMoney,
   nomeMes,
+  chartSeriesFromLivro,
+  chartMaxAbs,
+  buildFinanceiroChartConfig,
 } from './eccFinanceiro.js'
 
 describe('eccFinanceiro', () => {
@@ -56,5 +59,38 @@ describe('eccFinanceiro', () => {
     assert.match(formatMoney(1234.5), /1\.234,50/)
     assert.equal(nomeMes(1), 'Janeiro')
     assert.equal(nomeMes(12), 'Dezembro')
+  })
+
+  it('chartSeriesFromLivro monta 12 meses com entradas/saídas', () => {
+    const series = chartSeriesFromLivro({
+      meses: [
+        {
+          mes: 3,
+          total_mensal: 50,
+          acumulado: 150,
+          totais_por_conta: {
+            a: { entradas: 100, saidas: 20 },
+            b: { entradas: 10, saidas: 40 },
+          },
+        },
+      ],
+    })
+    assert.equal(series.length, 12)
+    assert.equal(series[0].entradas, 0)
+    assert.equal(series[2].label, 'Março')
+    assert.equal(series[2].entradas, 110)
+    assert.equal(series[2].saidas, 60)
+    assert.equal(series[2].acumulado, 150)
+    assert.equal(chartMaxAbs([110, 60]), 121)
+
+    const cfg = buildFinanceiroChartConfig(series)
+    assert.equal(cfg.type, 'bar')
+    assert.equal(cfg.data.labels.length, 12)
+    assert.equal(cfg.data.datasets.length, 3)
+    assert.equal(cfg.data.datasets[0].label, 'Entradas')
+    assert.equal(cfg.data.datasets[1].label, 'Saídas')
+    assert.equal(cfg.data.datasets[2].label, 'Acumulado')
+    assert.equal(cfg.data.datasets[0].data[2], 110)
+    assert.equal(cfg.data.datasets[2].data[2], 150)
   })
 })
