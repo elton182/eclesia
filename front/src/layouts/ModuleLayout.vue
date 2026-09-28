@@ -6,7 +6,7 @@ import { useAuthAdminStore } from '@/stores/authAdmin'
 import { useTenantStore } from '@/stores/tenant'
 import { useIgrejaStore } from '@/stores/igreja'
 import { useBrandingStore } from '@/stores/branding'
-import { userHasPermission, canSeeEccCasaisNav, canSeeEccEventosNav, isSomenteLiderEquipe } from '@/utils/userRoles'
+import { userHasPermission, canSeeEccCasaisNav, canSeeEccEventosNav, canSeeEccFinanceiroNav, isSomenteLiderEquipe } from '@/utils/userRoles'
 import PwaInstallNavButton from '@/components/base/PwaInstallNavButton.vue'
 import fallbackLogo from '@/assets/logo-icon.png'
 
@@ -143,6 +143,9 @@ const navItems = computed(() => {
   }
   if (canSeeEccEventosNav(authTenant.user, { isSuperAdmin: isPlatformAdmin.value })) {
     items.push({ label: 'Eventos', path: '/ecc/eventos' })
+  }
+  if (canSeeEccFinanceiroNav(authTenant.user, { isSuperAdmin: isPlatformAdmin.value })) {
+    items.push({ label: 'Financeiro', path: '/ecc/financeiro' })
   }
   items.push({ label: 'Relatórios', path: '/ecc/relatorios', stub: true })
   return items

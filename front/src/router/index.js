@@ -18,6 +18,7 @@ import EccCasaisView from '../views/EccCasaisView.vue'
 import EccCasalDetailView from '../views/EccCasalDetailView.vue'
 import EccEventosView from '../views/EccEventosView.vue'
 import EccEventoDetailView from '../views/EccEventoDetailView.vue'
+import EccFinanceiroView from '../views/EccFinanceiroView.vue'
 import EventosView from '../views/EventosView.vue'
 import EventoDetailView from '../views/EventoDetailView.vue'
 import CalendarioMensaisView from '../views/CalendarioMensaisView.vue'
@@ -213,6 +214,11 @@ const router = createRouter({
           path: 'ecc/eventos/:id',
           name: 'ecc-evento-detail',
           component: EccEventoDetailView,
+        },
+        {
+          path: 'ecc/financeiro',
+          name: 'ecc-financeiro',
+          component: EccFinanceiroView,
         },
       ],
     },

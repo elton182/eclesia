@@ -18,6 +18,8 @@ mkdir -p \
   storage/logs
 composer install --no-dev --prefer-dist --optimize-autoloader --no-interaction
 php artisan migrate --force --no-interaction
+# Bancos dos tenants (stancl): migrations em database/migrations/tenant/
+php artisan tenants:migrate --force --no-interaction
 php artisan config:cache
 php artisan route:cache
 php artisan view:cache
