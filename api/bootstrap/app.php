@@ -19,6 +19,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'cookie.to.token' => \App\Http\Middleware\CookieToTokenMiddleware::class,
             'tenancy.slug' => \App\Http\Middleware\InitializeTenancyBySlug::class,
+            'tenancy.path_slug' => \App\Http\Middleware\InitializeTenancyByPathSlug::class,
             'auth.tenant' => \App\Http\Middleware\AuthenticateTenantApi::class,
         ]);
 
@@ -29,6 +30,10 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->prependToPriorityList(
             before: \Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests::class,
             prepend: \App\Http\Middleware\InitializeTenancyBySlug::class,
+        );
+        $middleware->prependToPriorityList(
+            before: \Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests::class,
+            prepend: \App\Http\Middleware\InitializeTenancyByPathSlug::class,
         );
         $middleware->prependToPriorityList(
             before: \Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests::class,

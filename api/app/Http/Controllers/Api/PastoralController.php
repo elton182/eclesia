@@ -74,6 +74,7 @@ class PastoralController extends Controller
     {
         abort_unless($this->access->canManagePastoral(auth()->user(), $pastoral->igreja_id), 403);
         $pastoral->delete();
+        $this->site->forgetPublicSeoCache();
 
         return response()->noContent();
     }

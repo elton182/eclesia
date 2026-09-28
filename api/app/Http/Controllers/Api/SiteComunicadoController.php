@@ -78,6 +78,7 @@ class SiteComunicadoController extends Controller
     {
         abort_unless($this->access->canManageComunicado(auth()->user(), $comunicado->igreja_id), 403);
         $comunicado->delete();
+        $this->site->forgetPublicSeoCache();
 
         return response()->noContent();
     }

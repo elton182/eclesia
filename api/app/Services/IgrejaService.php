@@ -15,6 +15,7 @@ class IgrejaService
 {
     public function __construct(
         private readonly IgrejaAccessService $access,
+        private readonly SiteService $site,
     ) {}
 
     /**
@@ -41,6 +42,7 @@ class IgrejaService
     {
         $igreja = Igreja::query()->create($this->normalize($data));
         EccEquipeServico::seedDefaultsForIgreja($igreja->id);
+        $this->site->forgetPublicSeoCache();
 
         return $igreja;
     }
@@ -52,6 +54,7 @@ class IgrejaService
     {
         $igreja->fill($this->normalize($data));
         $igreja->save();
+        $this->site->forgetPublicSeoCache();
 
         return $igreja->refresh();
     }
@@ -77,6 +80,7 @@ class IgrejaService
         DB::transaction(static function () use ($igreja): void {
             $igreja->delete();
         });
+        $this->site->forgetPublicSeoCache();
     }
 
     /**
