@@ -1,4 +1,4 @@
-# SPEC-016 — Home do líder de equipe ECC
+# SPEC-017 — Home do líder de equipe ECC
 
 **Status:** draft
 **Data:** 2026-09-28
