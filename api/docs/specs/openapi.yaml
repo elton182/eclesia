@@ -1843,6 +1843,11 @@ paths:
           description: Casal
     put:
       summary: Atualizar casal
+      description: >
+        Requer `ecc.casais.manage` ou `ecc.casais.atualizar`.
+        Com `ecc.casais.atualizar`, o casal precisa pertencer a uma equipe vinculada
+        ao líder (caso contrário 404). `equipe_id` e `equipe` são ignorados:
+        o vínculo de equipe não muda. Spec: SPEC-016.
       security:
         - bearerAuth: []
           tenantHeader: []
@@ -1922,8 +1927,9 @@ paths:
     post:
       summary: Upload ou substituição da foto da pessoa
       description: >
-        Multipart field `file`. Requer `pessoas.manage` ou `ecc.casais.manage`.
-        Atualiza `ficha_com_foto` dos casais vinculados. Spec: SPEC-006.
+        Multipart field `file`. Requer `pessoas.manage`, `ecc.casais.manage`
+        ou `ecc.casais.atualizar` quando a pessoa é cônjuge de casal da equipe
+        do líder. Atualiza `ficha_com_foto` dos casais vinculados. Spec: SPEC-006, SPEC-016.
       security:
         - bearerAuth: []
           tenantHeader: []
@@ -1965,7 +1971,9 @@ paths:
           description: Arquivo inválido
     delete:
       summary: Remover foto da pessoa
-      description: Requer `pessoas.manage` ou `ecc.casais.manage`. Spec: SPEC-006.
+      description: >
+        Requer `pessoas.manage`, `ecc.casais.manage` ou `ecc.casais.atualizar`
+        quando a pessoa é cônjuge de casal da equipe do líder. Spec: SPEC-006, SPEC-016.
       security:
         - bearerAuth: []
           tenantHeader: []

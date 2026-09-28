@@ -9,6 +9,8 @@ import {
   canSeeEccCasaisNav,
   canSeeEccEventosNav,
   canSeeCalendarioNav,
+  isSomenteLiderEquipe,
+  homePathForUser,
 } from './userRoles.js'
 
 describe('userRoles', () => {
@@ -118,7 +120,10 @@ describe('userRoles', () => {
       equipes_lideradas: [{ id: 'eq1', nome: 'A' }],
     }
     assert.equal(userHasPermission(lider, 'ecc.casais.view'), true)
+    assert.equal(userHasPermission(lider, 'ecc.casais.atualizar'), true)
     assert.equal(userHasPermission(lider, 'ecc.casais.manage'), false)
+    assert.equal(userHasPermission(lider, 'telas.eventos'), false)
+    assert.equal(userHasPermission(lider, 'telas.calendario'), false)
     assert.equal(isLiderEquipeScoped(lider), true)
     assert.deepEqual(equipesLideradasIds(lider), ['eq1'])
   })
@@ -149,10 +154,10 @@ describe('userRoles', () => {
     assert.equal(canSeeEccCasaisNav(null, { isSuperAdmin: true }), true)
   })
 
-  it('canSeeEccEventosNav para líder, admin e cadastros-eventos', () => {
+  it('canSeeEccEventosNav para admin e cadastros-eventos', () => {
     assert.equal(
       canSeeEccEventosNav({ roles: [{ name: 'lider-equipe' }] }),
-      true,
+      false,
     )
     assert.equal(
       canSeeEccEventosNav({ roles: [{ name: 'admin-igreja' }] }),
@@ -179,7 +184,27 @@ describe('userRoles', () => {
   it('canSeeCalendarioNav para admin-igreja e cadastros-calendario', () => {
     assert.equal(canSeeCalendarioNav({ roles: [{ name: 'admin-igreja' }] }), true)
     assert.equal(canSeeCalendarioNav({ roles: [{ name: 'cadastros-calendario' }] }), true)
-    assert.equal(canSeeCalendarioNav({ roles: [{ name: 'lider-equipe' }] }), true)
+    assert.equal(canSeeCalendarioNav({ roles: [{ name: 'lider-equipe' }] }), false)
     assert.equal(canSeeCalendarioNav({ roles: [{ name: 'cadastros-usuarios' }] }), false)
+  })
+
+  it('isSomenteLiderEquipe só quando o único papel é lider-equipe', () => {
+    assert.equal(isSomenteLiderEquipe({ roles: [{ name: 'lider-equipe' }] }), true)
+    assert.equal(
+      isSomenteLiderEquipe({
+        roles: [{ name: 'lider-equipe' }, { name: 'lider-equipe' }],
+      }),
+      true,
+    )
+    assert.equal(
+      isSomenteLiderEquipe({
+        roles: [{ name: 'lider-equipe' }, { name: 'cadastros-casais' }],
+      }),
+      false,
+    )
+    assert.equal(isSomenteLiderEquipe({ roles: [{ name: 'admin-igreja' }] }), false)
+    assert.equal(isSomenteLiderEquipe({ roles: [{ name: 'lider-equipe' }] }, { isSuperAdmin: true }), false)
+    assert.equal(homePathForUser({ roles: [{ name: 'lider-equipe' }] }), '/ecc/minha-equipe')
+    assert.equal(homePathForUser({ roles: [{ name: 'admin-igreja' }] }), '/inicio')
   })
 })

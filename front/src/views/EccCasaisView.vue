@@ -10,7 +10,7 @@ import { innovToast } from '@/plugins/toast'
 import { innovConfirm } from '@/plugins/dialog'
 import { casaisListQuery, casaisListQueryFromRoute, filterCasais } from '@/utils/eccFilters'
 import { isoToBr } from '@/utils/dateBr'
-import { userHasPermission } from '@/utils/userRoles'
+import { userHasPermission, isSomenteLiderEquipe } from '@/utils/userRoles'
 import { casalEle, casalEla, formFieldsFromEleEla, swapEleElaFormFields } from '@/utils/casalDisplay'
 import DateInput from '@/components/form/DateInput.vue'
 import PessoaFotoField from '@/components/ecc/PessoaFotoField.vue'
@@ -37,6 +37,20 @@ const authOpts = () => ({
 const canManageCasais = computed(() =>
   userHasPermission(authStore.user, 'ecc.casais.manage', authOpts()),
 )
+
+const canEditCasal = computed(() =>
+  canManageCasais.value || userHasPermission(authStore.user, 'ecc.casais.atualizar', authOpts()),
+)
+
+const somenteLider = computed(() => isSomenteLiderEquipe(authStore.user, authOpts()))
+
+const leaveForm = () => {
+  if (somenteLider.value) {
+    router.push({ name: 'ecc-minha-equipe' })
+    return
+  }
+  mode.value = 'list'
+}
 
 const canManageEquipes = computed(() =>
   userHasPermission(authStore.user, 'ecc.equipes.manage', authOpts()),
@@ -421,6 +435,10 @@ const save = async () => {
     }
 
     innovToast('success', 'OK', 'Casal salvo')
+    if (somenteLider.value) {
+      router.push({ name: 'ecc-minha-equipe' })
+      return
+    }
     mode.value = 'list'
     await load()
   } catch (e) {
@@ -492,9 +510,15 @@ onMounted(async () => {
   <div class="p-6 md:p-[30px] w-full" data-testid="ecc-casais-page">
     <div class="mb-6 md:mb-8">
       <p class="page-eyebrow">ECC</p>
-      <h2 class="font-serif text-[27px] leading-tight mt-1" style="color: #2A1418">Casais</h2>
+      <h2 class="font-serif text-[27px] leading-tight mt-1" style="color: #2A1418">
+        {{ somenteLider ? 'Atualizar cadastro' : 'Casais' }}
+      </h2>
       <p class="mt-2 text-[13.5px] leading-relaxed" style="color: rgba(42, 20, 24, 0.62)">
-        Cadastro de casais e vínculo com equipe. Importe a planilha Excel do modelo atual.
+        {{
+          somenteLider
+            ? 'Ficha do casal da sua equipe. Incluir, excluir ou trocar de equipe fica com a secretaria.'
+            : 'Cadastro de casais e vínculo com equipe. Importe a planilha Excel do modelo atual.'
+        }}
       </p>
     </div>
 
@@ -627,7 +651,7 @@ onMounted(async () => {
               </div>
             </div>
             <div
-              v-if="canManageCasais"
+              v-if="canEditCasal"
               class="flex flex-wrap gap-2 shrink-0 sm:justify-end"
             >
               <button
@@ -638,9 +662,10 @@ onMounted(async () => {
                 Abrir
               </button>
               <button class="btn btn-ghost" data-testid="casais-editar" @click="openEdit(casal)">
-                Editar
+                {{ canManageCasais ? 'Editar' : 'Atualizar' }}
               </button>
               <button
+                v-if="canManageCasais"
                 class="btn btn-ghost text-red-700"
                 data-testid="casais-excluir"
                 @click="remove(casal)"
@@ -792,6 +817,7 @@ onMounted(async () => {
       <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
         <h3 class="text-xl mb-0">{{ form.id ? 'Editar casal' : 'Novo casal' }}</h3>
         <button
+          v-if="canManageCasais"
           type="button"
           class="btn btn-ghost"
           :disabled="swapping"
@@ -804,10 +830,22 @@ onMounted(async () => {
       <form class="grid grid-cols-1 md:grid-cols-2 gap-4" @submit.prevent="save">
         <div class="md:col-span-2">
           <label class="fld">Equipe</label>
-          <select v-model="form.equipe_id" class="input">
+          <select
+            v-model="form.equipe_id"
+            class="input"
+            :disabled="!!form.id && !canManageCasais"
+            data-testid="casal-form-equipe"
+          >
             <option value="">Sem equipe</option>
             <option v-for="eq in equipes" :key="eq.id" :value="eq.id">{{ eq.nome }}</option>
           </select>
+          <p
+            v-if="form.id && !canManageCasais"
+            class="text-[12.5px] mt-1"
+            style="color: var(--color-muted)"
+          >
+            A troca de equipe fica com a secretaria.
+          </p>
         </div>
 
         <div>
@@ -1066,7 +1104,7 @@ onMounted(async () => {
           <button type="submit" class="btn btn-primary w-full sm:w-auto" :disabled="saving">
             Salvar
           </button>
-          <button type="button" class="btn btn-ghost w-full sm:w-auto" @click="mode = 'list'">
+          <button type="button" class="btn btn-ghost w-full sm:w-auto" @click="leaveForm">
             Cancelar
           </button>
         </div>

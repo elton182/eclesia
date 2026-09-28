@@ -8,6 +8,8 @@ import LandingView from '../views/LandingView.vue'
 import TenantLoginView from '../views/TenantLoginView.vue'
 import LoginView from '../views/LoginView.vue'
 import WelcomeView from '../views/WelcomeView.vue'
+import MinhaEquipeView from '../views/MinhaEquipeView.vue'
+import { isSomenteLiderEquipe } from '../utils/userRoles'
 import TenantsView from '../views/TenantsView.vue'
 import UsersView from '../views/UsersView.vue'
 import AuditoriaView from '../views/AuditoriaView.vue'
@@ -184,6 +186,11 @@ const router = createRouter({
       meta: { requiresAuthTenantOrAdmin: true },
       children: [
         {
+          path: 'ecc/minha-equipe',
+          name: 'ecc-minha-equipe',
+          component: MinhaEquipeView,
+        },
+        {
           path: 'ecc/equipes',
           redirect: { name: 'ecc-casais' },
         },
@@ -256,6 +263,15 @@ const router = createRouter({
   ],
 })
 
+function nextAfterTenantAuth(to, next) {
+  const authTenant = useAuthStore()
+  if (to.name === 'inicio' && isSomenteLiderEquipe(authTenant.user)) {
+    next({ name: 'ecc-minha-equipe' })
+    return
+  }
+  next()
+}
+
 router.beforeEach(async (to, from, next) => {
   const authAdmin = useAuthAdminStore()
   const authTenant = useAuthStore()
@@ -263,7 +279,11 @@ router.beforeEach(async (to, from, next) => {
 
   if (to.name === 'tenant-login') {
     const ok = await authTenant.checkAuth()
-    next(ok ? HOME_PATH : undefined)
+    if (!ok) {
+      next()
+      return
+    }
+    next(isSomenteLiderEquipe(authTenant.user) ? { name: 'ecc-minha-equipe' } : HOME_PATH)
     return
   }
 
@@ -284,14 +304,18 @@ router.beforeEach(async (to, from, next) => {
         if (tenantStore.slug) {
           await branding.ensureLoaded()
         }
-        next()
+        nextAfterTenantAuth(to, next)
         return
       }
       const tenantOk = await authTenant.checkAuth()
       if (tenantOk && tenantStore.slug) {
         await branding.ensureLoaded()
       }
-      next(tenantOk ? undefined : LOGIN_TENANT_PATH)
+      if (!tenantOk) {
+        next(LOGIN_TENANT_PATH)
+        return
+      }
+      nextAfterTenantAuth(to, next)
       return
     }
 

@@ -28,18 +28,18 @@ A autenticação web do tenant existe (`web/login|me|logout`), mas não há gest
 - [ ] Provisionar tenant cria usuário admin inicial com papel `admin-tenant`.
 - [ ] `GET/POST/PATCH/DELETE /api/v1/users` (ULID público); PII `name`/`email` encryptable.
 - [ ] `PUT /api/v1/users/{id}/roles` sincroniza N papéis (`igreja_id` + `roles[]`); `lider-equipe` exige `equipe_ids` (N:M em `ecc_equipe_user`).
-- [ ] Líder de equipe (`lider-equipe` sem `ecc.*.manage`) lista só as equipes vinculadas e só os casais dessas equipes; show de recurso alheio → 404; create/update/delete/import → 403.
+- [ ] Líder de equipe (`lider-equipe` sem `ecc.*.manage`) lista só as equipes vinculadas e só os casais dessas equipes; show de recurso alheio → 404; create/delete/import/swap → 403. Atualizar a ficha da própria equipe é `ecc.casais.atualizar` ([SPEC-016](SPEC-016-ecc-home-lider-equipe.md)).
 - [ ] `GET /api/v1/roles`: SuperAdmin vê `admin-tenant` + papéis de igreja; usuário do tenant não vê `admin-tenant`.
 - [ ] `GET /api/v1/permissions` lista catálogo (sem CRUD).
 - [ ] Sem permissão → 403; sem auth → 401; validação → 422.
 - [ ] Isolamento: usuário de um tenant não acessa dados de outro.
 - [ ] Front `/` login tenant; `/admin/login` super-admin; gestão de usuários com **toggles** de papéis.
-- [ ] Front Casais/Equipes: ações de cadastro só com `ecc.*.manage`; líder vê apenas o retorno já filtrado da API.
+- [ ] Front Casais/Equipes: criar, excluir e importar só com `ecc.*.manage`; líder vê apenas o retorno já filtrado da API e atualiza a ficha com `ecc.casais.atualizar` (SPEC-016).
 
 ## Fora de escopo
 
 - CRUD de papéis/permissões customizados.
-- Líder editar casais/equipes da própria equipe (só leitura nesta fatia; decisão em aberto no BRIEF).
+- Líder criar, excluir ou mover casal de equipe (a ficha da própria equipe está na SPEC-016).
 - Vínculo obrigatório User ↔ Pessoa; `pessoa_id` nullable.
 - Seletor de igreja completo no shell.
 

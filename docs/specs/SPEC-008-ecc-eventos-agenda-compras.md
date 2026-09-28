@@ -50,7 +50,7 @@ Tipos: `encontro` \| `anual` \| `servos` \| `perseveranca` \| `formacao`.
 - [x] Participantes: POST/DELETE sob `/ecc/eventos/{id}/participantes`.
 - [x] Itens-compra (anual): CRUD + doar / comprar / desfazer; 422 se tipo ≠ anual.
 - [x] 401 sem auth; 403 sem permissão; isolamento por igreja/tenant.
-- [x] Seed: `telas.eventos`, `ecc.eventos.view`, `ecc.eventos.manage` em admin-tenant / admin-igreja; líder vê (`view`).
+- [x] Seed: `telas.eventos`, `ecc.eventos.view`, `ecc.eventos.manage` em admin-tenant / admin-igreja. O papel `lider-equipe` não recebe eventos (SPEC-016).
 - [x] Front: nav Eventos; `/ecc/eventos` Lista \| Calendário; detalhe; compras no anual.
 - [x] Testes API (PHPUnit) + util front (filtros/agenda).
 

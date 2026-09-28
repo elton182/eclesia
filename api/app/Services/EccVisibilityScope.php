@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Models\Casal;
 use App\Models\SuperAdmin;
 use App\Models\User;
 use Illuminate\Contracts\Auth\Authenticatable;
@@ -75,6 +76,45 @@ class EccVisibilityScope
         } finally {
             setPermissionsTeamId($previous);
         }
+    }
+
+    /**
+     * Foto e ficha: pessoa é cônjuge de casal numa equipe do líder.
+     */
+    public function canAtualizarPessoa(string $pessoaId): bool
+    {
+        if ($this->userCan('pessoas.manage') || $this->userCan('ecc.casais.manage')) {
+            return true;
+        }
+
+        if (! $this->userCan('ecc.casais.atualizar')) {
+            return false;
+        }
+
+        return $this->pessoaNaEquipeRestrita($pessoaId);
+    }
+
+    public function pessoaNaEquipeRestrita(string $pessoaId): bool
+    {
+        $ids = $this->restrictedEquipeIds();
+        if ($ids === null || $ids === []) {
+            return false;
+        }
+
+        try {
+            $igrejaId = $this->igrejaContext->current()->id;
+        } catch (\Throwable) {
+            return false;
+        }
+
+        return Casal::query()
+            ->where('igreja_id', $igrejaId)
+            ->whereIn('ecc_equipe_id', $ids)
+            ->where(function ($query) use ($pessoaId): void {
+                $query->where('pessoa_a_id', $pessoaId)
+                    ->orWhere('pessoa_b_id', $pessoaId);
+            })
+            ->exists();
     }
 
     public function assertCanAccessEquipe(?string $equipeId): void

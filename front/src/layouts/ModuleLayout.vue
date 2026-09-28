@@ -6,7 +6,7 @@ import { useAuthAdminStore } from '@/stores/authAdmin'
 import { useTenantStore } from '@/stores/tenant'
 import { useIgrejaStore } from '@/stores/igreja'
 import { useBrandingStore } from '@/stores/branding'
-import { userHasPermission, canSeeEccCasaisNav, canSeeEccEventosNav } from '@/utils/userRoles'
+import { userHasPermission, canSeeEccCasaisNav, canSeeEccEventosNav, isSomenteLiderEquipe } from '@/utils/userRoles'
 import PwaInstallNavButton from '@/components/base/PwaInstallNavButton.vue'
 import fallbackLogo from '@/assets/logo-icon.png'
 
@@ -104,7 +104,14 @@ const moduleMeta = computed(() => {
   }
 })
 
+const somenteLider = computed(() =>
+  isSomenteLiderEquipe(authTenant.user, { isSuperAdmin: isPlatformAdmin.value }),
+)
+
 const navItems = computed(() => {
+  if (props.moduleKey === 'ecc' && somenteLider.value) {
+    return [{ label: 'Minha equipe', path: '/ecc/minha-equipe', exact: true }]
+  }
   if (props.moduleKey === 'site') {
     return [
       { label: 'Páginas e seções', path: '/site', exact: true },
@@ -215,6 +222,7 @@ onMounted(async () => {
       </div>
 
       <router-link
+        v-if="!somenteLider"
         to="/inicio"
         class="flex items-center gap-2.5 no-underline px-2"
         data-testid="module-back-launcher"
@@ -285,7 +293,8 @@ onMounted(async () => {
           style="color: var(--color-muted)"
         >
           <router-link
-            to="/inicio"
+            v-if="!somenteLider || route.path !== '/ecc/minha-equipe'"
+            :to="somenteLider ? '/ecc/minha-equipe' : '/inicio'"
             class="md:hidden no-underline"
             style="color: var(--color-primary-hover)"
           >
