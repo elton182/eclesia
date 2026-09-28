@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import * as XLSX from 'xlsx'
 import api from '@/services/api'
@@ -23,6 +23,14 @@ import {
   etapasPayload,
   normalizeEtapasForm,
 } from '@/utils/eccFicha'
+import {
+  FICHA_STEPS,
+  fichaStepAt,
+  fichaStepProgress,
+  isFirstFichaStep,
+  isLastFichaStep,
+  validateFichaStep,
+} from '@/utils/eccFichaSteps'
 
 const route = useRoute()
 const router = useRouter()
@@ -44,12 +52,53 @@ const canEditCasal = computed(() =>
 
 const somenteLider = computed(() => isSomenteLiderEquipe(authStore.user, authOpts()))
 
-const leaveForm = () => {
+const stepIndex = ref(0)
+const formSnapshot = ref('')
+const formDirty = ref(false)
+const suppressDirtyWatch = ref(false)
+
+const currentStep = computed(() => fichaStepAt(stepIndex.value))
+const stepProgress = computed(() => fichaStepProgress(stepIndex.value))
+const isFirstStep = computed(() => isFirstFichaStep(stepIndex.value))
+const isLastStep = computed(() => isLastFichaStep(stepIndex.value))
+
+const formSnapshotValue = () => {
+  const {
+    pending_foto_ele: _pe,
+    pending_foto_ela: _pa,
+    ...rest
+  } = form.value
+  return JSON.stringify(rest)
+}
+
+const markFormClean = () => {
+  formSnapshot.value = formSnapshotValue()
+  formDirty.value = false
+}
+
+const leaveForm = async () => {
+  if (formDirty.value) {
+    const ok = await innovConfirm({
+      title: 'Sair sem gravar?',
+      message: 'Há alterações nesta etapa que ainda não foram salvas. Deseja sair mesmo assim?',
+      confirmText: 'Sair',
+      danger: true,
+    })
+    if (!ok) return
+  }
+  formDirty.value = false
+  stepIndex.value = 0
   if (somenteLider.value) {
     router.push({ name: 'ecc-minha-equipe' })
     return
   }
   mode.value = 'list'
+}
+
+const onBeforeUnload = (event) => {
+  if (mode.value !== 'form' || !formDirty.value) return
+  event.preventDefault()
+  event.returnValue = ''
 }
 
 const canManageEquipes = computed(() =>
@@ -199,12 +248,21 @@ const load = async () => {
   }
 }
 
-const openCreate = () => {
-  form.value = emptyForm()
+const beginForm = async () => {
+  stepIndex.value = 0
   mode.value = 'form'
+  suppressDirtyWatch.value = true
+  await nextTick()
+  markFormClean()
+  suppressDirtyWatch.value = false
 }
 
-const openEdit = (item) => {
+const openCreate = async () => {
+  form.value = emptyForm()
+  await beginForm()
+}
+
+const openEdit = async (item) => {
   const pessoas = formFieldsFromEleEla(item)
   form.value = {
     ...emptyForm(),
@@ -231,7 +289,7 @@ const openEdit = (item) => {
     engajamento_paroquial: item.engajamento_paroquial || '',
     habilidades: item.habilidades || '',
   }
-  mode.value = 'form'
+  await beginForm()
 }
 
 const openEquipesPanel = () => {
@@ -280,12 +338,12 @@ const saveEquipe = async () => {
   }
 }
 
-const applyEditFromQuery = () => {
+const applyEditFromQuery = async () => {
   const editId = route.query.edit ? String(route.query.edit) : ''
   if (!editId || !casais.value.length) return false
   const item = casais.value.find((c) => String(c.id) === editId)
   if (!item) return false
-  openEdit(item)
+  await openEdit(item)
   const query = { ...route.query }
   delete query.edit
   router.replace({ query })
@@ -413,39 +471,80 @@ const swapEleEla = async () => {
   }
 }
 
-const save = async () => {
+const persistForm = async () => {
+  let saved
+  if (form.value.id) {
+    const { data } = await api.put(`/ecc/casais/${form.value.id}`, payload())
+    saved = data.data || data
+  } else {
+    const { data } = await api.post('/ecc/casais', payload())
+    saved = data.data || data
+  }
+
+  const eleId = saved?.ele?.id
+  const elaId = saved?.ela?.id
+  if (form.value.pending_foto_ele && eleId) {
+    await uploadPessoaFoto(api, eleId, form.value.pending_foto_ele)
+    form.value.pending_foto_ele = null
+  }
+  if (form.value.pending_foto_ela && elaId) {
+    await uploadPessoaFoto(api, elaId, form.value.pending_foto_ela)
+    form.value.pending_foto_ela = null
+  }
+
+  // Mantém ids e fotos do servidor sem sobrescrever datas BR do formulário
+  const pessoas = formFieldsFromEleEla(saved)
+  form.value.id = saved.id
+  form.value.equipe_id = saved.equipe_id || form.value.equipe_id || ''
+  form.value.pessoa_a_id = pessoas.pessoa_a_id
+  form.value.pessoa_b_id = pessoas.pessoa_b_id
+  form.value.foto_url_ele = pessoas.foto_url_ele
+  form.value.foto_url_ela = pessoas.foto_url_ela
+  return saved
+}
+
+const saveStep = async ({ advance = false, finish = false } = {}) => {
+  const validation = validateFichaStep(stepIndex.value, form.value)
+  if (!validation.ok) {
+    innovToast('error', 'Etapa', validation.error)
+    return false
+  }
+
   saving.value = true
   try {
-    let saved
-    if (form.value.id) {
-      const { data } = await api.put(`/ecc/casais/${form.value.id}`, payload())
-      saved = data.data || data
-    } else {
-      const { data } = await api.post('/ecc/casais', payload())
-      saved = data.data || data
+    await persistForm()
+    markFormClean()
+    innovToast('success', 'OK', finish ? 'Casal salvo' : 'Etapa salva')
+
+    if (finish) {
+      stepIndex.value = 0
+      if (somenteLider.value) {
+        router.push({ name: 'ecc-minha-equipe' })
+        return true
+      }
+      mode.value = 'list'
+      await load()
+      return true
     }
 
-    const eleId = saved?.ele?.id
-    const elaId = saved?.ela?.id
-    if (form.value.pending_foto_ele && eleId) {
-      await uploadPessoaFoto(api, eleId, form.value.pending_foto_ele)
+    if (advance && !isLastStep.value) {
+      stepIndex.value += 1
+      await nextTick()
+      markFormClean()
     }
-    if (form.value.pending_foto_ela && elaId) {
-      await uploadPessoaFoto(api, elaId, form.value.pending_foto_ela)
-    }
-
-    innovToast('success', 'OK', 'Casal salvo')
-    if (somenteLider.value) {
-      router.push({ name: 'ecc-minha-equipe' })
-      return
-    }
-    mode.value = 'list'
-    await load()
+    return true
   } catch (e) {
     innovToast('error', 'Erro', e.response?.data?.message || 'Falha ao salvar')
+    return false
   } finally {
     saving.value = false
   }
+}
+
+const continueStep = () => saveStep({ advance: true })
+const finishSteps = () => saveStep({ finish: true })
+const prevStep = () => {
+  if (!isFirstStep.value) stepIndex.value -= 1
 }
 
 const remove = async (item) => {
@@ -499,10 +598,26 @@ const onImportFile = async (event) => {
   }
 }
 
+watch(
+  form,
+  () => {
+    if (suppressDirtyWatch.value || mode.value !== 'form') return
+    formDirty.value = formSnapshotValue() !== formSnapshot.value
+      || !!form.value.pending_foto_ele
+      || !!form.value.pending_foto_ela
+  },
+  { deep: true },
+)
+
 onMounted(async () => {
+  window.addEventListener('beforeunload', onBeforeUnload)
   applyFiltersFromQuery()
   await load()
   applyEditFromQuery()
+})
+
+onUnmounted(() => {
+  window.removeEventListener('beforeunload', onBeforeUnload)
 })
 </script>
 
@@ -812,12 +927,19 @@ onMounted(async () => {
       </form>
     </div>
 
-    <!-- Form casal -->
+    <!-- Form casal em etapas -->
     <div v-else class="card p-6" data-testid="casal-form">
-      <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <h3 class="text-xl mb-0">{{ form.id ? 'Editar casal' : 'Novo casal' }}</h3>
+      <div class="flex flex-wrap items-center justify-between gap-3 mb-2">
+        <div>
+          <p class="text-[12px] font-medium" style="color: var(--color-accent-dark)" data-testid="casal-form-step-progress">
+            {{ stepProgress }}
+          </p>
+          <h3 class="text-xl mb-0 mt-1" data-testid="casal-form-step-title">
+            {{ currentStep?.title || (form.id ? 'Editar casal' : 'Novo casal') }}
+          </h3>
+        </div>
         <button
-          v-if="canManageCasais"
+          v-if="canManageCasais && currentStep?.id === 'contato'"
           type="button"
           class="btn btn-ghost"
           :disabled="swapping"
@@ -827,284 +949,332 @@ onMounted(async () => {
           Trocar Ele/Ela
         </button>
       </div>
-      <form class="grid grid-cols-1 md:grid-cols-2 gap-4" @submit.prevent="save">
-        <div class="md:col-span-2">
-          <label class="fld">Equipe</label>
-          <select
-            v-model="form.equipe_id"
-            class="input"
-            :disabled="!!form.id && !canManageCasais"
-            data-testid="casal-form-equipe"
-          >
-            <option value="">Sem equipe</option>
-            <option v-for="eq in equipes" :key="eq.id" :value="eq.id">{{ eq.nome }}</option>
-          </select>
-          <p
-            v-if="form.id && !canManageCasais"
-            class="text-[12.5px] mt-1"
-            style="color: var(--color-muted)"
-          >
-            A troca de equipe fica com a secretaria.
-          </p>
-        </div>
+      <p class="text-[13px] mb-4" style="color: var(--color-muted)">
+        {{ form.id ? 'Editar casal' : 'Novo casal' }} · cada Continuar grava no servidor.
+      </p>
 
-        <div>
-          <label class="fld">Ele (nome)</label>
-          <input v-model="form.nome" class="input" required>
-        </div>
-        <div>
-          <label class="fld">Ela (nome)</label>
-          <input v-model="form.nome_conjuge" class="input" required>
-        </div>
-        <div>
-          <label class="fld">E-mail (Ele)</label>
-          <input v-model="form.email" type="email" class="input">
-        </div>
-        <div>
-          <label class="fld">E-mail (Ela)</label>
-          <input v-model="form.email_conjuge" type="email" class="input">
-        </div>
-        <div>
-          <label class="fld">Telefone (Ele)</label>
-          <input v-model="form.telefone" class="input">
-        </div>
-        <div>
-          <label class="fld">Telefone (Ela)</label>
-          <input v-model="form.telefone_conjuge" class="input">
-        </div>
-        <DateInput
-          v-model="form.data_nascimento"
-          name="data_nascimento"
-          label="Nascimento (Ele)"
+      <div class="flex flex-wrap gap-1.5 mb-5" data-testid="casal-form-step-dots" aria-hidden="true">
+        <span
+          v-for="(step, idx) in FICHA_STEPS"
+          :key="step.id"
+          class="h-1.5 flex-1 min-w-8 rounded-full"
+          :style="{
+            background: idx <= stepIndex ? 'var(--color-primary-soft)' : 'var(--color-line)',
+          }"
         />
-        <DateInput
-          v-model="form.data_nascimento_conjuge"
-          name="data_nascimento_conjuge"
-          label="Nascimento (Ela)"
-        />
-        <div class="md:col-span-2 grid md:grid-cols-2 gap-4">
-          <PessoaFotoField
-            :pessoa-id="form.pessoa_a_id"
-            :foto-url="form.foto_url_ele"
-            label="Foto (Ele)"
-            :pending-file="form.pending_foto_ele"
-            @update:foto-url="form.foto_url_ele = $event"
-            @update:pending-file="form.pending_foto_ele = $event"
+      </div>
+
+      <form class="grid grid-cols-1 md:grid-cols-2 gap-4" @submit.prevent="isLastStep ? finishSteps() : continueStep()">
+        <template v-if="currentStep?.id === 'contato'">
+          <div class="md:col-span-2">
+            <label class="fld">Equipe</label>
+            <select
+              v-model="form.equipe_id"
+              class="input"
+              :disabled="!!form.id && !canManageCasais"
+              data-testid="casal-form-equipe"
+            >
+              <option value="">Sem equipe</option>
+              <option v-for="eq in equipes" :key="eq.id" :value="eq.id">{{ eq.nome }}</option>
+            </select>
+            <p
+              v-if="form.id && !canManageCasais"
+              class="text-[12.5px] mt-1"
+              style="color: var(--color-muted)"
+            >
+              A troca de equipe fica com a secretaria.
+            </p>
+          </div>
+
+          <div>
+            <label class="fld">Ele (nome)</label>
+            <input v-model="form.nome" class="input" required data-testid="form-nome-ele">
+          </div>
+          <div>
+            <label class="fld">Ela (nome)</label>
+            <input v-model="form.nome_conjuge" class="input" required data-testid="form-nome-ela">
+          </div>
+          <div>
+            <label class="fld">E-mail (Ele)</label>
+            <input v-model="form.email" type="email" class="input">
+          </div>
+          <div>
+            <label class="fld">E-mail (Ela)</label>
+            <input v-model="form.email_conjuge" type="email" class="input">
+          </div>
+          <div>
+            <label class="fld">Telefone (Ele)</label>
+            <input v-model="form.telefone" class="input">
+          </div>
+          <div>
+            <label class="fld">Telefone (Ela)</label>
+            <input v-model="form.telefone_conjuge" class="input">
+          </div>
+          <DateInput
+            v-model="form.data_nascimento"
+            name="data_nascimento"
+            label="Nascimento (Ele)"
           />
-          <PessoaFotoField
-            :pessoa-id="form.pessoa_b_id"
-            :foto-url="form.foto_url_ela"
-            label="Foto (Ela)"
-            :pending-file="form.pending_foto_ela"
-            @update:foto-url="form.foto_url_ela = $event"
-            @update:pending-file="form.pending_foto_ela = $event"
+          <DateInput
+            v-model="form.data_nascimento_conjuge"
+            name="data_nascimento_conjuge"
+            label="Nascimento (Ela)"
           />
-        </div>
-        <div>
-          <label class="fld">Nome usual (Ele)</label>
-          <input v-model="form.nome_usual_ele" class="input" data-testid="form-nome-usual-ele">
-        </div>
-        <div>
-          <label class="fld">Nome usual (Ela)</label>
-          <input v-model="form.nome_usual_ela" class="input" data-testid="form-nome-usual-ela">
-        </div>
-        <div>
-          <label class="fld">Profissão (Ele)</label>
-          <input v-model="form.profissao_ele" class="input">
-        </div>
-        <div>
-          <label class="fld">Profissão (Ela)</label>
-          <input v-model="form.profissao_ela" class="input">
-        </div>
-        <div>
-          <label class="fld">Religião (Ele)</label>
-          <input v-model="form.religiao_ele" class="input">
-        </div>
-        <div>
-          <label class="fld">Religião (Ela)</label>
-          <input v-model="form.religiao_ela" class="input">
-        </div>
-        <div>
-          <label class="fld">Endereço profissional (Ele)</label>
-          <input v-model="form.endereco_profissional_ele" class="input">
-        </div>
-        <div>
-          <label class="fld">Endereço profissional (Ela)</label>
-          <input v-model="form.endereco_profissional_ela" class="input">
-        </div>
-        <div>
-          <label class="fld">Telefone profissional (Ele)</label>
-          <input v-model="form.telefone_profissional_ele" class="input">
-        </div>
-        <div>
-          <label class="fld">Telefone profissional (Ela)</label>
-          <input v-model="form.telefone_profissional_ela" class="input">
-        </div>
-        <div class="md:col-span-2">
-          <label class="fld">Endereço</label>
-          <input v-model="form.endereco" class="input">
-        </div>
-        <div>
-          <label class="fld">Bairro</label>
-          <input v-model="form.bairro" class="input">
-        </div>
-        <div>
-          <label class="fld">Cidade</label>
-          <input v-model="form.cidade" class="input">
-        </div>
-        <div>
-          <label class="fld">UF</label>
-          <input v-model="form.uf" class="input" maxlength="2">
-        </div>
-        <div>
-          <label class="fld">CEP</label>
-          <input v-model="form.cep" class="input">
-        </div>
-        <DateInput
-          v-model="form.data_casamento"
-          name="data_casamento"
-          label="Data casamento"
-        />
-        <div>
-          <label class="fld">Anos de casados</label>
-          <input v-model="form.anos_casados" type="number" min="0" max="120" class="input">
-        </div>
-        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-6 md:col-span-2">
-          <label class="inline-flex items-center gap-2 text-sm" style="color: var(--color-ink)">
-            <input v-model="form.piloto" type="checkbox" class="rounded">
-            Piloto
-          </label>
-          <label class="inline-flex items-center gap-2 text-sm" style="color: var(--color-ink)">
-            <input v-model="form.foi_coordenador_geral" type="checkbox" class="rounded">
-            Foi coordenador geral
-          </label>
+          <div class="md:col-span-2 grid md:grid-cols-2 gap-4">
+            <PessoaFotoField
+              :pessoa-id="form.pessoa_a_id"
+              :foto-url="form.foto_url_ele"
+              label="Foto (Ele)"
+              :pending-file="form.pending_foto_ele"
+              @update:foto-url="form.foto_url_ele = $event"
+              @update:pending-file="form.pending_foto_ele = $event"
+            />
+            <PessoaFotoField
+              :pessoa-id="form.pessoa_b_id"
+              :foto-url="form.foto_url_ela"
+              label="Foto (Ela)"
+              :pending-file="form.pending_foto_ela"
+              @update:foto-url="form.foto_url_ela = $event"
+              @update:pending-file="form.pending_foto_ela = $event"
+            />
+          </div>
           <span
             v-if="form.foto_url_ele || form.foto_url_ela || form.pending_foto_ele || form.pending_foto_ela"
-            class="text-sm"
+            class="md:col-span-2 text-sm"
             style="color: rgba(42,20,24,0.62)"
             data-testid="ficha-com-foto-indicator"
           >
             Ficha com foto
           </span>
-        </div>
-        <div>
-          <label class="fld">ECC de origem</label>
-          <input v-model="form.ecc_origem" class="input" placeholder="Ex.: 8º">
-        </div>
-        <div>
-          <label class="fld">Função dirigente</label>
-          <input v-model="form.funcao_dirigente" class="input">
-        </div>
-        <div class="md:col-span-2" data-testid="form-etapas">
-          <div class="fld mb-2">Etapas (nº do ECC, data e local)</div>
-          <div
-            v-for="(et, idx) in form.etapas"
-            :key="et.etapa"
-            class="grid md:grid-cols-4 gap-3 mb-3"
-          >
-            <div class="text-[13px] font-medium self-center" style="color: var(--color-ink)">
-              {{ et.etapa }}ª etapa
-            </div>
-            <div>
-              <label class="fld">Nº ECC</label>
-              <input v-model="form.etapas[idx].ecc_numero" class="input" :data-testid="`etapa-${et.etapa}-numero`">
-            </div>
-            <DateInput
-              v-model="form.etapas[idx].data"
-              :name="`etapa_${et.etapa}_data`"
-              label="Data"
-            />
-            <div>
-              <label class="fld">Local</label>
-              <input v-model="form.etapas[idx].local" class="input">
-            </div>
-          </div>
-        </div>
-        <div class="md:col-span-2">
-          <label class="fld">Engajamento paroquial</label>
-          <textarea v-model="form.engajamento_paroquial" class="input min-h-20" data-testid="form-engajamento" />
-        </div>
-        <div class="md:col-span-2">
-          <label class="fld">Habilidades</label>
-          <textarea v-model="form.habilidades" class="input min-h-20" data-testid="form-habilidades" />
-        </div>
-        <div class="md:col-span-2" data-testid="form-atividades">
-          <div class="flex items-center justify-between mb-2">
-            <div class="fld mb-0">Histórico de atividades (equipes de trabalho)</div>
-            <button type="button" class="btn btn-ghost text-sm" @click="addAtividade">+ Atividade</button>
-          </div>
-          <div
-            v-for="(at, idx) in form.atividades"
-            :key="idx"
-            class="grid md:grid-cols-5 gap-2 mb-2 items-end"
-          >
-            <div>
-              <label class="fld">Nº ECC</label>
-              <input v-model="at.ecc_numero" class="input">
-            </div>
-            <div>
-              <label class="fld">Equipe</label>
-              <select v-model="at.equipe_servico_id" class="input">
-                <option value="">—</option>
-                <option v-for="eq in equipesServico" :key="eq.id" :value="eq.id">{{ eq.nome }}</option>
-              </select>
-            </div>
-            <div>
-              <label class="fld">Status</label>
-              <select v-model="at.status" class="input">
-                <option v-for="code in ATIVIDADE_STATUS_CODES" :key="code" :value="code">
-                  {{ code }} — {{ atividadeStatusLabel(code) }}
-                </option>
-              </select>
-            </div>
-            <div>
-              <label class="fld">Obs.</label>
-              <input v-model="at.observacao" class="input">
-            </div>
-            <button type="button" class="btn btn-ghost" @click="removeAtividade(idx)">Remover</button>
-          </div>
-          <p v-if="!form.atividades.length" class="text-[12.5px]" style="color: rgba(42,20,24,0.55)">
-            Nenhum serviço registrado. Ex.: ECC 34 na Cozinha.
-          </p>
-        </div>
-        <div class="md:col-span-2" data-testid="form-preferencias">
-          <div class="flex items-center justify-between mb-2">
-            <div class="fld mb-0">Preferências de equipe</div>
-            <button type="button" class="btn btn-ghost text-sm" @click="addPreferencia">+ Preferência</button>
-          </div>
-          <div
-            v-for="(pref, idx) in form.preferencias"
-            :key="idx"
-            class="grid md:grid-cols-3 gap-2 mb-2 items-end"
-          >
-            <div>
-              <label class="fld">Ordem</label>
-              <input v-model="pref.ordem" type="number" min="1" class="input">
-            </div>
-            <div>
-              <label class="fld">Equipe</label>
-              <select v-model="pref.equipe_servico_id" class="input">
-                <option value="">—</option>
-                <option v-for="eq in equipesServico" :key="eq.id" :value="eq.id">{{ eq.nome }}</option>
-              </select>
-            </div>
-            <button type="button" class="btn btn-ghost" @click="removePreferencia(idx)">Remover</button>
-          </div>
-        </div>
-        <div class="md:col-span-2">
-          <label class="fld">Filhos</label>
-          <input v-model="form.filhos" class="input">
-        </div>
-        <div class="md:col-span-2">
-          <label class="fld">Observações</label>
-          <textarea v-model="form.observacoes" class="input min-h-24" />
-        </div>
+        </template>
 
-        <div class="md:col-span-2 flex flex-col gap-2 sm:flex-row">
-          <button type="submit" class="btn btn-primary w-full sm:w-auto" :disabled="saving">
-            Salvar
+        <template v-else-if="currentStep?.id === 'endereco'">
+          <div class="md:col-span-2">
+            <label class="fld">Endereço</label>
+            <input v-model="form.endereco" class="input">
+          </div>
+          <div>
+            <label class="fld">Bairro</label>
+            <input v-model="form.bairro" class="input">
+          </div>
+          <div>
+            <label class="fld">Cidade</label>
+            <input v-model="form.cidade" class="input">
+          </div>
+          <div>
+            <label class="fld">UF</label>
+            <input v-model="form.uf" class="input" maxlength="2">
+          </div>
+          <div>
+            <label class="fld">CEP</label>
+            <input v-model="form.cep" class="input">
+          </div>
+        </template>
+
+        <template v-else-if="currentStep?.id === 'pessoas'">
+          <div>
+            <label class="fld">Nome usual (Ele)</label>
+            <input v-model="form.nome_usual_ele" class="input" data-testid="form-nome-usual-ele">
+          </div>
+          <div>
+            <label class="fld">Nome usual (Ela)</label>
+            <input v-model="form.nome_usual_ela" class="input" data-testid="form-nome-usual-ela">
+          </div>
+          <div>
+            <label class="fld">Profissão (Ele)</label>
+            <input v-model="form.profissao_ele" class="input">
+          </div>
+          <div>
+            <label class="fld">Profissão (Ela)</label>
+            <input v-model="form.profissao_ela" class="input">
+          </div>
+          <div>
+            <label class="fld">Religião (Ele)</label>
+            <input v-model="form.religiao_ele" class="input">
+          </div>
+          <div>
+            <label class="fld">Religião (Ela)</label>
+            <input v-model="form.religiao_ela" class="input">
+          </div>
+          <div>
+            <label class="fld">Endereço profissional (Ele)</label>
+            <input v-model="form.endereco_profissional_ele" class="input">
+          </div>
+          <div>
+            <label class="fld">Endereço profissional (Ela)</label>
+            <input v-model="form.endereco_profissional_ela" class="input">
+          </div>
+          <div>
+            <label class="fld">Telefone profissional (Ele)</label>
+            <input v-model="form.telefone_profissional_ele" class="input">
+          </div>
+          <div>
+            <label class="fld">Telefone profissional (Ela)</label>
+            <input v-model="form.telefone_profissional_ela" class="input">
+          </div>
+        </template>
+
+        <template v-else-if="currentStep?.id === 'ecc'">
+          <DateInput
+            v-model="form.data_casamento"
+            name="data_casamento"
+            label="Data casamento"
+          />
+          <div>
+            <label class="fld">Anos de casados</label>
+            <input v-model="form.anos_casados" type="number" min="0" max="120" class="input">
+          </div>
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-6 md:col-span-2">
+            <label class="inline-flex items-center gap-2 text-sm" style="color: var(--color-ink)">
+              <input v-model="form.piloto" type="checkbox" class="rounded">
+              Piloto
+            </label>
+            <label class="inline-flex items-center gap-2 text-sm" style="color: var(--color-ink)">
+              <input v-model="form.foi_coordenador_geral" type="checkbox" class="rounded">
+              Foi coordenador geral
+            </label>
+          </div>
+          <div>
+            <label class="fld">ECC de origem</label>
+            <input v-model="form.ecc_origem" class="input" placeholder="Ex.: 8º">
+          </div>
+          <div>
+            <label class="fld">Função dirigente</label>
+            <input v-model="form.funcao_dirigente" class="input">
+          </div>
+          <div class="md:col-span-2" data-testid="form-etapas">
+            <div class="fld mb-2">Etapas (nº do ECC, data e local)</div>
+            <div
+              v-for="(et, idx) in form.etapas"
+              :key="et.etapa"
+              class="grid md:grid-cols-4 gap-3 mb-3"
+            >
+              <div class="text-[13px] font-medium self-center" style="color: var(--color-ink)">
+                {{ et.etapa }}ª etapa
+              </div>
+              <div>
+                <label class="fld">Nº ECC</label>
+                <input v-model="form.etapas[idx].ecc_numero" class="input" :data-testid="`etapa-${et.etapa}-numero`">
+              </div>
+              <DateInput
+                v-model="form.etapas[idx].data"
+                :name="`etapa_${et.etapa}_data`"
+                label="Data"
+              />
+              <div>
+                <label class="fld">Local</label>
+                <input v-model="form.etapas[idx].local" class="input">
+              </div>
+            </div>
+          </div>
+        </template>
+
+        <template v-else-if="currentStep?.id === 'servico'">
+          <div class="md:col-span-2">
+            <label class="fld">Engajamento paroquial</label>
+            <textarea v-model="form.engajamento_paroquial" class="input min-h-20" data-testid="form-engajamento" />
+          </div>
+          <div class="md:col-span-2">
+            <label class="fld">Habilidades</label>
+            <textarea v-model="form.habilidades" class="input min-h-20" data-testid="form-habilidades" />
+          </div>
+          <div class="md:col-span-2" data-testid="form-atividades">
+            <div class="flex items-center justify-between mb-2">
+              <div class="fld mb-0">Histórico de atividades (equipes de trabalho)</div>
+              <button type="button" class="btn btn-ghost text-sm" @click="addAtividade">+ Atividade</button>
+            </div>
+            <div
+              v-for="(at, idx) in form.atividades"
+              :key="idx"
+              class="grid md:grid-cols-5 gap-2 mb-2 items-end"
+            >
+              <div>
+                <label class="fld">Nº ECC</label>
+                <input v-model="at.ecc_numero" class="input">
+              </div>
+              <div>
+                <label class="fld">Equipe</label>
+                <select v-model="at.equipe_servico_id" class="input">
+                  <option value="">—</option>
+                  <option v-for="eq in equipesServico" :key="eq.id" :value="eq.id">{{ eq.nome }}</option>
+                </select>
+              </div>
+              <div>
+                <label class="fld">Status</label>
+                <select v-model="at.status" class="input">
+                  <option v-for="code in ATIVIDADE_STATUS_CODES" :key="code" :value="code">
+                    {{ code }} — {{ atividadeStatusLabel(code) }}
+                  </option>
+                </select>
+              </div>
+              <div>
+                <label class="fld">Obs.</label>
+                <input v-model="at.observacao" class="input">
+              </div>
+              <button type="button" class="btn btn-ghost" @click="removeAtividade(idx)">Remover</button>
+            </div>
+            <p v-if="!form.atividades.length" class="text-[12.5px]" style="color: rgba(42,20,24,0.55)">
+              Nenhum serviço registrado. Ex.: ECC 34 na Cozinha.
+            </p>
+          </div>
+          <div class="md:col-span-2" data-testid="form-preferencias">
+            <div class="flex items-center justify-between mb-2">
+              <div class="fld mb-0">Preferências de equipe</div>
+              <button type="button" class="btn btn-ghost text-sm" @click="addPreferencia">+ Preferência</button>
+            </div>
+            <div
+              v-for="(pref, idx) in form.preferencias"
+              :key="idx"
+              class="grid md:grid-cols-3 gap-2 mb-2 items-end"
+            >
+              <div>
+                <label class="fld">Ordem</label>
+                <input v-model="pref.ordem" type="number" min="1" class="input">
+              </div>
+              <div>
+                <label class="fld">Equipe</label>
+                <select v-model="pref.equipe_servico_id" class="input">
+                  <option value="">—</option>
+                  <option v-for="eq in equipesServico" :key="eq.id" :value="eq.id">{{ eq.nome }}</option>
+                </select>
+              </div>
+              <button type="button" class="btn btn-ghost" @click="removePreferencia(idx)">Remover</button>
+            </div>
+          </div>
+          <div class="md:col-span-2">
+            <label class="fld">Filhos</label>
+            <input v-model="form.filhos" class="input">
+          </div>
+          <div class="md:col-span-2">
+            <label class="fld">Observações</label>
+            <textarea v-model="form.observacoes" class="input min-h-24" />
+          </div>
+        </template>
+
+        <div class="md:col-span-2 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+          <button
+            v-if="!isFirstStep"
+            type="button"
+            class="btn btn-ghost w-full sm:w-auto"
+            data-testid="casal-form-voltar"
+            @click="prevStep"
+          >
+            Voltar
           </button>
-          <button type="button" class="btn btn-ghost w-full sm:w-auto" @click="leaveForm">
+          <button
+            type="submit"
+            class="btn btn-primary w-full sm:w-auto"
+            :disabled="saving"
+            data-testid="casal-form-continuar"
+          >
+            {{ isLastStep ? 'Concluir' : 'Continuar' }}
+          </button>
+          <button
+            type="button"
+            class="btn btn-ghost w-full sm:w-auto"
+            data-testid="casal-form-cancelar"
+            @click="leaveForm"
+          >
             Cancelar
           </button>
         </div>
