@@ -140,6 +140,7 @@ class SitePublicHtmlTest extends TestCase
         $this->assertStringContainsString('Bem-vindo à Matriz', $html);
         $this->assertStringContainsString('Nossa comunidade de fé', $html);
         $this->assertStringContainsString('Texto seguro', $html);
+        $this->assertStringContainsString('<h1>Org Html</h1>', $html);
         $this->assertStringNotContainsString('<script>alert(1)</script>', $html);
         $this->assertStringNotContainsString('alert(1)', $html);
         $this->assertStringContainsString('id="app"', $html);

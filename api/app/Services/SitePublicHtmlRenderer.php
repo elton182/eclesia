@@ -102,7 +102,7 @@ class SitePublicHtmlRenderer
         $seo = $this->resolveSeo(
             is_array($page?->seo) ? $page->seo : null,
             is_array($settings->seo) ? $settings->seo : null,
-            $page?->titulo ?: ($settings->titulo ?: 'Site'),
+            $page?->titulo ?: $this->brandTitle($settings),
         );
 
         $base = rtrim((string) config('app.frontend_url'), '/');
@@ -152,9 +152,19 @@ class SitePublicHtmlRenderer
         ];
     }
 
+    private function brandTitle(SiteSetting $settings): string
+    {
+        $tenantName = tenant('name');
+        if (is_string($tenantName) && $tenantName !== '') {
+            return $tenantName;
+        }
+
+        return (string) ($settings->titulo ?: 'Site');
+    }
+
     private function renderMain(SiteSetting $settings, ?SitePage $page): string
     {
-        $brand = e((string) ($settings->titulo ?: 'Site'));
+        $brand = e($this->brandTitle($settings));
         $parts = ['    <main data-site-seo="1">'];
         $parts[] = '      <h1>'.$brand.'</h1>';
 
