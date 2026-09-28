@@ -9,6 +9,7 @@ use App\Models\SuperAdmin;
 use App\Models\Tenant;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\File;
 use Laravel\Sanctum\Sanctum;
@@ -29,6 +30,10 @@ class EccLiderEquipeScopeTest extends TestCase
     private string $casalAlphaId;
 
     private string $casalBetaId;
+
+    private string $pessoaAlphaId;
+
+    private string $pessoaBetaId;
 
     private User $lider;
 
@@ -69,17 +74,21 @@ class EccLiderEquipeScopeTest extends TestCase
             'cor' => '#222222',
         ])->assertCreated()->json('data.id');
 
-        $this->casalAlphaId = $this->tenantJson('POST', '/api/v1/ecc/casais', [
+        $casalAlpha = $this->tenantJson('POST', '/api/v1/ecc/casais', [
             'equipe_id' => $this->equipeAlphaId,
             'nome' => 'João Alpha',
             'nome_conjuge' => 'Maria Alpha',
-        ])->assertCreated()->json('data.id');
+        ])->assertCreated()->json('data');
+        $this->casalAlphaId = $casalAlpha['id'];
+        $this->pessoaAlphaId = $casalAlpha['ele']['id'];
 
-        $this->casalBetaId = $this->tenantJson('POST', '/api/v1/ecc/casais', [
+        $casalBeta = $this->tenantJson('POST', '/api/v1/ecc/casais', [
             'equipe_id' => $this->equipeBetaId,
             'nome' => 'Pedro Beta',
             'nome_conjuge' => 'Ana Beta',
-        ])->assertCreated()->json('data.id');
+        ])->assertCreated()->json('data');
+        $this->casalBetaId = $casalBeta['id'];
+        $this->pessoaBetaId = $casalBeta['ele']['id'];
 
         $liderId = $this->tenantJson('POST', '/api/v1/users', [
             'name' => 'Líder Alpha',
@@ -192,5 +201,63 @@ class EccLiderEquipeScopeTest extends TestCase
 
         $this->tenantJson('DELETE', '/api/v1/ecc/equipes/'.$this->equipeAlphaId)
             ->assertForbidden();
+    }
+
+    public function test_lider_atualiza_ficha_da_propria_equipe_sem_mover(): void
+    {
+        $this->tenantJson('PUT', '/api/v1/ecc/casais/'.$this->casalAlphaId, [
+            'equipe_id' => $this->equipeBetaId,
+            'equipe' => 'Equipe Nova',
+            'nome' => 'João Alpha',
+            'nome_conjuge' => 'Maria Alpha',
+            'telefone' => '11999990000',
+            'habilidades' => 'Cozinha',
+        ])->assertOk()
+            ->assertJsonPath('data.telefone', '11999990000')
+            ->assertJsonPath('data.habilidades', 'Cozinha')
+            ->assertJsonPath('data.equipe_id', $this->equipeAlphaId);
+
+        $this->tenantJson('GET', '/api/v1/ecc/casais/'.$this->casalAlphaId)
+            ->assertOk()
+            ->assertJsonPath('data.equipe_id', $this->equipeAlphaId);
+    }
+
+    public function test_lider_nao_atualiza_casal_de_outra_equipe_nem_apaga_ou_troca(): void
+    {
+        $this->tenantJson('PUT', '/api/v1/ecc/casais/'.$this->casalBetaId, [
+            'nome' => 'Pedro Beta',
+            'nome_conjuge' => 'Ana Beta',
+            'telefone' => '11888880000',
+        ])->assertNotFound();
+
+        $this->tenantJson('DELETE', '/api/v1/ecc/casais/'.$this->casalAlphaId)
+            ->assertForbidden();
+
+        $this->tenantJson('POST', '/api/v1/ecc/casais/'.$this->casalAlphaId.'/swap')
+            ->assertForbidden();
+    }
+
+    public function test_lider_envia_foto_somente_da_propria_equipe(): void
+    {
+        $this->withHeader('X-Tenant', 'paroquia-escopo')
+            ->post('/api/v1/pessoas/'.$this->pessoaAlphaId.'/foto', [
+                'file' => UploadedFile::fake()->image('foto.jpg'),
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.id', $this->pessoaAlphaId);
+
+        $this->withHeader('X-Tenant', 'paroquia-escopo')
+            ->post('/api/v1/pessoas/'.$this->pessoaBetaId.'/foto', [
+                'file' => UploadedFile::fake()->image('outra.jpg'),
+            ])
+            ->assertForbidden();
+
+        $this->withHeader('X-Tenant', 'paroquia-escopo')
+            ->deleteJson('/api/v1/pessoas/'.$this->pessoaBetaId.'/foto')
+            ->assertForbidden();
+
+        $this->withHeader('X-Tenant', 'paroquia-escopo')
+            ->deleteJson('/api/v1/pessoas/'.$this->pessoaAlphaId.'/foto')
+            ->assertNoContent();
     }
 }

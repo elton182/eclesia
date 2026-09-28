@@ -61,13 +61,11 @@ export function userHasPermission(user, permission, opts = {}) {
   if (permission === 'telas.casais' && (roleNames.includes('cadastros-casais') || roleNames.includes('lider-equipe'))) {
     return true
   }
-  if (
-    permission === 'telas.eventos' &&
-    (roleNames.includes('lider-equipe') || roleNames.includes('cadastros-eventos'))
-  ) {
+  if (permission === 'telas.eventos' && roleNames.includes('cadastros-eventos')) {
     return true
   }
   if (permission === 'ecc.casais.manage' && roleNames.includes('cadastros-casais')) return true
+  if (permission === 'ecc.casais.atualizar' && roleNames.includes('lider-equipe')) return true
   if (permission === 'ecc.equipes.manage' && roleNames.includes('cadastros-equipes')) return true
   if (permission === 'ecc.eventos.manage' && roleNames.includes('cadastros-eventos')) return true
   if (permission === 'ecc.casais.view' && (roleNames.includes('cadastros-casais') || roleNames.includes('lider-equipe'))) {
@@ -76,10 +74,7 @@ export function userHasPermission(user, permission, opts = {}) {
   if (permission === 'ecc.equipes.view' && (roleNames.includes('cadastros-equipes') || roleNames.includes('lider-equipe'))) {
     return true
   }
-  if (
-    permission === 'ecc.eventos.view' &&
-    (roleNames.includes('lider-equipe') || roleNames.includes('cadastros-eventos'))
-  ) {
+  if (permission === 'ecc.eventos.view' && roleNames.includes('cadastros-eventos')) {
     return true
   }
   if (
@@ -96,10 +91,7 @@ export function userHasPermission(user, permission, opts = {}) {
     (permission === 'telas.calendario' ||
       permission === 'calendario.gerir' ||
       permission === 'calendario.colaborar') &&
-    (roleNames.includes('admin-igreja') ||
-      roleNames.includes('cadastros-calendario') ||
-      (permission === 'calendario.colaborar' && roleNames.includes('lider-equipe')) ||
-      (permission === 'telas.calendario' && roleNames.includes('lider-equipe')))
+    (roleNames.includes('admin-igreja') || roleNames.includes('cadastros-calendario'))
   ) {
     return true
   }
@@ -165,6 +157,27 @@ export function canSeeEccFinanceiroNav(user, opts = {}) {
 export function equipesLideradasIds(user) {
   if (!user || !Array.isArray(user.equipes_lideradas)) return []
   return user.equipes_lideradas.map((e) => e.id).filter(Boolean)
+}
+
+/**
+ * Papel exclusivo de líder de equipe (pode liderar N equipes).
+ * @param {{ roles?: Array<{ name: string }> }|null|undefined} user
+ * @param {{ isSuperAdmin?: boolean }} [opts]
+ */
+export function isSomenteLiderEquipe(user, opts = {}) {
+  if (opts.isSuperAdmin) return false
+  if (!user) return false
+  const names = [...new Set((user.roles || []).map((r) => r?.name).filter(Boolean))]
+  return names.length === 1 && names[0] === 'lider-equipe'
+}
+
+/**
+ * Destino após o login.
+ * @param {{ roles?: Array<{ name: string }> }|null|undefined} user
+ * @param {{ isSuperAdmin?: boolean }} [opts]
+ */
+export function homePathForUser(user, opts = {}) {
+  return isSomenteLiderEquipe(user, opts) ? '/ecc/minha-equipe' : '/inicio'
 }
 
 /**

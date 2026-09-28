@@ -93,6 +93,7 @@ class RolesAndPermissionsSeeder extends Seeder
         'ecc.equipes.manage',
         'ecc.casais.view',
         'ecc.casais.manage',
+        'ecc.casais.atualizar',
         'ecc.eventos.view',
         'ecc.eventos.manage',
         'ecc.financeiro.view',
@@ -199,13 +200,9 @@ class RolesAndPermissionsSeeder extends Seeder
         Role::findByName('lider-equipe', self::GUARD)->syncPermissions([
             'telas.equipes',
             'telas.casais',
-            'telas.eventos',
             'ecc.equipes.view',
             'ecc.casais.view',
-            'ecc.eventos.view',
-            'ecc.escala.editar',
-            'telas.calendario',
-            'calendario.colaborar',
+            'ecc.casais.atualizar',
         ]);
 
         app()[PermissionRegistrar::class]->forgetCachedPermissions();
