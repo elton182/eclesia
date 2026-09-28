@@ -10,6 +10,8 @@ info:
     Login web resolve tenant por slug|apelido|nome no body (sem X-Tenant obrigatório).
     Dados pessoais criptografados em repouso (LGPD).
     Site público do tenant: `/public/site*` (X-Tenant, sem auth) — SPEC-005 / ADR-0003.
+    SEO HTML/sitemap: `/public/site/html/{tenantSlug}` e `/public/site/sitemap/{tenantSlug}`
+    (tenancy pelo slug no path; sem X-Tenant).
 servers:
   - url: http://localhost:8000/api/v1
     description: Local
@@ -2146,6 +2148,69 @@ paths:
           description: Validação
         '429':
           description: Rate limit
+  /public/site/html/{tenantSlug}:
+    get:
+      summary: HTML SEO da home pública (tenancy pelo path)
+      description: |
+        Sem X-Tenant. Devolve documento HTML com title, meta description, canonical,
+        Open Graph e texto dos blocos publicados. Mesmo conteúdo para pessoa e crawler.
+      parameters:
+        - name: tenantSlug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: HTML da home publicada
+          content:
+            text/html:
+              schema:
+                type: string
+        '404':
+          description: Site não publicado ou tenant inexistente
+  /public/site/html/{tenantSlug}/{pageSlug}:
+    get:
+      summary: HTML SEO de página pública (tenancy pelo path)
+      parameters:
+        - name: tenantSlug
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: pageSlug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: HTML da página publicada
+          content:
+            text/html:
+              schema:
+                type: string
+        '404':
+          description: Página/site não publicados
+  /public/site/sitemap/{tenantSlug}:
+    get:
+      summary: Sitemap XML das páginas publicadas
+      description: URLs canônicas com base em FRONTEND_URL. Sem X-Tenant (slug no path).
+      parameters:
+        - name: tenantSlug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: sitemap.xml
+          content:
+            application/xml:
+              schema:
+                type: string
+        '404':
+          description: Site não publicado
   /site/settings:
     get:
       summary: Obter settings do site (admin)
