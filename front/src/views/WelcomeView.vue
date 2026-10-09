@@ -6,7 +6,13 @@ import { useAuthAdminStore } from '@/stores/authAdmin'
 import { useTenantStore } from '@/stores/tenant'
 import { useIgrejaStore } from '@/stores/igreja'
 import { useBrandingStore } from '@/stores/branding'
-import { userHasPermission, canSeeEccCasaisNav, canSeeEccEventosNav, canSeeCalendarioNav } from '@/utils/userRoles'
+import {
+  userHasPermission,
+  canSeeEccCasaisNav,
+  canSeeEccEventosNav,
+  canSeeCalendarioNav,
+  canSeePastoraisNav,
+} from '@/utils/userRoles'
 import api from '@/services/api'
 import PwaInstallNavButton from '@/components/base/PwaInstallNavButton.vue'
 
@@ -91,6 +97,7 @@ const moduleAccessCount = computed(() => {
   if (can('telas.site') || isPlatformAdmin.value) n++
   if (showCalendario.value) n++
   if (showEventos.value) n++
+  if (showPastorais.value) n++
   return n
 })
 
@@ -119,6 +126,11 @@ const showCalendario = computed(() =>
 )
 const showEventos = computed(() =>
   canSeeEccEventosNav(authTenant.user, { isSuperAdmin: isPlatformAdmin.value }),
+)
+const showPastorais = computed(
+  () =>
+    canSeePastoraisNav(authTenant.user, { isSuperAdmin: isPlatformAdmin.value }) ||
+    isPlatformAdmin.value,
 )
 const showSite = computed(() => can('telas.site') || isPlatformAdmin.value)
 const showIgrejas = computed(() => can('telas.igrejas') || isPlatformAdmin.value)
@@ -475,24 +487,40 @@ function go(path) {
           </div>
         </button>
 
-        <div
-          class="rounded-xl p-[22px] flex flex-col gap-3 opacity-90"
+        <button
+          v-if="showPastorais"
+          type="button"
+          class="text-left rounded-xl p-[22px] flex flex-col gap-3 cursor-pointer transition-shadow"
           style="background: var(--color-surface); border: 1px solid var(--color-line)"
+          data-testid="launcher-card-pastorais"
+          @click="go('/pastorais')"
+          @mouseenter="($event.currentTarget.style.borderColor = 'var(--color-primary-hover)')"
+          @mouseleave="($event.currentTarget.style.borderColor = 'var(--color-line)')"
         >
-          <div
-            class="w-[38px] h-[38px] rounded-[9px] flex items-center justify-center font-serif text-[17px] font-medium"
-            style="background: var(--color-surface-2); color: var(--color-primary-soft)"
-          >
-            P
+          <div class="flex items-start justify-between">
+            <div
+              class="w-[38px] h-[38px] rounded-[9px] flex items-center justify-center font-serif text-[17px] font-medium"
+              style="background: var(--color-primary-soft); color: var(--color-on-primary)"
+            >
+              P
+            </div>
+            <span
+              class="text-[11px] font-medium px-2 py-1 rounded-full"
+              style="color: var(--color-accent-dark); background: var(--color-accent-soft)"
+            >
+              ativo
+            </span>
           </div>
           <div>
             <div class="font-serif text-[17px] font-medium" style="color: var(--color-ink)">Pastorais</div>
             <div class="text-[12.5px] leading-relaxed mt-1" style="color: var(--color-muted)">
-              Grupos, coordenações e membros.
+              Cadastro, membros e planejamento anual.
             </div>
           </div>
-          <div class="mt-auto text-[12px]" style="color: var(--color-muted)">em breve</div>
-        </div>
+          <div class="mt-auto flex gap-3.5 text-[12px]" style="color: var(--color-muted)">
+            <span>Coleta e revisão do ano</span>
+          </div>
+        </button>
 
         <div
           class="rounded-xl p-[22px] flex flex-col gap-3"
@@ -690,21 +718,27 @@ function go(path) {
         </div>
       </button>
 
-      <div
-        class="flex items-center gap-3.5 rounded-[11px] p-[15px] min-h-11"
+      <button
+        v-if="showPastorais"
+        type="button"
+        class="flex items-center gap-3.5 rounded-[11px] p-[15px] min-h-11 text-left"
         style="background: var(--color-surface); border: 1px solid var(--color-line)"
+        data-testid="launcher-card-pastorais-mobile"
+        @click="go('/pastorais')"
       >
         <div
           class="w-9 h-9 rounded-lg flex items-center justify-center font-serif text-[16px] font-medium shrink-0"
-          style="background: var(--color-surface-2); color: var(--color-primary-soft)"
+          style="background: var(--color-primary-soft); color: var(--color-on-primary)"
         >
           P
         </div>
-        <div class="flex-1">
+        <div class="flex-1 min-w-0">
           <div class="font-serif text-[15px] font-medium" style="color: var(--color-ink)">Pastorais</div>
-          <div class="text-[12px] mt-0.5" style="color: var(--color-muted)">em breve</div>
+          <div class="text-[12px] mt-0.5" style="color: var(--color-muted)">
+            Cadastro e planejamento anual
+          </div>
         </div>
-      </div>
+      </button>
 
       <div
         class="flex items-center gap-3.5 rounded-[11px] p-[15px] min-h-11"

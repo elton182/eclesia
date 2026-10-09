@@ -14,6 +14,8 @@ use App\Http\Controllers\Api\EccFinanceiroController;
 use App\Http\Controllers\Api\EventoTipoController;
 use App\Http\Controllers\Api\IgrejaController;
 use App\Http\Controllers\Api\PastoralController;
+use App\Http\Controllers\Api\PastoraisController;
+use App\Http\Controllers\Api\PlanejamentoController;
 use App\Http\Controllers\Api\PessoaFotoController;
 use App\Http\Controllers\Api\PublicSiteController;
 use App\Http\Controllers\Api\RolePermissionController;
@@ -198,6 +200,28 @@ Route::middleware([
     Route::post('calendario/mensais/{id}/coleta-links', [CalendarioController::class, 'storeColetaLink']);
     Route::post('calendario/mensais/{id}/indisponibilidades', [CalendarioController::class, 'storeIndisponibilidades']);
     Route::get('calendario/mensais/{id}/pdf', [CalendarioController::class, 'pdf']);
+
+    Route::get('pastorais', [PastoraisController::class, 'index']);
+    Route::post('pastorais', [PastoraisController::class, 'store']);
+    Route::get('pastorais/{id}', [PastoraisController::class, 'show']);
+    Route::patch('pastorais/{id}', [PastoraisController::class, 'update']);
+    Route::delete('pastorais/{id}', [PastoraisController::class, 'destroy']);
+    Route::get('pastorais/{id}/membros', [PastoraisController::class, 'indexMembros']);
+    Route::post('pastorais/{id}/membros', [PastoraisController::class, 'storeMembro']);
+    Route::delete('pastorais/{id}/membros/{userId}', [PastoraisController::class, 'destroyMembro']);
+
+    Route::get('planejamento/anuais', [PlanejamentoController::class, 'indexAnuais']);
+    Route::post('planejamento/anuais', [PlanejamentoController::class, 'storeAnual']);
+    Route::get('planejamento/anuais/{id}', [PlanejamentoController::class, 'showAnual']);
+    Route::patch('planejamento/anuais/{id}', [PlanejamentoController::class, 'updateAnual']);
+    Route::delete('planejamento/anuais/{id}', [PlanejamentoController::class, 'destroyAnual']);
+    Route::post('planejamento/anuais/{id}/status', [PlanejamentoController::class, 'transitionStatus']);
+    Route::get('planejamento/anuais/{id}/eventos', [PlanejamentoController::class, 'indexEventos']);
+    Route::post('planejamento/anuais/{id}/eventos', [PlanejamentoController::class, 'storeEvento']);
+    Route::get('planejamento/eventos/{eventoId}', [PlanejamentoController::class, 'showEvento']);
+    Route::patch('planejamento/eventos/{eventoId}', [PlanejamentoController::class, 'updateEvento']);
+    Route::delete('planejamento/eventos/{eventoId}', [PlanejamentoController::class, 'destroyEvento']);
+    Route::get('planejamento/anuais/{id}/pdf', [PlanejamentoController::class, 'pdf']);
 
     Route::post('pessoas/{id}/foto', [PessoaFotoController::class, 'store']);
     Route::delete('pessoas/{id}/foto', [PessoaFotoController::class, 'destroy']);

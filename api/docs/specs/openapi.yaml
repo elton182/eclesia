@@ -308,6 +308,123 @@ components:
           type: boolean
         ativa:
           type: boolean
+        membros:
+          type: array
+          items:
+            $ref: '#/components/schemas/PastoralMembro'
+    PastoralMembro:
+      type: object
+      properties:
+        user_id:
+          type: string
+          description: ULID do usuário
+        name:
+          type: string
+        email:
+          type: string
+        papel:
+          type: string
+          enum: [coordenador, membro]
+    PlanejamentoAnual:
+      type: object
+      properties:
+        id:
+          type: string
+        igreja_id:
+          type: string
+        ano:
+          type: integer
+        status:
+          type: string
+          enum: [rascunho, coleta, revisao, fechado]
+        fechado_em:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    PlanejamentoEventoConflito:
+      type: object
+      properties:
+        id:
+          type: string
+        titulo:
+          type: string
+        pastoral_id:
+          type: string
+        data_inicio:
+          type: string
+          format: date
+        data_fim:
+          type: string
+          format: date
+          nullable: true
+        hora_inicio:
+          type: string
+          nullable: true
+        hora_fim:
+          type: string
+          nullable: true
+        local_ids:
+          type: array
+          items:
+            type: string
+    PlanejamentoEvento:
+      type: object
+      properties:
+        id:
+          type: string
+        planejamento_anual_id:
+          type: string
+        pastoral_id:
+          type: string
+        titulo:
+          type: string
+        data_inicio:
+          type: string
+          format: date
+        data_fim:
+          type: string
+          format: date
+          nullable: true
+        hora_inicio:
+          type: string
+          nullable: true
+          example: '19:30'
+        hora_fim:
+          type: string
+          nullable: true
+        participantes_media:
+          type: integer
+          nullable: true
+        recorrencia_texto:
+          type: string
+          nullable: true
+        observacoes:
+          type: string
+          nullable: true
+        local_texto:
+          type: string
+          nullable: true
+        local_ids:
+          type: array
+          items:
+            type: string
+        status_solicitacao:
+          type: string
+          enum: [proposta, confirmado, ajuste_solicitado, reagendado, recusado, cotidiano]
+        motivo_ajuste:
+          type: string
+          nullable: true
+        conflitos:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlanejamentoEventoConflito'
+          description: Alertas de conflito (mesmo local + horário sobreposto); HTTP 2xx mesmo com itens
     SiteForm:
       type: object
       properties:
@@ -3564,3 +3681,462 @@ paths:
                 motivo: {type: string}
       responses:
         '201': {description: Created}
+
+  # SPEC-018 — Pastorais (domínio) e planejamento anual
+  /pastorais:
+    get:
+      summary: Listar pastorais da igreja (cadastro de domínio)
+      security: [{bearerAuth: [], tenantHeader: [], igrejaHeader: []}]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Pastoral'
+        '401': {description: Não autenticado}
+        '403': {description: Sem permissão}
+    post:
+      summary: Criar pastoral
+      security: [{bearerAuth: [], tenantHeader: [], igrejaHeader: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nome]
+              properties:
+                nome: {type: string}
+                descricao_publica: {type: string, nullable: true}
+                contato_publico: {type: string, nullable: true}
+                ordem: {type: integer}
+                publicado_no_site: {type: boolean}
+                ativa: {type: boolean}
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Pastoral'
+        '401': {description: Não autenticado}
+        '403': {description: Sem permissão}
+        '422': {description: Validação}
+  /pastorais/{id}:
+    get:
+      summary: Detalhe da pastoral
+      security: [{bearerAuth: [], tenantHeader: [], igrejaHeader: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Pastoral'
+        '401': {description: Não autenticado}
+        '403': {description: Sem permissão}
+        '404': {description: Não encontrado}
+    patch:
+      summary: Atualizar pastoral
+      security: [{bearerAuth: [], tenantHeader: [], igrejaHeader: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nome: {type: string}
+                descricao_publica: {type: string, nullable: true}
+                contato_publico: {type: string, nullable: true}
+                ordem: {type: integer}
+                publicado_no_site: {type: boolean}
+                ativa: {type: boolean}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Pastoral'
+        '401': {description: Não autenticado}
+        '403': {description: Sem permissão}
+        '422': {description: Validação}
+    delete:
+      summary: Excluir pastoral
+      security: [{bearerAuth: [], tenantHeader: [], igrejaHeader: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      responses:
+        '204': {description: No Content}
+        '401': {description: Não autenticado}
+        '403': {description: Sem permissão}
+  /pastorais/{id}/membros:
+    get:
+      summary: Listar membros da pastoral
+      security: [{bearerAuth: [], tenantHeader: [], igrejaHeader: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PastoralMembro'
+        '401': {description: Não autenticado}
+        '403': {description: Sem permissão}
+    post:
+      summary: Associar usuário à pastoral
+      security: [{bearerAuth: [], tenantHeader: [], igrejaHeader: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_id, papel]
+              properties:
+                user_id: {type: string, description: ULID do usuário}
+                papel: {type: string, enum: [coordenador, membro]}
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PastoralMembro'
+        '401': {description: Não autenticado}
+        '403': {description: Sem permissão}
+        '422': {description: Validação}
+  /pastorais/{id}/membros/{userId}:
+    delete:
+      summary: Desassociar usuário da pastoral
+      security: [{bearerAuth: [], tenantHeader: [], igrejaHeader: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+        - {name: userId, in: path, required: true, schema: {type: string}, description: ULID do usuário}
+      responses:
+        '204': {description: No Content}
+        '401': {description: Não autenticado}
+        '403': {description: Sem permissão}
+        '404': {description: Não encontrado}
+
+  /planejamento/anuais:
+    get:
+      summary: Listar calendários anuais de planejamento
+      security: [{bearerAuth: [], tenantHeader: [], igrejaHeader: []}]
+      parameters:
+        - {name: ano, in: query, required: false, schema: {type: integer}}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PlanejamentoAnual'
+        '401': {description: Não autenticado}
+        '403': {description: Sem permissão}
+    post:
+      summary: Criar calendário anual (status rascunho)
+      security: [{bearerAuth: [], tenantHeader: [], igrejaHeader: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ano]
+              properties:
+                ano: {type: integer, minimum: 2000, maximum: 2100}
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PlanejamentoAnual'
+        '401': {description: Não autenticado}
+        '403': {description: Sem permissão}
+        '422': {description: Validação (ano duplicado)}
+  /planejamento/anuais/{id}:
+    get:
+      summary: Detalhe do calendário anual
+      security: [{bearerAuth: [], tenantHeader: [], igrejaHeader: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PlanejamentoAnual'
+        '401': {description: Não autenticado}
+        '403': {description: Sem permissão}
+        '404': {description: Não encontrado}
+    patch:
+      summary: Atualizar metadados do calendário anual
+      security: [{bearerAuth: [], tenantHeader: [], igrejaHeader: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ano: {type: integer}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PlanejamentoAnual'
+        '401': {description: Não autenticado}
+        '403': {description: Sem permissão}
+        '422': {description: Validação}
+    delete:
+      summary: Excluir calendário anual
+      security: [{bearerAuth: [], tenantHeader: [], igrejaHeader: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      responses:
+        '204': {description: No Content}
+        '401': {description: Não autenticado}
+        '403': {description: Sem permissão}
+  /planejamento/anuais/{id}/status:
+    post:
+      summary: Transicionar status do calendário anual
+      description: |
+        Transições: rascunho→coleta→revisao→fechado.
+        Reabertura: fechado→revisao (somente planejamento.gerir).
+      security: [{bearerAuth: [], tenantHeader: [], igrejaHeader: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: {type: string, enum: [rascunho, coleta, revisao, fechado]}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PlanejamentoAnual'
+        '401': {description: Não autenticado}
+        '403': {description: Sem permissão}
+        '422': {description: Transição inválida}
+  /planejamento/anuais/{id}/eventos:
+    get:
+      summary: Listar eventos do calendário anual
+      security: [{bearerAuth: [], tenantHeader: [], igrejaHeader: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+        - {name: mes, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 12}}
+        - {name: pastoral_id, in: query, required: false, schema: {type: string}}
+        - {name: status_solicitacao, in: query, required: false, schema: {type: string}}
+        - {name: local_id, in: query, required: false, schema: {type: string}}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PlanejamentoEvento'
+        '401': {description: Não autenticado}
+        '403': {description: Sem permissão}
+    post:
+      summary: Criar evento de planejamento
+      description: |
+        Conflitos de local/horário retornam em `conflitos[]` com HTTP 201 (não bloqueiam).
+        Coordenador: só pastorais do pivot; em coleta livre; em revisao só se ajuste_solicitado.
+      security: [{bearerAuth: [], tenantHeader: [], igrejaHeader: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [pastoral_id, titulo, data_inicio]
+              properties:
+                pastoral_id: {type: string}
+                titulo: {type: string}
+                data_inicio: {type: string, format: date}
+                data_fim: {type: string, format: date, nullable: true}
+                hora_inicio: {type: string, nullable: true, example: '19:30'}
+                hora_fim: {type: string, nullable: true}
+                participantes_media: {type: integer, nullable: true}
+                recorrencia_texto: {type: string, nullable: true}
+                observacoes: {type: string, nullable: true}
+                local_texto: {type: string, nullable: true}
+                local_ids:
+                  type: array
+                  items: {type: string}
+                  description: ULIDs de calendario_locais (N:N)
+                status_solicitacao:
+                  type: string
+                  enum: [proposta, confirmado, ajuste_solicitado, reagendado, recusado, cotidiano]
+                  description: Somente gestor (planejamento.gerir) pode definir; coordenador cria como proposta
+                motivo_ajuste: {type: string, nullable: true}
+      responses:
+        '201':
+          description: Created (pode incluir conflitos[])
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PlanejamentoEvento'
+        '401': {description: Não autenticado}
+        '403': {description: Sem permissão / fora do escopo}
+        '422': {description: Validação}
+  /planejamento/eventos/{eventoId}:
+    get:
+      summary: Detalhe do evento de planejamento
+      security: [{bearerAuth: [], tenantHeader: [], igrejaHeader: []}]
+      parameters:
+        - {name: eventoId, in: path, required: true, schema: {type: string}}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PlanejamentoEvento'
+        '401': {description: Não autenticado}
+        '403': {description: Sem permissão}
+        '404': {description: Não encontrado}
+    patch:
+      summary: Atualizar evento de planejamento
+      description: Conflitos retornam em `conflitos[]` com HTTP 200 (não bloqueiam).
+      security: [{bearerAuth: [], tenantHeader: [], igrejaHeader: []}]
+      parameters:
+        - {name: eventoId, in: path, required: true, schema: {type: string}}
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                pastoral_id: {type: string}
+                titulo: {type: string}
+                data_inicio: {type: string, format: date}
+                data_fim: {type: string, format: date, nullable: true}
+                hora_inicio: {type: string, nullable: true}
+                hora_fim: {type: string, nullable: true}
+                participantes_media: {type: integer, nullable: true}
+                recorrencia_texto: {type: string, nullable: true}
+                observacoes: {type: string, nullable: true}
+                local_texto: {type: string, nullable: true}
+                local_ids:
+                  type: array
+                  items: {type: string}
+                status_solicitacao:
+                  type: string
+                  enum: [proposta, confirmado, ajuste_solicitado, reagendado, recusado, cotidiano]
+                motivo_ajuste: {type: string, nullable: true}
+      responses:
+        '200':
+          description: OK (pode incluir conflitos[])
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PlanejamentoEvento'
+        '401': {description: Não autenticado}
+        '403': {description: Sem permissão / fora do escopo}
+        '422': {description: Validação}
+    delete:
+      summary: Excluir evento de planejamento
+      security: [{bearerAuth: [], tenantHeader: [], igrejaHeader: []}]
+      parameters:
+        - {name: eventoId, in: path, required: true, schema: {type: string}}
+      responses:
+        '204': {description: No Content}
+        '401': {description: Não autenticado}
+        '403': {description: Sem permissão / fora do escopo}
+  /planejamento/anuais/{id}/pdf:
+    get:
+      summary: Exportar PDF do planejamento anual (lista/grade)
+      description: Disponível em revisao ou fechado. Query `mes` filtra um mês (1–12).
+      security: [{bearerAuth: [], tenantHeader: [], igrejaHeader: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+        - {name: mes, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 12}}
+      responses:
+        '200':
+          description: PDF
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        '401': {description: Não autenticado}
+        '403': {description: Sem permissão}
+        '422': {description: Status não permite export}

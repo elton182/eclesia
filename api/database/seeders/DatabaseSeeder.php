@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace Database\Seeders;
 
 use App\Models\Igreja;
+use App\Models\Pastoral;
+use App\Models\PlanejamentoAnual;
 use App\Models\SuperAdmin;
 use App\Models\Tenant;
+use App\Models\User;
 use App\Services\TenantService;
 use Illuminate\Database\Seeder;
 
@@ -43,13 +46,9 @@ class DatabaseSeeder extends Seeder
         }
 
         $existing->run(function (): void {
-            if (Igreja::query()->count() >= 2) {
-                return;
-            }
-
             $first = Igreja::query()->orderBy('created_at')->first();
             if ($first === null) {
-                Igreja::query()->create([
+                $first = Igreja::query()->create([
                     'nome' => 'Paróquia São José',
                     'tipo' => 'paroquia',
                     'cidade' => 'São Paulo',
@@ -70,6 +69,64 @@ class DatabaseSeeder extends Seeder
                     'uf' => 'SP',
                 ]);
             }
+
+            $this->seedDemoPastoraisPlanejamento($first->fresh() ?? Igreja::query()->orderBy('created_at')->firstOrFail());
         });
+    }
+
+    private function seedDemoPastoraisPlanejamento(Igreja $igreja): void
+    {
+        $pastorais = [
+            'Pastoral da Criança',
+            'PASCOM',
+            'Setor Juventude',
+        ];
+
+        $created = [];
+        foreach ($pastorais as $i => $nome) {
+            $created[] = Pastoral::query()->firstOrCreate(
+                [
+                    'igreja_id' => $igreja->id,
+                    'nome' => $nome,
+                ],
+                [
+                    'ordem' => $i + 1,
+                    'ativa' => true,
+                    'publicado_no_site' => false,
+                ],
+            );
+        }
+
+        $ano = (int) date('Y') + 1;
+        PlanejamentoAnual::query()->firstOrCreate(
+            [
+                'igreja_id' => $igreja->id,
+                'ano' => $ano,
+            ],
+            [
+                'status' => PlanejamentoAnual::STATUS_COLETA,
+            ],
+        );
+
+        $coord = User::findByEmail('coordenador@demo.local');
+        if ($coord === null) {
+            $coord = User::query()->create([
+                'name' => 'Coord. Pastoral Demo',
+                'email' => 'coordenador@demo.local',
+                'password' => 'password',
+                'is_active' => true,
+            ]);
+        }
+
+        setPermissionsTeamId($igreja->id);
+        if (! $coord->hasRole('coordenador-pastoral')) {
+            $coord->assignRole('coordenador-pastoral');
+        }
+        setPermissionsTeamId(null);
+
+        $pastoral = $created[0];
+        if (! $pastoral->membros()->where('users.id', $coord->id)->exists()) {
+            $pastoral->membros()->attach($coord->id, ['papel' => 'coordenador']);
+        }
     }
 }

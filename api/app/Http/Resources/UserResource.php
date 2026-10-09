@@ -26,6 +26,7 @@ class UserResource extends JsonResource
             'pessoa_id' => $this->pessoa_id,
             'roles' => app(UserService::class)->rolesFor($this->resource),
             'equipes_lideradas' => app(UserService::class)->equipesLideradasFor($this->resource),
+            'pastorais' => app(UserService::class)->pastoraisFor($this->resource),
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
         ];
