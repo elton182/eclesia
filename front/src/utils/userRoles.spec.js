@@ -10,6 +10,7 @@ import {
   canSeeEccEventosNav,
   canSeeEccFinanceiroNav,
   canSeeCalendarioNav,
+  canSeePastoraisNav,
   isSomenteLiderEquipe,
   homePathForUser,
 } from './userRoles.js'
@@ -21,6 +22,7 @@ describe('userRoles', () => {
     assert.equal(roleLabel('cadastros-casais'), 'Cadastros · Casais')
     assert.equal(roleLabel('cadastros-eventos'), 'Cadastros · Eventos')
     assert.equal(roleLabel('cadastros-calendario'), 'Cadastros · Calendário')
+    assert.equal(roleLabel('coordenador-pastoral'), 'Coordenador · Pastoral')
     assert.equal(roleLabel('lider-equipe'), 'Líder de Equipe')
     assert.equal(roleLabel('admin-tenant'), 'Admin Organização')
   })
@@ -207,6 +209,25 @@ describe('userRoles', () => {
     assert.equal(canSeeCalendarioNav({ roles: [{ name: 'cadastros-calendario' }] }), true)
     assert.equal(canSeeCalendarioNav({ roles: [{ name: 'lider-equipe' }] }), false)
     assert.equal(canSeeCalendarioNav({ roles: [{ name: 'cadastros-usuarios' }] }), false)
+  })
+
+  it('canSeePastoraisNav para gestor e coordenador-pastoral', () => {
+    assert.equal(canSeePastoraisNav({ roles: [{ name: 'admin-igreja' }] }), true)
+    assert.equal(canSeePastoraisNav({ roles: [{ name: 'cadastros-calendario' }] }), true)
+    assert.equal(canSeePastoraisNav({ roles: [{ name: 'coordenador-pastoral' }] }), true)
+    assert.equal(canSeePastoraisNav({ roles: [{ name: 'lider-equipe' }] }), false)
+    assert.equal(
+      canSeePastoraisNav({ permissions: ['planejamento.propor'], roles: [] }),
+      true,
+    )
+    assert.equal(
+      userHasPermission({ roles: [{ name: 'coordenador-pastoral' }] }, 'planejamento.gerir'),
+      false,
+    )
+    assert.equal(
+      userHasPermission({ roles: [{ name: 'coordenador-pastoral' }] }, 'planejamento.propor'),
+      true,
+    )
   })
 
   it('isSomenteLiderEquipe só quando o único papel é lider-equipe', () => {

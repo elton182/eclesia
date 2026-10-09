@@ -26,6 +26,10 @@ import CalendarioMensalDetailView from '../views/CalendarioMensalDetailView.vue'
 import CalendarioLocaisView from '../views/CalendarioLocaisView.vue'
 import CalendarioTiposView from '../views/CalendarioTiposView.vue'
 import CalendarioColetaPublicView from '../views/CalendarioColetaPublicView.vue'
+import PastoraisView from '../views/PastoraisView.vue'
+import PastoralDetailView from '../views/PastoralDetailView.vue'
+import PlanejamentoAnuaisView from '../views/PlanejamentoAnuaisView.vue'
+import PlanejamentoAnualDetailView from '../views/PlanejamentoAnualDetailView.vue'
 import SiteAdminView from '../views/SiteAdminView.vue'
 import ConfiguracoesMarcaView from '../views/ConfiguracoesMarcaView.vue'
 import PublicSiteView from '../views/site/PublicSiteView.vue'
@@ -56,6 +60,13 @@ const ModuleLayoutCalendarioWrapper = {
   name: 'ModuleLayoutCalendario',
   setup() {
     return () => h(ModuleLayout, { moduleKey: 'calendario' })
+  },
+}
+
+const ModuleLayoutPastoraisWrapper = {
+  name: 'ModuleLayoutPastorais',
+  setup() {
+    return () => h(ModuleLayout, { moduleKey: 'pastorais' })
   },
 }
 
@@ -246,6 +257,33 @@ const router = createRouter({
           path: 'calendario/:id',
           name: 'calendario-mensal-detail',
           component: CalendarioMensalDetailView,
+        },
+      ],
+    },
+    {
+      path: '/',
+      component: ModuleLayoutPastoraisWrapper,
+      meta: { requiresAuthTenantOrAdmin: true },
+      children: [
+        {
+          path: 'pastorais',
+          name: 'pastorais',
+          component: PastoraisView,
+        },
+        {
+          path: 'pastorais/:id',
+          name: 'pastoral-detail',
+          component: PastoralDetailView,
+        },
+        {
+          path: 'planejamento',
+          name: 'planejamento-anuais',
+          component: PlanejamentoAnuaisView,
+        },
+        {
+          path: 'planejamento/:id',
+          name: 'planejamento-anual-detail',
+          component: PlanejamentoAnualDetailView,
         },
       ],
     },

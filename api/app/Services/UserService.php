@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Models\EccEquipe;
 use App\Models\Igreja;
+use App\Models\Pastoral;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -97,6 +98,23 @@ class UserService
             ->map(fn (EccEquipe $equipe) => [
                 'id' => $equipe->id,
                 'nome' => $equipe->nome,
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return list<array{id: string, nome: string, papel: string, igreja_id: string}>
+     */
+    public function pastoraisFor(User $user): array
+    {
+        return $user->pastorais()
+            ->get(['pastorais.id', 'pastorais.nome', 'pastorais.igreja_id'])
+            ->map(fn (Pastoral $pastoral) => [
+                'id' => $pastoral->id,
+                'nome' => $pastoral->nome,
+                'igreja_id' => $pastoral->igreja_id,
+                'papel' => (string) ($pastoral->pivot->papel ?? 'membro'),
             ])
             ->values()
             ->all();

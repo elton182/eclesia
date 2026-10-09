@@ -6,7 +6,14 @@ import { useAuthAdminStore } from '@/stores/authAdmin'
 import { useTenantStore } from '@/stores/tenant'
 import { useIgrejaStore } from '@/stores/igreja'
 import { useBrandingStore } from '@/stores/branding'
-import { userHasPermission, canSeeEccCasaisNav, canSeeEccEventosNav, canSeeEccFinanceiroNav, isSomenteLiderEquipe } from '@/utils/userRoles'
+import {
+  userHasPermission,
+  canSeeEccCasaisNav,
+  canSeeEccEventosNav,
+  canSeeEccFinanceiroNav,
+  canSeePastoraisNav,
+  isSomenteLiderEquipe,
+} from '@/utils/userRoles'
 import PwaInstallNavButton from '@/components/base/PwaInstallNavButton.vue'
 import fallbackLogo from '@/assets/logo-icon.png'
 
@@ -14,7 +21,7 @@ const props = defineProps({
   moduleKey: {
     type: String,
     required: true,
-    validator: (v) => ['ecc', 'site', 'eventos', 'calendario'].includes(v),
+    validator: (v) => ['ecc', 'site', 'eventos', 'calendario', 'pastorais'].includes(v),
   },
 })
 
@@ -97,6 +104,13 @@ const moduleMeta = computed(() => {
       subtitleMono: false,
     }
   }
+  if (props.moduleKey === 'pastorais') {
+    return {
+      title: 'Pastorais',
+      subtitle: 'Cadastro e planejamento anual',
+      subtitleMono: false,
+    }
+  }
   return {
     title: 'ECC',
     subtitle: 'Encontro de Casais com Cristo',
@@ -130,6 +144,27 @@ const navItems = computed(() => {
       { label: 'Locais e horários', path: '/calendario/locais' },
       { label: 'Tipos de evento', path: '/calendario/tipos' },
     ]
+  }
+  if (props.moduleKey === 'pastorais') {
+    const items = []
+    if (
+      canSeePastoraisNav(authTenant.user, { isSuperAdmin: isPlatformAdmin.value }) ||
+      can('telas.pastorais') ||
+      can('pastorais.manage') ||
+      can('pastorais.view')
+    ) {
+      items.push({ label: 'Pastorais', path: '/pastorais', exact: true })
+    }
+    if (
+      can('planejamento.gerir') ||
+      can('planejamento.propor') ||
+      can('planejamento.ver_global') ||
+      can('telas.pastorais') ||
+      isPlatformAdmin.value
+    ) {
+      items.push({ label: 'Planejamento anual', path: '/planejamento' })
+    }
+    return items
   }
   if (props.moduleKey === 'eventos') {
     if (canSeeEccEventosNav(authTenant.user, { isSuperAdmin: isPlatformAdmin.value })) {
@@ -167,6 +202,12 @@ function isActive(item) {
   }
   if (props.moduleKey === 'calendario' && item.path === '/calendario/tipos') {
     return route.path === '/calendario/tipos' || route.path.startsWith('/calendario/tipos/')
+  }
+  if (props.moduleKey === 'pastorais' && item.path === '/pastorais') {
+    return route.path === '/pastorais' || route.path.startsWith('/pastorais/')
+  }
+  if (props.moduleKey === 'pastorais' && item.path === '/planejamento') {
+    return route.path === '/planejamento' || route.path.startsWith('/planejamento/')
   }
   return route.path === item.path || route.path.startsWith(item.path + '/')
 }

@@ -39,7 +39,7 @@ O padre monta mensalmente o calendário litúrgico oficial (missas, celebraçõe
 ## Fora de escopo
 
 - Publicação automática em `evento_agenda`.
-- Calendários de pastorais.
+- Calendários de pastorais (ver [SPEC-018](./SPEC-018-pastorais-planejamento-anual.md) — módulo separado, sem sync nesta fase).
 - App nativo dedicado.
 - Cálculo automático do rótulo litúrgico (orbe / tempo comum etc.).
 

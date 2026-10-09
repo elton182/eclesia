@@ -11,6 +11,7 @@ export const ROLE_LABELS = {
   'cadastros-casais': 'Cadastros · Casais',
   'cadastros-eventos': 'Cadastros · Eventos',
   'cadastros-calendario': 'Cadastros · Calendário',
+  'coordenador-pastoral': 'Coordenador · Pastoral',
   'lider-equipe': 'Líder de Equipe',
 }
 
@@ -95,6 +96,26 @@ export function userHasPermission(user, permission, opts = {}) {
   ) {
     return true
   }
+  if (
+    (permission === 'telas.pastorais' ||
+      permission === 'pastorais.manage' ||
+      permission === 'pastorais.view' ||
+      permission === 'planejamento.gerir' ||
+      permission === 'planejamento.propor' ||
+      permission === 'planejamento.ver_global') &&
+    (roleNames.includes('admin-igreja') || roleNames.includes('cadastros-calendario'))
+  ) {
+    return true
+  }
+  if (
+    roleNames.includes('coordenador-pastoral') &&
+    (permission === 'telas.pastorais' ||
+      permission === 'pastorais.view' ||
+      permission === 'planejamento.propor' ||
+      permission === 'planejamento.ver_global')
+  ) {
+    return true
+  }
   return false
 }
 
@@ -108,6 +129,23 @@ export function canSeeCalendarioNav(user, opts = {}) {
     userHasPermission(user, 'telas.calendario', opts) ||
     userHasPermission(user, 'calendario.gerir', opts) ||
     userHasPermission(user, 'calendario.colaborar', opts)
+  )
+}
+
+/**
+ * Nav / launcher Pastorais + planejamento anual (SPEC-018).
+ * Distinto do CMS `/site` (site.pastorais.*) e do calendário oficial.
+ * @param {{ permissions?: string[], roles?: Array<{ name: string }> }|null|undefined} user
+ * @param {{ isSuperAdmin?: boolean }} [opts]
+ */
+export function canSeePastoraisNav(user, opts = {}) {
+  return (
+    userHasPermission(user, 'telas.pastorais', opts) ||
+    userHasPermission(user, 'pastorais.manage', opts) ||
+    userHasPermission(user, 'pastorais.view', opts) ||
+    userHasPermission(user, 'planejamento.gerir', opts) ||
+    userHasPermission(user, 'planejamento.propor', opts) ||
+    userHasPermission(user, 'planejamento.ver_global', opts)
   )
 }
 
