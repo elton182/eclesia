@@ -8,6 +8,8 @@ import LandingView from '../views/LandingView.vue'
 import TenantLoginView from '../views/TenantLoginView.vue'
 import LoginView from '../views/LoginView.vue'
 import WelcomeView from '../views/WelcomeView.vue'
+import MinhaEquipeView from '../views/MinhaEquipeView.vue'
+import { isSomenteLiderEquipe } from '../utils/userRoles'
 import TenantsView from '../views/TenantsView.vue'
 import UsersView from '../views/UsersView.vue'
 import AuditoriaView from '../views/AuditoriaView.vue'
@@ -16,6 +18,7 @@ import EccCasaisView from '../views/EccCasaisView.vue'
 import EccCasalDetailView from '../views/EccCasalDetailView.vue'
 import EccEventosView from '../views/EccEventosView.vue'
 import EccEventoDetailView from '../views/EccEventoDetailView.vue'
+import EccFinanceiroView from '../views/EccFinanceiroView.vue'
 import EventosView from '../views/EventosView.vue'
 import EventoDetailView from '../views/EventoDetailView.vue'
 import CalendarioMensaisView from '../views/CalendarioMensaisView.vue'
@@ -23,9 +26,10 @@ import CalendarioMensalDetailView from '../views/CalendarioMensalDetailView.vue'
 import CalendarioLocaisView from '../views/CalendarioLocaisView.vue'
 import CalendarioTiposView from '../views/CalendarioTiposView.vue'
 import CalendarioColetaPublicView from '../views/CalendarioColetaPublicView.vue'
-import PlanejamentoView from '../views/PlanejamentoView.vue'
-import PlanejamentoPastoraisView from '../views/PlanejamentoPastoraisView.vue'
-import PlanejamentoPublicView from '../views/PlanejamentoPublicView.vue'
+import PastoraisView from '../views/PastoraisView.vue'
+import PastoralDetailView from '../views/PastoralDetailView.vue'
+import PlanejamentoAnuaisView from '../views/PlanejamentoAnuaisView.vue'
+import PlanejamentoAnualDetailView from '../views/PlanejamentoAnualDetailView.vue'
 import SiteAdminView from '../views/SiteAdminView.vue'
 import ConfiguracoesMarcaView from '../views/ConfiguracoesMarcaView.vue'
 import PublicSiteView from '../views/site/PublicSiteView.vue'
@@ -59,17 +63,17 @@ const ModuleLayoutCalendarioWrapper = {
   },
 }
 
+const ModuleLayoutPastoraisWrapper = {
+  name: 'ModuleLayoutPastorais',
+  setup() {
+    return () => h(ModuleLayout, { moduleKey: 'pastorais' })
+  },
+}
+
 const ModuleLayoutEventosWrapper = {
   name: 'ModuleLayoutEventos',
   setup() {
     return () => h(ModuleLayout, { moduleKey: 'eventos' })
-  },
-}
-
-const ModuleLayoutPlanejamentoWrapper = {
-  name: 'ModuleLayoutPlanejamento',
-  setup() {
-    return () => h(ModuleLayout, { moduleKey: 'planejamento' })
   },
 }
 
@@ -103,12 +107,6 @@ const router = createRouter({
       path: '/calendario/coleta/:token',
       name: 'calendario-coleta-publica',
       component: CalendarioColetaPublicView,
-      meta: { publicSite: true },
-    },
-    {
-      path: '/planejamento/publico/:token',
-      name: 'planejamento-publico',
-      component: PlanejamentoPublicView,
       meta: { publicSite: true },
     },
     {
@@ -200,6 +198,11 @@ const router = createRouter({
       meta: { requiresAuthTenantOrAdmin: true },
       children: [
         {
+          path: 'ecc/minha-equipe',
+          name: 'ecc-minha-equipe',
+          component: MinhaEquipeView,
+        },
+        {
           path: 'ecc/equipes',
           redirect: { name: 'ecc-casais' },
         },
@@ -222,6 +225,11 @@ const router = createRouter({
           path: 'ecc/eventos/:id',
           name: 'ecc-evento-detail',
           component: EccEventoDetailView,
+        },
+        {
+          path: 'ecc/financeiro',
+          name: 'ecc-financeiro',
+          component: EccFinanceiroView,
         },
       ],
     },
@@ -254,6 +262,33 @@ const router = createRouter({
     },
     {
       path: '/',
+      component: ModuleLayoutPastoraisWrapper,
+      meta: { requiresAuthTenantOrAdmin: true },
+      children: [
+        {
+          path: 'pastorais',
+          name: 'pastorais',
+          component: PastoraisView,
+        },
+        {
+          path: 'pastorais/:id',
+          name: 'pastoral-detail',
+          component: PastoralDetailView,
+        },
+        {
+          path: 'planejamento',
+          name: 'planejamento-anuais',
+          component: PlanejamentoAnuaisView,
+        },
+        {
+          path: 'planejamento/:id',
+          name: 'planejamento-anual-detail',
+          component: PlanejamentoAnualDetailView,
+        },
+      ],
+    },
+    {
+      path: '/',
       component: ModuleLayoutEventosWrapper,
       meta: { requiresAuthTenantOrAdmin: true },
       children: [
@@ -269,25 +304,17 @@ const router = createRouter({
         },
       ],
     },
-    {
-      path: '/',
-      component: ModuleLayoutPlanejamentoWrapper,
-      meta: { requiresAuthTenantOrAdmin: true },
-      children: [
-        {
-          path: 'planejamento',
-          name: 'planejamento',
-          component: PlanejamentoView,
-        },
-        {
-          path: 'planejamento/pastorais',
-          name: 'planejamento-pastorais',
-          component: PlanejamentoPastoraisView,
-        },
-      ],
-    },
   ],
 })
+
+function nextAfterTenantAuth(to, next) {
+  const authTenant = useAuthStore()
+  if (to.name === 'inicio' && isSomenteLiderEquipe(authTenant.user)) {
+    next({ name: 'ecc-minha-equipe' })
+    return
+  }
+  next()
+}
 
 router.beforeEach(async (to, from, next) => {
   const authAdmin = useAuthAdminStore()
@@ -296,7 +323,11 @@ router.beforeEach(async (to, from, next) => {
 
   if (to.name === 'tenant-login') {
     const ok = await authTenant.checkAuth()
-    next(ok ? HOME_PATH : undefined)
+    if (!ok) {
+      next()
+      return
+    }
+    next(isSomenteLiderEquipe(authTenant.user) ? { name: 'ecc-minha-equipe' } : HOME_PATH)
     return
   }
 
@@ -317,14 +348,18 @@ router.beforeEach(async (to, from, next) => {
         if (tenantStore.slug) {
           await branding.ensureLoaded()
         }
-        next()
+        nextAfterTenantAuth(to, next)
         return
       }
       const tenantOk = await authTenant.checkAuth()
       if (tenantOk && tenantStore.slug) {
         await branding.ensureLoaded()
       }
-      next(tenantOk ? undefined : LOGIN_TENANT_PATH)
+      if (!tenantOk) {
+        next(LOGIN_TENANT_PATH)
+        return
+      }
+      nextAfterTenantAuth(to, next)
       return
     }
 

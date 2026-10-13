@@ -23,7 +23,7 @@ class RolesAndPermissionsSeeder extends Seeder
         'cadastros-casais',
         'cadastros-eventos',
         'cadastros-calendario',
-        'cadastros-planejamento',
+        'coordenador-pastoral',
         'lider-equipe',
     ];
 
@@ -36,7 +36,7 @@ class RolesAndPermissionsSeeder extends Seeder
         'cadastros-casais',
         'cadastros-eventos',
         'cadastros-calendario',
-        'cadastros-planejamento',
+        'coordenador-pastoral',
         'lider-equipe',
     ];
 
@@ -71,8 +71,9 @@ class RolesAndPermissionsSeeder extends Seeder
         'telas.igrejas',
         'telas.site',
         'telas.calendario',
-        'telas.planejamento',
+        'telas.pastorais',
         'telas.auditoria',
+        'telas.financeiro',
     ];
 
     /** @var list<string> */
@@ -82,9 +83,16 @@ class RolesAndPermissionsSeeder extends Seeder
     ];
 
     /** @var list<string> */
+    public const PASTORAIS_PERMISSIONS = [
+        'pastorais.view',
+        'pastorais.manage',
+    ];
+
+    /** @var list<string> */
     public const PLANEJAMENTO_PERMISSIONS = [
         'planejamento.gerir',
         'planejamento.propor',
+        'planejamento.ver_global',
     ];
 
     /** @var list<string> */
@@ -101,8 +109,11 @@ class RolesAndPermissionsSeeder extends Seeder
         'ecc.equipes.manage',
         'ecc.casais.view',
         'ecc.casais.manage',
+        'ecc.casais.atualizar',
         'ecc.eventos.view',
         'ecc.eventos.manage',
+        'ecc.financeiro.view',
+        'ecc.financeiro.manage',
         'ecc.escala.editar',
         'pessoas.manage',
     ];
@@ -136,6 +147,7 @@ class RolesAndPermissionsSeeder extends Seeder
             ...self::IGREJA_PERMISSIONS,
             ...self::ECC_STUB_PERMISSIONS,
             ...self::CALENDARIO_PERMISSIONS,
+            ...self::PASTORAIS_PERMISSIONS,
             ...self::PLANEJAMENTO_PERMISSIONS,
             ...self::SITE_PERMISSIONS,
         ] as $name) {
@@ -161,6 +173,7 @@ class RolesAndPermissionsSeeder extends Seeder
             ...self::AUDITORIA_PERMISSIONS,
             ...self::ECC_STUB_PERMISSIONS,
             ...self::CALENDARIO_PERMISSIONS,
+            ...self::PASTORAIS_PERMISSIONS,
             ...self::PLANEJAMENTO_PERMISSIONS,
             'igrejas.view',
             'igrejas.update',
@@ -202,23 +215,24 @@ class RolesAndPermissionsSeeder extends Seeder
             'telas.calendario',
             'calendario.gerir',
             'calendario.colaborar',
+            'telas.pastorais',
+            ...self::PASTORAIS_PERMISSIONS,
+            ...self::PLANEJAMENTO_PERMISSIONS,
         ]);
 
-        Role::findByName('cadastros-planejamento', self::GUARD)->syncPermissions([
-            'telas.planejamento',
-            'planejamento.gerir',
+        Role::findByName('coordenador-pastoral', self::GUARD)->syncPermissions([
+            'telas.pastorais',
+            'pastorais.view',
+            'planejamento.propor',
+            'planejamento.ver_global',
         ]);
 
         Role::findByName('lider-equipe', self::GUARD)->syncPermissions([
             'telas.equipes',
             'telas.casais',
-            'telas.eventos',
             'ecc.equipes.view',
             'ecc.casais.view',
-            'ecc.eventos.view',
-            'ecc.escala.editar',
-            'telas.calendario',
-            'calendario.colaborar',
+            'ecc.casais.atualizar',
         ]);
 
         app()[PermissionRegistrar::class]->forgetCachedPermissions();

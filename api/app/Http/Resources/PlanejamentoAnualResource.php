@@ -7,10 +7,14 @@ namespace App\Http\Resources;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
-/** @mixin \App\Models\PlanejamentoAnual */
+/**
+ * @mixin \App\Models\PlanejamentoAnual
+ */
 class PlanejamentoAnualResource extends JsonResource
 {
-    /** @return array<string, mixed> */
+    /**
+     * @return array<string, mixed>
+     */
     public function toArray(Request $request): array
     {
         return [
@@ -18,10 +22,7 @@ class PlanejamentoAnualResource extends JsonResource
             'igreja_id' => $this->igreja_id,
             'ano' => $this->ano,
             'status' => $this->status,
-            'aberto_em' => $this->aberto_em?->toIso8601String(),
-            'coleta_em' => $this->coleta_em?->toIso8601String(),
             'fechado_em' => $this->fechado_em?->toIso8601String(),
-            'eventos' => PlanejamentoEventoResource::collection($this->whenLoaded('eventos')),
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
         ];

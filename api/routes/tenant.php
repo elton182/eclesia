@@ -10,17 +10,20 @@ use App\Http\Controllers\Api\EccCasalController;
 use App\Http\Controllers\Api\EccEquipeController;
 use App\Http\Controllers\Api\EccEquipeServicoController;
 use App\Http\Controllers\Api\EccEventoController;
+use App\Http\Controllers\Api\EccFinanceiroController;
 use App\Http\Controllers\Api\EventoTipoController;
 use App\Http\Controllers\Api\IgrejaController;
 use App\Http\Controllers\Api\PastoralController;
-use App\Http\Controllers\Api\PessoaFotoController;
+use App\Http\Controllers\Api\PastoraisController;
 use App\Http\Controllers\Api\PlanejamentoController;
+use App\Http\Controllers\Api\PessoaFotoController;
 use App\Http\Controllers\Api\PublicSiteController;
 use App\Http\Controllers\Api\RolePermissionController;
 use App\Http\Controllers\Api\SiteAdminController;
 use App\Http\Controllers\Api\SiteComunicadoController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Middleware\AuthenticateTenantApi;
+use App\Http\Middleware\InitializeTenancyByPathSlug;
 use App\Http\Middleware\InitializeTenancyBySlug;
 use App\Http\Middleware\SetIgrejaFromHeader;
 use Illuminate\Support\Facades\Route;
@@ -31,12 +34,22 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 |
 | Login resolve tenant pelo body (sem X-Tenant). Demais rotas exigem X-Tenant.
+| HTML/sitemap SEO: tenancy pelo slug no path (ADR-0003).
 | Recursos autenticados: SuperAdmin (token central) OU User (token do tenant).
 |
 */
 
 Route::middleware(['api'])->prefix('api/v1')->group(function () {
     Route::post('web/login', [AuthWebController::class, 'auth']);
+});
+
+Route::middleware([
+    'api',
+    InitializeTenancyByPathSlug::class,
+])->prefix('api/v1/public/site')->group(function () {
+    Route::get('html/{tenantSlug}', [PublicSiteController::class, 'htmlHome']);
+    Route::get('html/{tenantSlug}/{pageSlug}', [PublicSiteController::class, 'htmlPage']);
+    Route::get('sitemap/{tenantSlug}', [PublicSiteController::class, 'sitemap']);
 });
 
 Route::middleware([
@@ -70,15 +83,6 @@ Route::middleware([
         Route::get('coleta/{token}', [CalendarioController::class, 'showColetaPublica']);
         Route::post('coleta/{token}', [CalendarioController::class, 'storeColetaPublica'])
             ->middleware('throttle:30,1');
-    });
-
-    Route::prefix('public/planejamento')->group(function () {
-        Route::get('{token}', [PlanejamentoController::class, 'showPublico']);
-        Route::get('{token}/eventos', [PlanejamentoController::class, 'indexEventosPublicos']);
-        Route::post('{token}/eventos', [PlanejamentoController::class, 'storeEventoPublico'])
-            ->middleware('throttle:30,1');
-        Route::put('{token}/eventos/{eventoId}', [PlanejamentoController::class, 'updateEventoPublico']);
-        Route::delete('{token}/eventos/{eventoId}', [PlanejamentoController::class, 'destroyEventoPublico']);
     });
 
     // Foto: URL assinada + ?tenant= (img não envia X-Tenant/Bearer). Spec SPEC-006 / ADR-0002.
@@ -136,6 +140,20 @@ Route::middleware([
     // Prefixo URI "ecc/" não entra no nome — sem ->names(), colide com apiResource('eventos').
     Route::apiResource('ecc/eventos', EccEventoController::class)->names('ecc.eventos');
 
+    Route::get('ecc/financeiro', [EccFinanceiroController::class, 'index']);
+    Route::get('ecc/financeiro/anos', [EccFinanceiroController::class, 'anos']);
+    Route::post('ecc/financeiro/import', [EccFinanceiroController::class, 'import']);
+    Route::post('ecc/financeiro/zerar', [EccFinanceiroController::class, 'zerar']);
+    Route::get('ecc/financeiro/contas', [EccFinanceiroController::class, 'listContas']);
+    Route::post('ecc/financeiro/contas', [EccFinanceiroController::class, 'storeConta']);
+    Route::put('ecc/financeiro/contas/{id}', [EccFinanceiroController::class, 'updateConta']);
+    Route::delete('ecc/financeiro/contas/{id}', [EccFinanceiroController::class, 'destroyConta']);
+    Route::post('ecc/financeiro/lancamentos', [EccFinanceiroController::class, 'storeLancamento']);
+    Route::put('ecc/financeiro/lancamentos/{id}', [EccFinanceiroController::class, 'updateLancamento']);
+    Route::delete('ecc/financeiro/lancamentos/{id}', [EccFinanceiroController::class, 'destroyLancamento']);
+    Route::post('ecc/financeiro/transferencias', [EccFinanceiroController::class, 'transferir']);
+    Route::post('ecc/financeiro/transportar', [EccFinanceiroController::class, 'transportar']);
+
     Route::get('eventos/tipos', [EventoTipoController::class, 'index']);
     Route::post('eventos/tipos', [EventoTipoController::class, 'store']);
     Route::put('eventos/tipos/{id}', [EventoTipoController::class, 'update']);
@@ -183,23 +201,27 @@ Route::middleware([
     Route::post('calendario/mensais/{id}/indisponibilidades', [CalendarioController::class, 'storeIndisponibilidades']);
     Route::get('calendario/mensais/{id}/pdf', [CalendarioController::class, 'pdf']);
 
-    Route::get('planejamento/anos', [PlanejamentoController::class, 'indexAnos']);
-    Route::post('planejamento/anos', [PlanejamentoController::class, 'storeAno']);
-    Route::get('planejamento/anos/{id}', [PlanejamentoController::class, 'showAno']);
-    Route::put('planejamento/anos/{id}', [PlanejamentoController::class, 'updateAno']);
-    Route::delete('planejamento/anos/{id}', [PlanejamentoController::class, 'destroyAno']);
-    Route::post('planejamento/anos/{id}/status', [PlanejamentoController::class, 'transitionStatus']);
-    Route::get('planejamento/anos/{id}/eventos', [PlanejamentoController::class, 'indexEventos']);
-    Route::post('planejamento/anos/{id}/eventos', [PlanejamentoController::class, 'storeEvento']);
+    Route::get('pastorais', [PastoraisController::class, 'index']);
+    Route::post('pastorais', [PastoraisController::class, 'store']);
+    Route::get('pastorais/{id}', [PastoraisController::class, 'show']);
+    Route::patch('pastorais/{id}', [PastoraisController::class, 'update']);
+    Route::delete('pastorais/{id}', [PastoraisController::class, 'destroy']);
+    Route::get('pastorais/{id}/membros', [PastoraisController::class, 'indexMembros']);
+    Route::post('pastorais/{id}/membros', [PastoraisController::class, 'storeMembro']);
+    Route::delete('pastorais/{id}/membros/{userId}', [PastoraisController::class, 'destroyMembro']);
+
+    Route::get('planejamento/anuais', [PlanejamentoController::class, 'indexAnuais']);
+    Route::post('planejamento/anuais', [PlanejamentoController::class, 'storeAnual']);
+    Route::get('planejamento/anuais/{id}', [PlanejamentoController::class, 'showAnual']);
+    Route::patch('planejamento/anuais/{id}', [PlanejamentoController::class, 'updateAnual']);
+    Route::delete('planejamento/anuais/{id}', [PlanejamentoController::class, 'destroyAnual']);
+    Route::post('planejamento/anuais/{id}/status', [PlanejamentoController::class, 'transitionStatus']);
+    Route::get('planejamento/anuais/{id}/eventos', [PlanejamentoController::class, 'indexEventos']);
+    Route::post('planejamento/anuais/{id}/eventos', [PlanejamentoController::class, 'storeEvento']);
     Route::get('planejamento/eventos/{eventoId}', [PlanejamentoController::class, 'showEvento']);
-    Route::put('planejamento/eventos/{eventoId}', [PlanejamentoController::class, 'updateEvento']);
-    Route::patch('planejamento/eventos/{eventoId}', [PlanejamentoController::class, 'patchEvento']);
+    Route::patch('planejamento/eventos/{eventoId}', [PlanejamentoController::class, 'updateEvento']);
     Route::delete('planejamento/eventos/{eventoId}', [PlanejamentoController::class, 'destroyEvento']);
-    Route::post('planejamento/anos/{id}/pastorais/{pastoralId}/token', [PlanejamentoController::class, 'storeToken']);
-    Route::delete('planejamento/anos/{id}/pastorais/{pastoralId}/token', [PlanejamentoController::class, 'destroyToken']);
-    Route::get('planejamento/pastorais/{pastoralId}/usuarios', [PlanejamentoController::class, 'indexPastoralUsers']);
-    Route::post('planejamento/pastorais/{pastoralId}/usuarios', [PlanejamentoController::class, 'storePastoralUser']);
-    Route::delete('planejamento/pastorais/{pastoralId}/usuarios', [PlanejamentoController::class, 'destroyPastoralUser']);
+    Route::get('planejamento/anuais/{id}/pdf', [PlanejamentoController::class, 'pdf']);
 
     Route::post('pessoas/{id}/foto', [PessoaFotoController::class, 'store']);
     Route::delete('pessoas/{id}/foto', [PessoaFotoController::class, 'destroy']);

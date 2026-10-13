@@ -61,6 +61,32 @@ describe('siteBlocks', () => {
       description: '',
     })
   })
+
+  it('applyDocumentSeo atualiza meta existente', async () => {
+    const { applyDocumentSeo } = await import('./siteBlocks.js')
+    const meta = {
+      attrs: { name: 'description', content: 'old' },
+      setAttribute(k, v) {
+        this.attrs[k] = v
+      },
+      getAttribute(k) {
+        return this.attrs[k]
+      },
+    }
+    const doc = {
+      title: '',
+      head: { appendChild() {} },
+      querySelector(sel) {
+        return sel === 'meta[name="description"]' ? meta : null
+      },
+      createElement() {
+        throw new Error('não deve criar meta nova')
+      },
+    }
+    applyDocumentSeo({ title: 'Novo', description: 'Desc' }, doc)
+    assert.equal(doc.title, 'Novo')
+    assert.equal(meta.getAttribute('content'), 'Desc')
+  })
 })
 
 describe('siteBlocks — biblioteca de blocos', () => {

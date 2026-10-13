@@ -7,6 +7,7 @@ import {
   loadLoginCredentials,
   persistLoginCredentials,
 } from '../utils/tenantAuth'
+import { homePathForUser } from '../utils/userRoles'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -41,7 +42,7 @@ const handleLogin = async () => {
 
   if (result.success) {
     persistLoginCredentials({ tenant: tenant.value, email: email.value })
-    router.push('/inicio')
+    router.push(homePathForUser(authStore.user))
   } else {
     errorMessage.value = result.error
   }

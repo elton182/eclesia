@@ -13,16 +13,19 @@ class PlanejamentoAnual extends Model
 {
     use HasUlids;
 
-    public const STATUS_ABERTO = 'aberto';
+    public const STATUS_RASCUNHO = 'rascunho';
 
     public const STATUS_COLETA = 'coleta';
+
+    public const STATUS_REVISAO = 'revisao';
 
     public const STATUS_FECHADO = 'fechado';
 
     /** @var list<string> */
     public const STATUSES = [
-        self::STATUS_ABERTO,
+        self::STATUS_RASCUNHO,
         self::STATUS_COLETA,
+        self::STATUS_REVISAO,
         self::STATUS_FECHADO,
     ];
 
@@ -33,8 +36,6 @@ class PlanejamentoAnual extends Model
         'igreja_id',
         'ano',
         'status',
-        'aberto_em',
-        'coleta_em',
         'fechado_em',
     ];
 
@@ -43,8 +44,6 @@ class PlanejamentoAnual extends Model
     {
         return [
             'ano' => 'integer',
-            'aberto_em' => 'datetime',
-            'coleta_em' => 'datetime',
             'fechado_em' => 'datetime',
         ];
     }
@@ -59,18 +58,8 @@ class PlanejamentoAnual extends Model
         return $this->hasMany(PlanejamentoEvento::class, 'planejamento_anual_id');
     }
 
-    public function tokens(): HasMany
-    {
-        return $this->hasMany(PlanejamentoPastoralToken::class, 'planejamento_anual_id');
-    }
-
     public function isFechado(): bool
     {
         return $this->status === self::STATUS_FECHADO;
-    }
-
-    public function isColeta(): bool
-    {
-        return $this->status === self::STATUS_COLETA;
     }
 }

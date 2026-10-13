@@ -3,7 +3,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import api from '@/services/api'
 import { useTenantStore } from '@/stores/tenant'
-import { normalizeBlocks, resolveMenuLinks, resolveSeo } from '@/utils/siteBlocks'
+import { normalizeBlocks, resolveMenuLinks, resolveSeo, applyDocumentSeo } from '@/utils/siteBlocks'
 import { rememberTenantForLogin } from '@/utils/tenantAuth'
 import { applyBrandCores } from '@/utils/branding'
 import { useBrandingStore } from '@/stores/branding'
@@ -64,7 +64,7 @@ async function load() {
       page.value?.seo || settings.value?.seo,
       page.value?.titulo || brandTitle.value,
     )
-    document.title = seo.title
+    applyDocumentSeo(seo)
     applyBrandCores(settings.value?.cores)
   } catch (e) {
     error.value = e.response?.status === 404

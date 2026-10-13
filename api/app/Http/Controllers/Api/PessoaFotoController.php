@@ -46,10 +46,7 @@ class PessoaFotoController extends Controller
 
     public function destroy(string $id): Response
     {
-        abort_unless(
-            $this->visibility->userCan('pessoas.manage') || $this->visibility->userCan('ecc.casais.manage'),
-            403
-        );
+        abort_unless($this->visibility->canAtualizarPessoa($id), 403);
 
         $pessoa = $this->fotos->findInCurrentIgreja($id);
         $this->fotos->destroy($pessoa);

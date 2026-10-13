@@ -8,8 +8,11 @@ import {
   equipesLideradasIds,
   canSeeEccCasaisNav,
   canSeeEccEventosNav,
+  canSeeEccFinanceiroNav,
   canSeeCalendarioNav,
-  canSeePlanejamentoNav,
+  canSeePastoraisNav,
+  isSomenteLiderEquipe,
+  homePathForUser,
 } from './userRoles.js'
 
 describe('userRoles', () => {
@@ -19,7 +22,7 @@ describe('userRoles', () => {
     assert.equal(roleLabel('cadastros-casais'), 'Cadastros · Casais')
     assert.equal(roleLabel('cadastros-eventos'), 'Cadastros · Eventos')
     assert.equal(roleLabel('cadastros-calendario'), 'Cadastros · Agenda Paroquial')
-    assert.equal(roleLabel('cadastros-planejamento'), 'Cadastros · Planejamento Anual')
+    assert.equal(roleLabel('coordenador-pastoral'), 'Coordenador · Pastoral')
     assert.equal(roleLabel('lider-equipe'), 'Líder de Equipe')
     assert.equal(roleLabel('admin-tenant'), 'Admin Organização')
   })
@@ -120,7 +123,10 @@ describe('userRoles', () => {
       equipes_lideradas: [{ id: 'eq1', nome: 'A' }],
     }
     assert.equal(userHasPermission(lider, 'ecc.casais.view'), true)
+    assert.equal(userHasPermission(lider, 'ecc.casais.atualizar'), true)
     assert.equal(userHasPermission(lider, 'ecc.casais.manage'), false)
+    assert.equal(userHasPermission(lider, 'telas.eventos'), false)
+    assert.equal(userHasPermission(lider, 'telas.calendario'), false)
     assert.equal(isLiderEquipeScoped(lider), true)
     assert.deepEqual(equipesLideradasIds(lider), ['eq1'])
   })
@@ -151,10 +157,10 @@ describe('userRoles', () => {
     assert.equal(canSeeEccCasaisNav(null, { isSuperAdmin: true }), true)
   })
 
-  it('canSeeEccEventosNav para líder, admin e cadastros-eventos', () => {
+  it('canSeeEccEventosNav para admin e cadastros-eventos', () => {
     assert.equal(
       canSeeEccEventosNav({ roles: [{ name: 'lider-equipe' }] }),
-      true,
+      false,
     )
     assert.equal(
       canSeeEccEventosNav({ roles: [{ name: 'admin-igreja' }] }),
@@ -178,17 +184,69 @@ describe('userRoles', () => {
     )
   })
 
+  it('canSeeEccFinanceiroNav só para admin (não líder)', () => {
+    assert.equal(
+      canSeeEccFinanceiroNav({ roles: [{ name: 'admin-igreja' }] }),
+      true,
+    )
+    assert.equal(
+      canSeeEccFinanceiroNav({ roles: [{ name: 'admin-tenant' }] }),
+      true,
+    )
+    assert.equal(
+      canSeeEccFinanceiroNav({ roles: [{ name: 'lider-equipe' }] }),
+      false,
+    )
+    assert.equal(
+      canSeeEccFinanceiroNav({ permissions: ['ecc.financeiro.view'], roles: [] }),
+      true,
+    )
+    assert.equal(canSeeEccFinanceiroNav(null, { isSuperAdmin: true }), true)
+  })
+
   it('canSeeCalendarioNav para admin-igreja e cadastros-calendario', () => {
     assert.equal(canSeeCalendarioNav({ roles: [{ name: 'admin-igreja' }] }), true)
     assert.equal(canSeeCalendarioNav({ roles: [{ name: 'cadastros-calendario' }] }), true)
-    assert.equal(canSeeCalendarioNav({ roles: [{ name: 'lider-equipe' }] }), true)
+    assert.equal(canSeeCalendarioNav({ roles: [{ name: 'lider-equipe' }] }), false)
     assert.equal(canSeeCalendarioNav({ roles: [{ name: 'cadastros-usuarios' }] }), false)
   })
 
-  it('canSeePlanejamentoNav para admin-igreja e cadastros-planejamento', () => {
-    assert.equal(canSeePlanejamentoNav({ roles: [{ name: 'admin-igreja' }] }), true)
-    assert.equal(canSeePlanejamentoNav({ roles: [{ name: 'cadastros-planejamento' }] }), true)
-    assert.equal(canSeePlanejamentoNav({ roles: [{ name: 'cadastros-usuarios' }] }), false)
-    assert.equal(canSeePlanejamentoNav(null, { isSuperAdmin: true }), true)
+  it('canSeePastoraisNav para gestor e coordenador-pastoral', () => {
+    assert.equal(canSeePastoraisNav({ roles: [{ name: 'admin-igreja' }] }), true)
+    assert.equal(canSeePastoraisNav({ roles: [{ name: 'cadastros-calendario' }] }), true)
+    assert.equal(canSeePastoraisNav({ roles: [{ name: 'coordenador-pastoral' }] }), true)
+    assert.equal(canSeePastoraisNav({ roles: [{ name: 'lider-equipe' }] }), false)
+    assert.equal(
+      canSeePastoraisNav({ permissions: ['planejamento.propor'], roles: [] }),
+      true,
+    )
+    assert.equal(
+      userHasPermission({ roles: [{ name: 'coordenador-pastoral' }] }, 'planejamento.gerir'),
+      false,
+    )
+    assert.equal(
+      userHasPermission({ roles: [{ name: 'coordenador-pastoral' }] }, 'planejamento.propor'),
+      true,
+    )
+  })
+
+  it('isSomenteLiderEquipe só quando o único papel é lider-equipe', () => {
+    assert.equal(isSomenteLiderEquipe({ roles: [{ name: 'lider-equipe' }] }), true)
+    assert.equal(
+      isSomenteLiderEquipe({
+        roles: [{ name: 'lider-equipe' }, { name: 'lider-equipe' }],
+      }),
+      true,
+    )
+    assert.equal(
+      isSomenteLiderEquipe({
+        roles: [{ name: 'lider-equipe' }, { name: 'cadastros-casais' }],
+      }),
+      false,
+    )
+    assert.equal(isSomenteLiderEquipe({ roles: [{ name: 'admin-igreja' }] }), false)
+    assert.equal(isSomenteLiderEquipe({ roles: [{ name: 'lider-equipe' }] }, { isSuperAdmin: true }), false)
+    assert.equal(homePathForUser({ roles: [{ name: 'lider-equipe' }] }), '/ecc/minha-equipe')
+    assert.equal(homePathForUser({ roles: [{ name: 'admin-igreja' }] }), '/inicio')
   })
 })

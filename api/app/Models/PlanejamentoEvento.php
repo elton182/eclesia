@@ -7,6 +7,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class PlanejamentoEvento extends Model
 {
@@ -14,23 +15,25 @@ class PlanejamentoEvento extends Model
 
     public const STATUS_PROPOSTA = 'proposta';
 
-    public const STATUS_EM_REVISAO = 'em_revisao';
+    public const STATUS_CONFIRMADO = 'confirmado';
 
-    public const STATUS_APROVADO = 'aprovado';
+    public const STATUS_AJUSTE_SOLICITADO = 'ajuste_solicitado';
 
-    public const STATUS_REJEITADO = 'rejeitado';
+    public const STATUS_REAGENDADO = 'reagendado';
+
+    public const STATUS_RECUSADO = 'recusado';
+
+    public const STATUS_COTIDIANO = 'cotidiano';
 
     /** @var list<string> */
-    public const STATUSES = [
+    public const STATUS_SOLICITACAO = [
         self::STATUS_PROPOSTA,
-        self::STATUS_EM_REVISAO,
-        self::STATUS_APROVADO,
-        self::STATUS_REJEITADO,
+        self::STATUS_CONFIRMADO,
+        self::STATUS_AJUSTE_SOLICITADO,
+        self::STATUS_REAGENDADO,
+        self::STATUS_RECUSADO,
+        self::STATUS_COTIDIANO,
     ];
-
-    public const VIA_LOGIN = 'login';
-
-    public const VIA_LINK = 'link';
 
     protected $table = 'planejamento_eventos';
 
@@ -39,26 +42,29 @@ class PlanejamentoEvento extends Model
         'planejamento_anual_id',
         'pastoral_id',
         'titulo',
-        'descricao',
         'data_inicio',
         'data_fim',
-        'dia_inteiro',
-        'status',
-        'criado_via',
-        'notas_revisao',
+        'hora_inicio',
+        'hora_fim',
+        'participantes_media',
+        'recorrencia_texto',
+        'observacoes',
+        'local_texto',
+        'status_solicitacao',
+        'motivo_ajuste',
     ];
 
     /** @return array<string, string> */
     protected function casts(): array
     {
         return [
-            'data_inicio' => 'datetime',
-            'data_fim' => 'datetime',
-            'dia_inteiro' => 'boolean',
+            'data_inicio' => 'date',
+            'data_fim' => 'date',
+            'participantes_media' => 'integer',
         ];
     }
 
-    public function planejamento(): BelongsTo
+    public function planejamentoAnual(): BelongsTo
     {
         return $this->belongsTo(PlanejamentoAnual::class, 'planejamento_anual_id');
     }
@@ -68,8 +74,13 @@ class PlanejamentoEvento extends Model
         return $this->belongsTo(Pastoral::class);
     }
 
-    public function isProposta(): bool
+    public function locais(): BelongsToMany
     {
-        return $this->status === self::STATUS_PROPOSTA;
+        return $this->belongsToMany(
+            CalendarioLocal::class,
+            'planejamento_evento_local',
+            'planejamento_evento_id',
+            'calendario_local_id'
+        );
     }
 }

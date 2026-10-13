@@ -5,6 +5,7 @@ import vue from '@vitejs/plugin-vue'
 import vueDevTools from 'vite-plugin-vue-devtools'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
+import { siteHtmlPrerenderPlugin } from './vite.site-html-plugin.js'
 
 const pwaPlugin = VitePWA({
   registerType: 'autoUpdate',
@@ -54,7 +55,7 @@ const pwaPlugin = VitePWA({
   workbox: {
     globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2,webp}'],
     navigateFallback: '/index.html',
-    navigateFallbackDenylist: [/^\/api\//],
+    navigateFallbackDenylist: [/^\/api\//, /^\/site\//],
     runtimeCaching: [
       {
         urlPattern: ({ url }) => url.pathname.startsWith('/api/'),
@@ -133,6 +134,7 @@ export default defineConfig(() => {
       vue(),
       vueDevTools(),
       tailwindcss(),
+      siteHtmlPrerenderPlugin(),
       pwaPlugin,
     ],
     resolve: {

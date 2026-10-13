@@ -11,15 +11,18 @@ use App\Http\Resources\SiteComunicadoResource;
 use App\Http\Resources\SiteFormSubmissionResource;
 use App\Http\Resources\SitePageResource;
 use App\Http\Resources\SiteSettingResource;
+use App\Services\SitePublicHtmlRenderer;
 use App\Services\SiteService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Http\Response;
 
 class PublicSiteController extends Controller
 {
     public function __construct(
         private readonly SiteService $site,
+        private readonly SitePublicHtmlRenderer $html,
     ) {}
 
     public function show(): JsonResponse
@@ -33,6 +36,30 @@ class PublicSiteController extends Controller
                     ? (new SitePageResource($home['page']))->resolve()
                     : null,
             ],
+        ]);
+    }
+
+    public function htmlHome(string $tenantSlug): Response
+    {
+        return response($this->html->renderHome($tenantSlug), 200, [
+            'Content-Type' => 'text/html; charset=UTF-8',
+            'Cache-Control' => 'public, max-age=60',
+        ]);
+    }
+
+    public function htmlPage(string $tenantSlug, string $pageSlug): Response
+    {
+        return response($this->html->renderPage($tenantSlug, $pageSlug), 200, [
+            'Content-Type' => 'text/html; charset=UTF-8',
+            'Cache-Control' => 'public, max-age=60',
+        ]);
+    }
+
+    public function sitemap(string $tenantSlug): Response
+    {
+        return response($this->html->renderSitemap($tenantSlug), 200, [
+            'Content-Type' => 'application/xml; charset=UTF-8',
+            'Cache-Control' => 'public, max-age=60',
         ]);
     }
 

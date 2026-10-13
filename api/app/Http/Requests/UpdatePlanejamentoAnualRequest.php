@@ -10,12 +10,16 @@ class UpdatePlanejamentoAnualRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true;
+        return $this->user() !== null;
     }
 
-    /** @return array<string, mixed> */
+    /**
+     * @return array<string, mixed>
+     */
     public function rules(): array
     {
-        return [];
+        return [
+            'ano' => ['sometimes', 'integer', 'min:2000', 'max:2100'],
+        ];
     }
 }

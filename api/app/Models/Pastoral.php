@@ -13,6 +13,16 @@ class Pastoral extends Model
 {
     use HasUlids;
 
+    public const PAPEL_COORDENADOR = 'coordenador';
+
+    public const PAPEL_MEMBRO = 'membro';
+
+    /** @var list<string> */
+    public const PAPEIS = [
+        self::PAPEL_COORDENADOR,
+        self::PAPEL_MEMBRO,
+    ];
+
     protected $table = 'pastorais';
 
     /**
@@ -45,9 +55,10 @@ class Pastoral extends Model
         return $this->belongsTo(Igreja::class);
     }
 
-    public function users(): BelongsToMany
+    public function membros(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'pastoral_user')
+            ->withPivot(['papel'])
             ->withTimestamps();
     }
 }

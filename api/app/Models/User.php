@@ -122,6 +122,7 @@ class User extends Authenticatable
     public function pastorais(): BelongsToMany
     {
         return $this->belongsToMany(Pastoral::class, 'pastoral_user')
+            ->withPivot(['papel'])
             ->withTimestamps();
     }
 }

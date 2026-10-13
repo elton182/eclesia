@@ -7,6 +7,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class CalendarioLocal extends Model
@@ -40,5 +41,15 @@ class CalendarioLocal extends Model
     public function slots(): HasMany
     {
         return $this->hasMany(CalendarioSlotPadrao::class, 'local_id');
+    }
+
+    public function planejamentoEventos(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            PlanejamentoEvento::class,
+            'planejamento_evento_local',
+            'calendario_local_id',
+            'planejamento_evento_id'
+        );
     }
 }

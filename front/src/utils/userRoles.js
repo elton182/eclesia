@@ -11,7 +11,7 @@ export const ROLE_LABELS = {
   'cadastros-casais': 'Cadastros · Casais',
   'cadastros-eventos': 'Cadastros · Eventos',
   'cadastros-calendario': 'Cadastros · Agenda Paroquial',
-  'cadastros-planejamento': 'Cadastros · Planejamento Anual',
+  'coordenador-pastoral': 'Coordenador · Pastoral',
   'lider-equipe': 'Líder de Equipe',
 }
 
@@ -62,13 +62,11 @@ export function userHasPermission(user, permission, opts = {}) {
   if (permission === 'telas.casais' && (roleNames.includes('cadastros-casais') || roleNames.includes('lider-equipe'))) {
     return true
   }
-  if (
-    permission === 'telas.eventos' &&
-    (roleNames.includes('lider-equipe') || roleNames.includes('cadastros-eventos'))
-  ) {
+  if (permission === 'telas.eventos' && roleNames.includes('cadastros-eventos')) {
     return true
   }
   if (permission === 'ecc.casais.manage' && roleNames.includes('cadastros-casais')) return true
+  if (permission === 'ecc.casais.atualizar' && roleNames.includes('lider-equipe')) return true
   if (permission === 'ecc.equipes.manage' && roleNames.includes('cadastros-equipes')) return true
   if (permission === 'ecc.eventos.manage' && roleNames.includes('cadastros-eventos')) return true
   if (permission === 'ecc.casais.view' && (roleNames.includes('cadastros-casais') || roleNames.includes('lider-equipe'))) {
@@ -77,30 +75,44 @@ export function userHasPermission(user, permission, opts = {}) {
   if (permission === 'ecc.equipes.view' && (roleNames.includes('cadastros-equipes') || roleNames.includes('lider-equipe'))) {
     return true
   }
-  if (
-    permission === 'ecc.eventos.view' &&
-    (roleNames.includes('lider-equipe') || roleNames.includes('cadastros-eventos'))
-  ) {
+  if (permission === 'ecc.eventos.view' && roleNames.includes('cadastros-eventos')) {
     return true
+  }
+  if (
+    permission === 'telas.financeiro' ||
+    permission === 'ecc.financeiro.view' ||
+    permission === 'ecc.financeiro.manage'
+  ) {
+    // só admin-igreja / admin-tenant (já cobertos acima); líder não
+    if (roleNames.includes('lider-equipe') && !roleNames.includes('admin-igreja')) {
+      return false
+    }
   }
   if (
     (permission === 'telas.calendario' ||
       permission === 'calendario.gerir' ||
       permission === 'calendario.colaborar') &&
-    (roleNames.includes('admin-igreja') ||
-      roleNames.includes('cadastros-calendario') ||
-      (permission === 'calendario.colaborar' && roleNames.includes('lider-equipe')) ||
-      (permission === 'telas.calendario' && roleNames.includes('lider-equipe')))
+    (roleNames.includes('admin-igreja') || roleNames.includes('cadastros-calendario'))
   ) {
     return true
   }
   if (
-    (permission === 'telas.planejamento' ||
+    (permission === 'telas.pastorais' ||
+      permission === 'pastorais.manage' ||
+      permission === 'pastorais.view' ||
       permission === 'planejamento.gerir' ||
-      permission === 'planejamento.propor') &&
-    (roleNames.includes('admin-igreja') ||
-      roleNames.includes('cadastros-planejamento') ||
-      (permission === 'planejamento.propor' && roleNames.includes('cadastros-planejamento')))
+      permission === 'planejamento.propor' ||
+      permission === 'planejamento.ver_global') &&
+    (roleNames.includes('admin-igreja') || roleNames.includes('cadastros-calendario'))
+  ) {
+    return true
+  }
+  if (
+    roleNames.includes('coordenador-pastoral') &&
+    (permission === 'telas.pastorais' ||
+      permission === 'pastorais.view' ||
+      permission === 'planejamento.propor' ||
+      permission === 'planejamento.ver_global')
   ) {
     return true
   }
@@ -121,15 +133,19 @@ export function canSeeCalendarioNav(user, opts = {}) {
 }
 
 /**
- * Nav / launcher Planejamento Anual.
+ * Nav / launcher Pastorais + planejamento anual (SPEC-018).
+ * Distinto do CMS `/site` (site.pastorais.*) e do calendário oficial.
  * @param {{ permissions?: string[], roles?: Array<{ name: string }> }|null|undefined} user
  * @param {{ isSuperAdmin?: boolean }} [opts]
  */
-export function canSeePlanejamentoNav(user, opts = {}) {
+export function canSeePastoraisNav(user, opts = {}) {
   return (
-    userHasPermission(user, 'telas.planejamento', opts) ||
+    userHasPermission(user, 'telas.pastorais', opts) ||
+    userHasPermission(user, 'pastorais.manage', opts) ||
+    userHasPermission(user, 'pastorais.view', opts) ||
     userHasPermission(user, 'planejamento.gerir', opts) ||
-    userHasPermission(user, 'planejamento.propor', opts)
+    userHasPermission(user, 'planejamento.propor', opts) ||
+    userHasPermission(user, 'planejamento.ver_global', opts)
   )
 }
 
@@ -159,6 +175,19 @@ export function canSeeEccEventosNav(user, opts = {}) {
 }
 
 /**
+ * Nav Financeiro ECC (livro-caixa anual). Líder de equipe não vê.
+ * @param {{ permissions?: string[], roles?: Array<{ name: string }> }|null|undefined} user
+ * @param {{ isSuperAdmin?: boolean }} [opts]
+ */
+export function canSeeEccFinanceiroNav(user, opts = {}) {
+  return (
+    userHasPermission(user, 'telas.financeiro', opts) ||
+    userHasPermission(user, 'ecc.financeiro.view', opts) ||
+    userHasPermission(user, 'ecc.financeiro.manage', opts)
+  )
+}
+
+/**
  * IDs das equipes lideradas pelo usuário (vazio = sem vínculo de líder).
  * @param {{ equipes_lideradas?: Array<{ id: string }> }|null|undefined} user
  * @returns {string[]}
@@ -166,6 +195,27 @@ export function canSeeEccEventosNav(user, opts = {}) {
 export function equipesLideradasIds(user) {
   if (!user || !Array.isArray(user.equipes_lideradas)) return []
   return user.equipes_lideradas.map((e) => e.id).filter(Boolean)
+}
+
+/**
+ * Papel exclusivo de líder de equipe (pode liderar N equipes).
+ * @param {{ roles?: Array<{ name: string }> }|null|undefined} user
+ * @param {{ isSuperAdmin?: boolean }} [opts]
+ */
+export function isSomenteLiderEquipe(user, opts = {}) {
+  if (opts.isSuperAdmin) return false
+  if (!user) return false
+  const names = [...new Set((user.roles || []).map((r) => r?.name).filter(Boolean))]
+  return names.length === 1 && names[0] === 'lider-equipe'
+}
+
+/**
+ * Destino após o login.
+ * @param {{ roles?: Array<{ name: string }> }|null|undefined} user
+ * @param {{ isSuperAdmin?: boolean }} [opts]
+ */
+export function homePathForUser(user, opts = {}) {
+  return isSomenteLiderEquipe(user, opts) ? '/ecc/minha-equipe' : '/inicio'
 }
 
 /**

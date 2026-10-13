@@ -7,7 +7,7 @@ import { innovConfirm } from '@/plugins/dialog'
 import { casalEle, casalEla } from '@/utils/casalDisplay'
 import { useAuthStore } from '@/stores/auth'
 import { useAuthAdminStore } from '@/stores/authAdmin'
-import { userHasPermission } from '@/utils/userRoles'
+import { userHasPermission, isSomenteLiderEquipe } from '@/utils/userRoles'
 import PessoaFotoField from '@/components/ecc/PessoaFotoField.vue'
 import { casaisListQueryFromRoute } from '@/utils/eccFilters'
 import { atividadeStatusLabel, etapaLabel } from '@/utils/eccFicha'
@@ -22,7 +22,15 @@ const casal = ref(null)
 
 const listQuery = () => casaisListQueryFromRoute(route.query)
 
+const authOpts = () => ({
+  isSuperAdmin: authAdminStore.isAuthenticated,
+})
+
 const goBackToList = () => {
+  if (isSomenteLiderEquipe(authStore.user, authOpts())) {
+    router.push({ name: 'ecc-minha-equipe' })
+    return
+  }
   router.push({ name: 'ecc-casais', query: listQuery() })
 }
 
@@ -35,11 +43,12 @@ const goEdit = () => {
 }
 
 const canManage = computed(() =>
-  userHasPermission(authStore.user, 'ecc.casais.manage', {
-    isSuperAdmin: authAdminStore.isAuthenticated,
-  }) || userHasPermission(authStore.user, 'pessoas.manage', {
-    isSuperAdmin: authAdminStore.isAuthenticated,
-  }),
+  userHasPermission(authStore.user, 'ecc.casais.manage', authOpts())
+  || userHasPermission(authStore.user, 'pessoas.manage', authOpts()),
+)
+
+const canEdit = computed(() =>
+  canManage.value || userHasPermission(authStore.user, 'ecc.casais.atualizar', authOpts()),
 )
 
 const headerPhoto = computed(() => casal.value?.ele?.foto_url || casal.value?.ela?.foto_url || null)
@@ -209,6 +218,7 @@ onMounted(load)
               Trocar Ele/Ela
             </button>
             <button
+              v-if="canEdit"
               type="button"
               class="rounded-lg px-3.5 py-2.5 text-[12.5px] font-medium"
               style="border: 1px solid rgba(255,253,250,0.3); background: transparent; color: #FFFDFA"
@@ -232,7 +242,7 @@ onMounted(load)
             :pessoa-id="ele.id"
             :foto-url="ele.foto_url"
             label="Foto"
-            :editable="canManage && !!ele.id"
+            :editable="canEdit && !!ele.id"
             @update:foto-url="onEleFoto"
           />
           <div class="text-[15px] font-medium" style="color: #2A1418">
@@ -284,7 +294,7 @@ onMounted(load)
             :pessoa-id="ela.id"
             :foto-url="ela.foto_url"
             label="Foto"
-            :editable="canManage && !!ela.id"
+            :editable="canEdit && !!ela.id"
             @update:foto-url="onElaFoto"
           />
           <div class="text-[15px] font-medium" style="color: #2A1418">

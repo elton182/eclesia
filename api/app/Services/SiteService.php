@@ -16,6 +16,7 @@ use App\Models\SitePage;
 use App\Models\SiteSetting;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -23,6 +24,14 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 class SiteService
 {
+    public const SEO_CACHE_VERSION_KEY = 'site_seo_v';
+
+    public function forgetPublicSeoCache(): void
+    {
+        $current = (int) Cache::get(self::SEO_CACHE_VERSION_KEY, 0);
+        Cache::forever(self::SEO_CACHE_VERSION_KEY, $current + 1);
+    }
+
     public function settings(): SiteSetting
     {
         return SiteSetting::query()->firstOrCreate([], [
@@ -51,6 +60,7 @@ class SiteService
         $settings = $this->settings();
         $settings->fill($allowed);
         $settings->save();
+        $this->forgetPublicSeoCache();
 
         return $settings->refresh();
     }
@@ -131,6 +141,8 @@ class SiteService
                 $this->syncBlocks($page, $blocks);
             }
 
+            $this->forgetPublicSeoCache();
+
             return $page->load('blocks');
         });
     }
@@ -155,6 +167,8 @@ class SiteService
                 $this->syncBlocks($page, $blocks);
             }
 
+            $this->forgetPublicSeoCache();
+
             return $page->refresh()->load('blocks');
         });
     }
@@ -162,6 +176,7 @@ class SiteService
     public function deletePage(SitePage $page): void
     {
         $page->delete();
+        $this->forgetPublicSeoCache();
     }
 
     /**
@@ -218,7 +233,10 @@ class SiteService
             $data['publicado_em'] = now();
         }
 
-        return SiteComunicado::query()->create($data);
+        $item = SiteComunicado::query()->create($data);
+        $this->forgetPublicSeoCache();
+
+        return $item;
     }
 
     /**
@@ -234,6 +252,7 @@ class SiteService
 
         $comunicado->fill($data);
         $comunicado->save();
+        $this->forgetPublicSeoCache();
 
         return $comunicado->refresh();
     }
@@ -243,7 +262,10 @@ class SiteService
      */
     public function createPastoral(array $data): Pastoral
     {
-        return Pastoral::query()->create($data);
+        $item = Pastoral::query()->create($data);
+        $this->forgetPublicSeoCache();
+
+        return $item;
     }
 
     /**
@@ -253,6 +275,7 @@ class SiteService
     {
         $pastoral->fill($data);
         $pastoral->save();
+        $this->forgetPublicSeoCache();
 
         return $pastoral->refresh();
     }

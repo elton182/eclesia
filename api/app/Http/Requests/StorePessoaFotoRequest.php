@@ -13,7 +13,9 @@ class StorePessoaFotoRequest extends FormRequest
     {
         $scope = app(EccVisibilityScope::class);
 
-        return $scope->userCan('pessoas.manage') || $scope->userCan('ecc.casais.manage');
+        $pessoaId = (string) $this->route('id');
+
+        return $scope->canAtualizarPessoa($pessoaId);
     }
 
     /**

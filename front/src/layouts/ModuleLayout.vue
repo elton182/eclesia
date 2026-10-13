@@ -6,7 +6,14 @@ import { useAuthAdminStore } from '@/stores/authAdmin'
 import { useTenantStore } from '@/stores/tenant'
 import { useIgrejaStore } from '@/stores/igreja'
 import { useBrandingStore } from '@/stores/branding'
-import { userHasPermission, canSeeEccCasaisNav, canSeeEccEventosNav, canSeePlanejamentoNav } from '@/utils/userRoles'
+import {
+  userHasPermission,
+  canSeeEccCasaisNav,
+  canSeeEccEventosNav,
+  canSeeEccFinanceiroNav,
+  canSeePastoraisNav,
+  isSomenteLiderEquipe,
+} from '@/utils/userRoles'
 import PwaInstallNavButton from '@/components/base/PwaInstallNavButton.vue'
 import fallbackLogo from '@/assets/logo-icon.png'
 
@@ -14,7 +21,7 @@ const props = defineProps({
   moduleKey: {
     type: String,
     required: true,
-    validator: (v) => ['ecc', 'site', 'eventos', 'calendario', 'planejamento'].includes(v),
+    validator: (v) => ['ecc', 'site', 'eventos', 'calendario', 'pastorais'].includes(v),
   },
 })
 
@@ -97,7 +104,7 @@ const moduleMeta = computed(() => {
       subtitleMono: false,
     }
   }
-  if (props.moduleKey === 'planejamento') {
+  if (props.moduleKey === 'pastorais') {
     return {
       title: 'Planejamento Anual',
       subtitle: 'Pastorais propõem · padres revisam',
@@ -111,7 +118,14 @@ const moduleMeta = computed(() => {
   }
 })
 
+const somenteLider = computed(() =>
+  isSomenteLiderEquipe(authTenant.user, { isSuperAdmin: isPlatformAdmin.value }),
+)
+
 const navItems = computed(() => {
+  if (props.moduleKey === 'ecc' && somenteLider.value) {
+    return [{ label: 'Minha equipe', path: '/ecc/minha-equipe', exact: true }]
+  }
   if (props.moduleKey === 'site') {
     return [
       { label: 'Páginas e seções', path: '/site', exact: true },
@@ -131,12 +145,25 @@ const navItems = computed(() => {
       { label: 'Tipos de evento', path: '/calendario/tipos' },
     ]
   }
-  if (props.moduleKey === 'planejamento') {
+  if (props.moduleKey === 'pastorais') {
     const items = []
-    if (canSeePlanejamentoNav(authTenant.user, { isSuperAdmin: isPlatformAdmin.value })) {
-      items.push({ label: 'Calendário', path: '/planejamento', exact: true })
+    if (
+      canSeePastoraisNav(authTenant.user, { isSuperAdmin: isPlatformAdmin.value }) ||
+      can('telas.pastorais') ||
+      can('pastorais.manage') ||
+      can('pastorais.view')
+    ) {
+      items.push({ label: 'Pastorais', path: '/pastorais', exact: true })
     }
-    items.push({ label: 'Pastorais', path: '/planejamento/pastorais' })
+    if (
+      can('planejamento.gerir') ||
+      can('planejamento.propor') ||
+      can('planejamento.ver_global') ||
+      can('telas.pastorais') ||
+      isPlatformAdmin.value
+    ) {
+      items.push({ label: 'Planejamento anual', path: '/planejamento' })
+    }
     return items
   }
   if (props.moduleKey === 'eventos') {
@@ -152,6 +179,9 @@ const navItems = computed(() => {
   if (canSeeEccEventosNav(authTenant.user, { isSuperAdmin: isPlatformAdmin.value })) {
     items.push({ label: 'Eventos', path: '/ecc/eventos' })
   }
+  if (canSeeEccFinanceiroNav(authTenant.user, { isSuperAdmin: isPlatformAdmin.value })) {
+    items.push({ label: 'Financeiro', path: '/ecc/financeiro' })
+  }
   items.push({ label: 'Relatórios', path: '/ecc/relatorios', stub: true })
   return items
 })
@@ -164,9 +194,6 @@ function isActive(item) {
     if (item.query?.tab) return route.path === '/site' && q === item.query.tab
   }
   if (item.exact) return route.path === item.path
-  if (props.moduleKey === 'planejamento' && item.path === '/planejamento') {
-    return route.path === '/planejamento'
-  }
   if (props.moduleKey === 'calendario' && item.path === '/calendario') {
     return route.path === '/calendario'
   }
@@ -175,6 +202,12 @@ function isActive(item) {
   }
   if (props.moduleKey === 'calendario' && item.path === '/calendario/tipos') {
     return route.path === '/calendario/tipos' || route.path.startsWith('/calendario/tipos/')
+  }
+  if (props.moduleKey === 'pastorais' && item.path === '/pastorais') {
+    return route.path === '/pastorais' || route.path.startsWith('/pastorais/')
+  }
+  if (props.moduleKey === 'pastorais' && item.path === '/planejamento') {
+    return route.path === '/planejamento' || route.path.startsWith('/planejamento/')
   }
   return route.path === item.path || route.path.startsWith(item.path + '/')
 }
@@ -233,6 +266,7 @@ onMounted(async () => {
       </div>
 
       <router-link
+        v-if="!somenteLider"
         to="/inicio"
         class="flex items-center gap-2.5 no-underline px-2"
         data-testid="module-back-launcher"
@@ -303,7 +337,8 @@ onMounted(async () => {
           style="color: var(--color-muted)"
         >
           <router-link
-            to="/inicio"
+            v-if="!somenteLider || route.path !== '/ecc/minha-equipe'"
+            :to="somenteLider ? '/ecc/minha-equipe' : '/inicio'"
             class="md:hidden no-underline"
             style="color: var(--color-primary-hover)"
           >

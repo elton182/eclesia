@@ -326,6 +326,25 @@ export function resolveSeo(seo, fallbackTitle) {
   }
 }
 
+/**
+ * Aplica title + meta description no document (pós-JS alinhado ao HTML SEO inicial).
+ * @param {{ title: string, description: string }} seo
+ * @param {Document} [doc]
+ */
+export function applyDocumentSeo(seo, doc = typeof document !== 'undefined' ? document : null) {
+  if (!doc) return
+  const title = String(seo?.title || 'Site')
+  const description = String(seo?.description || '')
+  doc.title = title
+  let meta = doc.querySelector('meta[name="description"]')
+  if (!meta) {
+    meta = doc.createElement('meta')
+    meta.setAttribute('name', 'description')
+    doc.head.appendChild(meta)
+  }
+  meta.setAttribute('content', description)
+}
+
 /** Âncora de seção no one-pager. */
 export function blockAnchor(tipo) {
   const map = {

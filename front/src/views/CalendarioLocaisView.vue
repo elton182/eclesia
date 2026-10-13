@@ -196,7 +196,7 @@ onMounted(load)
 <template>
   <div class="px-4 md:px-6 lg:px-8 xl:px-10 py-6 w-full space-y-6" data-testid="calendario-locais">
     <header class="mb-2">
-      <p class="page-eyebrow">Calendário</p>
+      <p class="page-eyebrow">Agenda Paroquial</p>
       <h1 class="font-serif text-[28px] font-normal" style="color: var(--color-ink)">
         Locais e horários
       </h1>

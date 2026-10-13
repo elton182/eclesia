@@ -88,6 +88,11 @@ class EccCasalService
     public function update(Casal $casal, array $data): Casal
     {
         return DB::transaction(function () use ($casal, $data) {
+            if (! $this->visibility->userCan('ecc.casais.manage')) {
+                unset($data['equipe']);
+                $data['equipe_id'] = $casal->ecc_equipe_id;
+            }
+
             $pessoaAData = [
                 'nome' => $data['nome'],
                 'email' => $data['email'] ?? null,

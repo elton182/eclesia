@@ -27,6 +27,10 @@ class PastoralResource extends JsonResource
             'ordem' => $this->ordem,
             'publicado_no_site' => (bool) $this->publicado_no_site,
             'ativa' => (bool) $this->ativa,
+            'membros' => $this->whenLoaded(
+                'membros',
+                fn () => PastoralMembroResource::collection($this->membros)
+            ),
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
         ];

@@ -33,6 +33,9 @@ Cada organização (tenant) precisa de um site público com informações, comun
 - [ ] `admin-igreja`: comunicados/pastorais da própria igreja; sem settings/pages/forms globais.
 - [ ] Isolamento entre tenants; 401 sem auth nas rotas admin; 403 sem permissão.
 - [ ] Front público renderiza blocos; front admin em `/site` gated por `telas.site`.
+- [ ] `GET /api/v1/public/site/html/{tenantSlug}` e `.../html/{tenantSlug}/{pageSlug}` devolvem HTML com `<title>`, meta description, canonical, Open Graph e texto dos blocos publicados (mesmo documento para pessoa e buscador); 404 se site/página não publicados; bloco `html` só com texto (`strip_tags`).
+- [ ] `GET /api/v1/public/site/sitemap/{tenantSlug}` lista URLs canônicas das páginas `publicado` (base `FRONTEND_URL`); 404 se site não publicado.
+- [ ] Front (dev/preview): `GET /site/{tenantSlug}` e `/{pageSlug}` fazem proxy do HTML da API + script do Vue; produção com `dist/` estático exige proxy equivalente (`/site/` → rota HTML da API).
 
 ## Fora de escopo
 
@@ -41,6 +44,7 @@ Cada organização (tenant) precisa de um site público com informações, comun
 - Editor drag-and-drop avançado; PWA do site
 - Membros/reuniões de pastorais
 - Coedição do CMS global por admin-igreja
+- JSON-LD / dados estruturados; editor “Domínio e SEO” (stub)
 
 ## Contrato de API
 
@@ -48,6 +52,8 @@ Ver `api/docs/specs/openapi.yaml` — paths `/public/site*` e `/site/*`.
 
 ## Notas
 
-- Tenancy pública: mesmo middleware `X-Tenant` (slug da URL no front).
+- Tenancy pública JSON: middleware `X-Tenant` (slug da URL no front).
+- Exceção SEO: rotas `public/site/html/*` e `public/site/sitemap/*` inicializam tenancy pelo **slug no path** (crawler não envia `X-Tenant`) — ADR-0003.
 - Prefixo de tabelas `site_*`; entidade `pastorais` sem prefixo (evolui para módulo Pastorais).
 - ULID em URLs públicas de recursos.
+- HTML SEO é derivado do conteúdo publicado (sem coluna de snapshot); cache curto invalidado ao salvar settings, páginas/blocos, comunicados, pastorais ou igreja publicável.
