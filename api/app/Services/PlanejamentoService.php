@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\CalendarioLocal;
+use App\Models\Igreja;
 use App\Models\Pastoral;
 use App\Models\PlanejamentoAnual;
 use App\Models\PlanejamentoEvento;
+use App\Models\PlanejamentoPastoralToken;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -459,5 +462,105 @@ class PlanejamentoService
         }
 
         return $found;
+    }
+
+    /**
+     * Gera ou rotaciona o link tokenizado da pastoral no ano.
+     *
+     * @return array{token: PlanejamentoPastoralToken, plain: string}
+     */
+    public function createOrRotatePastoralToken(PlanejamentoAnual $anual, string $pastoralId): array
+    {
+        $this->assertPastoralDaIgreja($pastoralId);
+
+        $plain = Str::random(48);
+        $hash = hash('sha256', $plain);
+
+        $token = PlanejamentoPastoralToken::query()->updateOrCreate(
+            [
+                'planejamento_anual_id' => $anual->id,
+                'pastoral_id' => $pastoralId,
+            ],
+            [
+                'token_hash' => $hash,
+                'token_preview' => substr($plain, 0, 8),
+                'expires_at' => null,
+                'revogado_em' => null,
+            ]
+        );
+
+        $token->refresh();
+        $token->setAttribute('plain_token', $plain);
+
+        return ['token' => $token, 'plain' => $plain];
+    }
+
+    public function revokePastoralToken(PlanejamentoAnual $anual, string $pastoralId): void
+    {
+        PlanejamentoPastoralToken::query()
+            ->where('planejamento_anual_id', $anual->id)
+            ->where('pastoral_id', $pastoralId)
+            ->whereNull('revogado_em')
+            ->update(['revogado_em' => now()]);
+    }
+
+    public function findTokenByPlain(string $plain): PlanejamentoPastoralToken
+    {
+        $hash = hash('sha256', $plain);
+
+        $token = PlanejamentoPastoralToken::query()
+            ->with(['planejamento', 'pastoral'])
+            ->where('token_hash', $hash)
+            ->first();
+
+        if ($token === null || ! $token->isAtivo()) {
+            throw ValidationException::withMessages([
+                'token' => ['Link inválido, expirado ou revogado.'],
+            ]);
+        }
+
+        return $token;
+    }
+
+    /**
+     * @return Collection<int, PlanejamentoEvento>
+     */
+    public function listEventosPublicos(PlanejamentoPastoralToken $token): Collection
+    {
+        return PlanejamentoEvento::query()
+            ->with(['locais', 'pastoral'])
+            ->where('planejamento_anual_id', $token->planejamento_anual_id)
+            ->where('pastoral_id', $token->pastoral_id)
+            ->orderBy('data_inicio')
+            ->orderBy('hora_inicio')
+            ->get();
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array{evento: PlanejamentoEvento, conflitos: list<array<string, mixed>>}
+     */
+    public function createEventoPublico(PlanejamentoPastoralToken $token, array $data): array
+    {
+        $anual = $token->planejamento;
+        if ($anual === null) {
+            $anual = PlanejamentoAnual::query()->findOrFail($token->planejamento_anual_id);
+        }
+
+        if ($anual->status !== PlanejamentoAnual::STATUS_COLETA) {
+            throw ValidationException::withMessages([
+                'status' => ['A coleta deste ano não está aberta.'],
+            ]);
+        }
+
+        $igreja = Igreja::query()->findOrFail($anual->igreja_id);
+        $this->igrejaContext->set($igreja);
+
+        return $this->createEvento($anual, [
+            ...$data,
+            'pastoral_id' => $token->pastoral_id,
+            'local_ids' => [],
+            'local_texto' => $data['local_texto'] ?? null,
+        ]);
     }
 }

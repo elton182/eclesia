@@ -26,6 +26,7 @@ import CalendarioMensalDetailView from '../views/CalendarioMensalDetailView.vue'
 import CalendarioLocaisView from '../views/CalendarioLocaisView.vue'
 import CalendarioTiposView from '../views/CalendarioTiposView.vue'
 import CalendarioColetaPublicView from '../views/CalendarioColetaPublicView.vue'
+import PlanejamentoPublicView from '../views/PlanejamentoPublicView.vue'
 import PastoraisView from '../views/PastoraisView.vue'
 import PastoralDetailView from '../views/PastoralDetailView.vue'
 import PlanejamentoAnuaisView from '../views/PlanejamentoAnuaisView.vue'
@@ -107,6 +108,12 @@ const router = createRouter({
       path: '/calendario/coleta/:token',
       name: 'calendario-coleta-publica',
       component: CalendarioColetaPublicView,
+      meta: { publicSite: true },
+    },
+    {
+      path: '/planejamento/publico/:token',
+      name: 'planejamento-publico',
+      component: PlanejamentoPublicView,
       meta: { publicSite: true },
     },
     {

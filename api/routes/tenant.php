@@ -85,6 +85,13 @@ Route::middleware([
             ->middleware('throttle:30,1');
     });
 
+    Route::prefix('public/planejamento')->group(function () {
+        Route::get('{token}', [PlanejamentoController::class, 'showPublico']);
+        Route::get('{token}/eventos', [PlanejamentoController::class, 'indexEventosPublicos']);
+        Route::post('{token}/eventos', [PlanejamentoController::class, 'storeEventoPublico'])
+            ->middleware('throttle:30,1');
+    });
+
     // Foto: URL assinada + ?tenant= (img não envia X-Tenant/Bearer). Spec SPEC-006 / ADR-0002.
     Route::get('pessoas/{id}/foto', [PessoaFotoController::class, 'show'])
         ->middleware('signed')
@@ -222,6 +229,8 @@ Route::middleware([
     Route::patch('planejamento/eventos/{eventoId}', [PlanejamentoController::class, 'updateEvento']);
     Route::delete('planejamento/eventos/{eventoId}', [PlanejamentoController::class, 'destroyEvento']);
     Route::get('planejamento/anuais/{id}/pdf', [PlanejamentoController::class, 'pdf']);
+    Route::post('planejamento/anuais/{id}/pastorais/{pastoralId}/token', [PlanejamentoController::class, 'storePastoralToken']);
+    Route::delete('planejamento/anuais/{id}/pastorais/{pastoralId}/token', [PlanejamentoController::class, 'destroyPastoralToken']);
 
     Route::post('pessoas/{id}/foto', [PessoaFotoController::class, 'store']);
     Route::delete('pessoas/{id}/foto', [PessoaFotoController::class, 'destroy']);

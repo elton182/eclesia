@@ -90,3 +90,20 @@ export async function downloadAnualPdf(anualId, params = {}) {
   })
   return res.data
 }
+
+/**
+ * @returns {Promise<{ token: string, data: Record<string, unknown>|null }>}
+ */
+export async function createPastoralToken(anualId, pastoralId) {
+  const { data } = await api.post(
+    `/planejamento/anuais/${anualId}/pastorais/${pastoralId}/token`,
+  )
+  return {
+    token: data.token || data.data?.token || '',
+    data: unwrapItem(data),
+  }
+}
+
+export async function revokePastoralToken(anualId, pastoralId) {
+  await api.delete(`/planejamento/anuais/${anualId}/pastorais/${pastoralId}/token`)
+}

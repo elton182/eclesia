@@ -6,12 +6,14 @@ import { listPastorais } from '@/services/pastorais'
 import {
   changeAnualStatus,
   createEvento,
+  createPastoralToken,
   deleteEvento,
   downloadAnualPdf,
   getAnual,
   listEventos,
   updateEvento,
 } from '@/services/planejamento'
+import { useTenantStore } from '@/stores/tenant'
 import { innovToast } from '@/plugins/toast'
 import { innovConfirm } from '@/plugins/dialog'
 import {
@@ -45,6 +47,7 @@ const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
 const authAdmin = useAuthAdminStore()
+const tenantStore = useTenantStore()
 
 const loading = ref(true)
 const saving = ref(false)
@@ -56,9 +59,13 @@ const mesView = ref(new Date().getMonth() + 1)
 const filtroPastoral = ref('')
 const filtroStatus = ref('')
 const diaSelecionado = ref('')
+const showDayModal = ref(false)
 const editingEvento = ref(null)
 const showForm = ref(false)
 const conflitoAlert = ref('')
+/** @type {import('vue').Ref<Record<string, string>>} */
+const pastoralLinks = ref({})
+const tokenBusy = ref('')
 
 const emptyForm = () => ({
   pastoral_id: '',
@@ -165,11 +172,11 @@ function openCreate(dayIso) {
   if (!podeCriar.value) return
   editingEvento.value = null
   form.value = emptyForm()
-  form.value.data_inicio = dayIso || ''
+  form.value.data_inicio = dayIso || diaSelecionado.value || ''
   form.value.pastoral_id = pastoraisOpcoes.value[0]?.id || ''
   form.value.local_ids = locais.value[0] ? [locais.value[0].id] : []
+  if (dayIso) diaSelecionado.value = dayIso
   showForm.value = true
-  diaSelecionado.value = dayIso || diaSelecionado.value
 }
 
 function openEdit(ev) {
@@ -190,6 +197,7 @@ function openEdit(ev) {
     status_solicitacao: ev.status_solicitacao || 'proposta',
     motivo_ajuste: ev.motivo_ajuste || '',
   }
+  showDayModal.value = false
   showForm.value = true
 }
 
@@ -197,6 +205,43 @@ function closeForm() {
   showForm.value = false
   editingEvento.value = null
   form.value = emptyForm()
+}
+
+function closeDayModal() {
+  showDayModal.value = false
+}
+
+function publicLinkFor(token) {
+  if (!token) return ''
+  const qs = tenantStore.slug ? `?tenant=${encodeURIComponent(tenantStore.slug)}` : ''
+  return `${window.location.origin}/planejamento/publico/${token}${qs}`
+}
+
+async function gerarLinkPastoral(pastoral) {
+  if (!canGerir.value || !anual.value) return
+  tokenBusy.value = pastoral.id
+  try {
+    const { token } = await createPastoralToken(anual.value.id, pastoral.id)
+    pastoralLinks.value = { ...pastoralLinks.value, [pastoral.id]: token }
+    const url = publicLinkFor(token)
+    try {
+      await navigator.clipboard.writeText(url)
+      innovToast('success', 'Link', `Link de ${pastoral.nome} copiado`)
+    } catch {
+      innovToast('success', 'Link', 'Link gerado — copie abaixo')
+    }
+  } catch (e) {
+    innovToast('error', 'Link', e.response?.data?.message || 'Falha ao gerar link')
+  } finally {
+    tokenBusy.value = ''
+  }
+}
+
+async function copiarLinkPastoral(pastoralId) {
+  const url = publicLinkFor(pastoralLinks.value[pastoralId])
+  if (!url) return
+  await navigator.clipboard.writeText(url)
+  innovToast('success', 'Link', 'Copiado')
 }
 
 function toggleLocal(id) {
@@ -296,6 +341,7 @@ async function salvarEvento() {
     showConflitos(result.conflitos)
     innovToast('success', 'Evento', editingEvento.value ? 'Atualizado' : 'Proposto')
     closeForm()
+    showDayModal.value = false
     await load({ silent: true })
   } catch (e) {
     innovToast('error', 'Evento', e.response?.data?.message || 'Falha ao salvar')
@@ -348,6 +394,7 @@ async function baixarPdf() {
 function selectDay(iso) {
   if (!iso) return
   diaSelecionado.value = iso
+  showDayModal.value = true
 }
 
 watch(
@@ -470,9 +517,14 @@ onMounted(load)
       </div>
 
       <div class="card p-4 md:p-5" data-testid="planejamento-grade">
-        <h2 class="font-serif text-[18px] font-medium mb-4" style="color: var(--color-ink)">
-          {{ mesTitulo }}
-        </h2>
+        <div class="flex flex-wrap items-end justify-between gap-2 mb-4">
+          <h2 class="font-serif text-[18px] font-medium" style="color: var(--color-ink)">
+            {{ mesTitulo }}
+          </h2>
+          <p class="text-[12px]" style="color: var(--color-muted)">
+            Clique em um dia para ver eventos e propor
+          </p>
+        </div>
         <div class="grid grid-cols-7 gap-1 text-center text-[11px] mb-1" style="color: var(--color-muted)">
           <div v-for="d in WEEKDAYS" :key="d">{{ d }}</div>
         </div>
@@ -497,7 +549,6 @@ onMounted(load)
             "
             :data-testid="cell.iso ? `planejamento-dia-${cell.iso}` : undefined"
             @click="cell.inMonth && selectDay(cell.iso)"
-            @dblclick="cell.inMonth && podeCriar && openCreate(cell.iso)"
           >
             <template v-if="cell.inMonth">
               <div class="text-[12px] font-medium mb-0.5">{{ cell.dia }}</div>
@@ -520,54 +571,115 @@ onMounted(load)
       </div>
 
       <section
-        v-if="diaSelecionado"
+        v-if="canGerir"
         class="card p-4 md:p-5"
-        data-testid="planejamento-dia-painel"
+        data-testid="planejamento-links-pastorais"
       >
-        <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
-          <h2 class="font-serif text-[18px] font-medium" style="color: var(--color-ink)">
-            {{ diaSelecionado }}
-          </h2>
-          <button
-            v-if="podeCriar"
-            type="button"
-            class="btn btn-ghost"
-            @click="openCreate(diaSelecionado)"
-          >
-            + Evento neste dia
-          </button>
-        </div>
-        <ul v-if="diaEventos.length" class="list-none p-0 m-0 space-y-3">
+        <h2 class="font-serif text-[18px] font-medium mb-1" style="color: var(--color-ink)">
+          Links para as pastorais
+        </h2>
+        <p class="text-[13px] mb-4" style="color: var(--color-muted)">
+          Gere um link por pastoral e envie para o coordenador propor datas sem login.
+          A coleta precisa estar aberta (<strong>status Coleta</strong>) para eles enviarem propostas.
+        </p>
+        <ul v-if="pastorais.length" class="list-none p-0 m-0 space-y-3">
           <li
-            v-for="ev in diaEventos"
-            :key="ev.id"
-            class="rounded-lg px-3 py-3"
+            v-for="p in pastorais"
+            :key="p.id"
+            class="rounded-lg px-3 py-3 flex flex-wrap items-start justify-between gap-3"
             style="border: 1px solid var(--color-line)"
-            data-testid="planejamento-evento"
           >
-            <div class="flex flex-wrap items-start justify-between gap-2">
-              <div class="min-w-0">
-                <div class="font-medium text-[14px]" style="color: var(--color-ink)">
-                  {{ ev.titulo }}
+            <div class="min-w-0 flex-1">
+              <div class="font-medium text-[14px]" style="color: var(--color-ink)">{{ p.nome }}</div>
+              <code
+                v-if="pastoralLinks[p.id]"
+                class="block text-[11px] mt-1 break-all"
+                style="color: var(--color-muted)"
+                data-testid="planejamento-link-url"
+              >
+                {{ publicLinkFor(pastoralLinks[p.id]) }}
+              </code>
+            </div>
+            <div class="flex flex-wrap gap-2 shrink-0">
+              <button
+                type="button"
+                class="btn btn-accent text-xs"
+                :disabled="tokenBusy === p.id"
+                data-testid="planejamento-gerar-link"
+                @click="gerarLinkPastoral(p)"
+              >
+                {{ pastoralLinks[p.id] ? 'Novo link' : 'Gerar link' }}
+              </button>
+              <button
+                v-if="pastoralLinks[p.id]"
+                type="button"
+                class="btn btn-ghost text-xs"
+                @click="copiarLinkPastoral(p.id)"
+              >
+                Copiar
+              </button>
+            </div>
+          </li>
+        </ul>
+        <p v-else class="text-[13px]" style="color: var(--color-muted)">
+          Cadastre pastorais em
+          <router-link to="/pastorais" class="underline" style="color: var(--color-primary)">
+            Pastorais
+          </router-link>
+          para gerar links.
+        </p>
+      </section>
+
+      <!-- Modal do dia -->
+      <div
+        v-if="showDayModal && diaSelecionado"
+        class="fixed inset-0 z-50 flex items-end md:items-center justify-center"
+        style="background: rgba(42, 20, 24, 0.4)"
+        data-testid="planejamento-day-modal"
+        @click.self="closeDayModal"
+      >
+        <div
+          class="w-full max-w-lg rounded-t-2xl md:rounded-2xl p-5 max-h-[90vh] overflow-y-auto"
+          style="background: var(--color-surface)"
+        >
+          <div class="flex items-start justify-between gap-3 mb-4">
+            <div>
+              <p class="page-eyebrow">Dia selecionado</p>
+              <h3 class="font-serif text-lg" style="color: var(--color-ink)">{{ diaSelecionado }}</h3>
+            </div>
+            <button type="button" class="btn btn-ghost text-xs" @click="closeDayModal">Fechar</button>
+          </div>
+
+          <ul v-if="diaEventos.length" class="list-none p-0 m-0 space-y-3 mb-4">
+            <li
+              v-for="ev in diaEventos"
+              :key="ev.id"
+              class="rounded-lg px-3 py-3"
+              style="border: 1px solid var(--color-line)"
+              data-testid="planejamento-evento"
+            >
+              <div class="flex flex-wrap items-start justify-between gap-2">
+                <div class="min-w-0">
+                  <div class="font-medium text-[14px]" style="color: var(--color-ink)">
+                    {{ ev.titulo }}
+                    <span
+                      v-if="eventoTemConflito(ev) || ev.tem_conflito"
+                      class="ml-1 text-[11px] font-medium px-2 py-0.5 rounded-full"
+                      style="color: var(--color-accent-dark); background: var(--color-accent-soft)"
+                      data-testid="planejamento-badge-conflito"
+                    >
+                      Conflito
+                    </span>
+                  </div>
+                  <div class="text-[12.5px] mt-0.5" style="color: var(--color-muted)">
+                    {{ pastoralNome(ev.pastoral_id) || ev.pastoral?.nome }}
+                    <template v-if="ev.hora_inicio">
+                      · {{ formatHoraCalendario(ev.hora_inicio) }}
+                      <template v-if="ev.hora_fim">–{{ formatHoraCalendario(ev.hora_fim) }}</template>
+                    </template>
+                  </div>
                   <span
-                    v-if="eventoTemConflito(ev) || (ev.tem_conflito)"
-                    class="ml-1 text-[11px] font-medium px-2 py-0.5 rounded-full"
-                    style="color: var(--color-accent-dark); background: var(--color-accent-soft)"
-                    data-testid="planejamento-badge-conflito"
-                  >
-                    Conflito
-                  </span>
-                </div>
-                <div class="text-[12.5px] mt-0.5" style="color: var(--color-muted)">
-                  {{ pastoralNome(ev.pastoral_id) || ev.pastoral?.nome }}
-                  <template v-if="ev.hora_inicio">
-                    · {{ formatHoraCalendario(ev.hora_inicio) }}
-                    <template v-if="ev.hora_fim">–{{ formatHoraCalendario(ev.hora_fim) }}</template>
-                  </template>
-                </div>
-                <div class="mt-1">
-                  <span
-                    class="text-[11px] font-medium px-2 py-0.5 rounded-full"
+                    class="inline-block mt-1 text-[11px] font-medium px-2 py-0.5 rounded-full"
                     :style="{
                       color: styleStatusSolicitacao(ev.status_solicitacao).fg,
                       background: styleStatusSolicitacao(ev.status_solicitacao).bg,
@@ -576,196 +688,210 @@ onMounted(load)
                     {{ labelStatusSolicitacao(ev.status_solicitacao) }}
                   </span>
                 </div>
-                <p
-                  v-if="ev.motivo_ajuste"
-                  class="text-[12px] mt-1"
-                  style="color: var(--color-muted)"
-                >
-                  Ajuste: {{ ev.motivo_ajuste }}
-                </p>
+                <div class="flex gap-2 shrink-0">
+                  <button
+                    v-if="podeEditar(ev)"
+                    type="button"
+                    class="btn btn-ghost !py-1.5 !px-3 text-xs"
+                    data-testid="planejamento-evento-editar"
+                    @click="openEdit(ev)"
+                  >
+                    Editar
+                  </button>
+                  <button
+                    v-if="podeEditar(ev)"
+                    type="button"
+                    class="btn btn-ghost !py-1.5 !px-3 text-xs"
+                    style="color: var(--color-danger)"
+                    @click="removerEvento(ev)"
+                  >
+                    Remover
+                  </button>
+                </div>
               </div>
-              <div class="flex gap-2 shrink-0">
-                <button
-                  v-if="podeEditar(ev)"
-                  type="button"
-                  class="btn btn-ghost !py-1.5 !px-3 text-xs"
-                  data-testid="planejamento-evento-editar"
-                  @click="openEdit(ev)"
-                >
-                  Editar
-                </button>
-                <button
-                  v-if="podeEditar(ev)"
-                  type="button"
-                  class="btn btn-ghost !py-1.5 !px-3 text-xs"
-                  style="color: var(--color-danger)"
-                  @click="removerEvento(ev)"
-                >
-                  Remover
-                </button>
-              </div>
-            </div>
-          </li>
-        </ul>
-        <p v-else class="text-[13.5px]" style="color: var(--color-muted)">
-          Nenhum evento neste dia.
-        </p>
-      </section>
+            </li>
+          </ul>
+          <p v-else class="text-[13.5px] mb-4" style="color: var(--color-muted)">
+            Nenhum evento neste dia.
+          </p>
 
-      <section
+          <button
+            v-if="podeCriar"
+            type="button"
+            class="btn btn-primary w-full"
+            data-testid="planejamento-modal-novo"
+            @click="openCreate(diaSelecionado)"
+          >
+            Propor evento neste dia
+          </button>
+          <p v-else class="text-[12.5px]" style="color: var(--color-muted)">
+            Não é possível propor eventos neste status do ano.
+          </p>
+        </div>
+      </div>
+
+      <!-- Modal do formulário -->
+      <div
         v-if="showForm"
-        class="card p-5 md:p-6"
+        class="fixed inset-0 z-[60] flex items-end md:items-center justify-center"
+        style="background: rgba(42, 20, 24, 0.45)"
         data-testid="planejamento-evento-form"
+        @click.self="closeForm"
       >
-        <h2 class="font-serif text-[18px] font-medium mb-4" style="color: var(--color-ink)">
-          {{ editingEvento ? 'Editar evento' : 'Propor evento' }}
-        </h2>
-        <form class="flex flex-col gap-4" @submit.prevent="salvarEvento">
-          <div class="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label class="fld" for="ev-pastoral">Pastoral</label>
-              <select
-                id="ev-pastoral"
-                v-model="form.pastoral_id"
-                class="input"
-                required
-                :disabled="!canGerir && !!editingEvento"
-                data-testid="planejamento-evento-pastoral"
-              >
-                <option v-for="p in pastoraisOpcoes" :key="p.id" :value="p.id">
-                  {{ p.nome }}
-                </option>
-              </select>
-            </div>
-            <div>
-              <label class="fld" for="ev-titulo">Título</label>
-              <input
-                id="ev-titulo"
-                v-model="form.titulo"
-                class="input"
-                required
-                data-testid="planejamento-evento-titulo"
-              />
-            </div>
-            <div>
-              <label class="fld" for="ev-inicio">Data início</label>
-              <input
-                id="ev-inicio"
-                v-model="form.data_inicio"
-                type="date"
-                class="input"
-                required
-              />
-            </div>
-            <div>
-              <label class="fld" for="ev-fim">Data fim</label>
-              <input id="ev-fim" v-model="form.data_fim" type="date" class="input" />
-            </div>
-            <div>
-              <label class="fld" for="ev-hi">Hora início</label>
-              <input id="ev-hi" v-model="form.hora_inicio" type="time" class="input" />
-            </div>
-            <div>
-              <label class="fld" for="ev-hf">Hora fim</label>
-              <input id="ev-hf" v-model="form.hora_fim" type="time" class="input" />
-            </div>
-            <div>
-              <label class="fld" for="ev-part">Participantes (média)</label>
-              <input
-                id="ev-part"
-                v-model.number="form.participantes_media"
-                type="number"
-                min="0"
-                class="input"
-              />
-            </div>
-            <div>
-              <label class="fld" for="ev-rec">Recorrência (texto)</label>
-              <input
-                id="ev-rec"
-                v-model="form.recorrencia_texto"
-                class="input"
-                placeholder="Ex.: toda 1ª terça"
-              />
-            </div>
-          </div>
-
-          <div>
-            <span class="fld">Locais do catálogo</span>
-            <div class="flex flex-wrap gap-2 mt-1">
-              <label
-                v-for="loc in locais"
-                :key="loc.id"
-                class="inline-flex items-center gap-1.5 text-[13px] cursor-pointer px-2.5 py-1.5 rounded-lg"
-                style="border: 1px solid var(--color-line)"
-              >
-                <input
-                  type="checkbox"
-                  :checked="form.local_ids.includes(loc.id)"
-                  @change="toggleLocal(loc.id)"
-                />
-                {{ loc.nome }}
-              </label>
-              <span v-if="!locais.length" class="text-[12.5px]" style="color: var(--color-muted)">
-                Nenhum local cadastrado — use texto livre ou cadastre em Calendário → Locais.
-              </span>
-            </div>
-          </div>
-
-          <div>
-            <label class="fld" for="ev-local-txt">Local (texto livre)</label>
-            <input
-              id="ev-local-txt"
-              v-model="form.local_texto"
-              class="input"
-              placeholder="Externo / legado"
-            />
-          </div>
-
-          <div>
-            <label class="fld" for="ev-obs">Observações</label>
-            <textarea id="ev-obs" v-model="form.observacoes" class="input min-h-[72px]" rows="2" />
-          </div>
-
-          <template v-if="podeAlterarStatusSolic && editingEvento">
+        <div
+          class="w-full max-w-xl rounded-t-2xl md:rounded-2xl p-5 max-h-[92vh] overflow-y-auto"
+          style="background: var(--color-surface)"
+        >
+          <h2 class="font-serif text-[18px] font-medium mb-4" style="color: var(--color-ink)">
+            {{ editingEvento ? 'Editar evento' : 'Propor evento' }}
+          </h2>
+          <form class="flex flex-col gap-4" @submit.prevent="salvarEvento">
             <div class="grid gap-4 sm:grid-cols-2">
               <div>
-                <label class="fld" for="ev-status">Status da solicitação</label>
+                <label class="fld" for="ev-pastoral">Pastoral</label>
                 <select
-                  id="ev-status"
-                  v-model="form.status_solicitacao"
+                  id="ev-pastoral"
+                  v-model="form.pastoral_id"
                   class="input"
-                  data-testid="planejamento-evento-status"
+                  required
+                  :disabled="!canGerir && !!editingEvento"
+                  data-testid="planejamento-evento-pastoral"
                 >
-                  <option
-                    v-for="opt in statusSolicitacaoOptions"
-                    :key="opt.value"
-                    :value="opt.value"
-                  >
-                    {{ opt.label }}
+                  <option v-for="p in pastoraisOpcoes" :key="p.id" :value="p.id">
+                    {{ p.nome }}
                   </option>
                 </select>
               </div>
               <div>
-                <label class="fld" for="ev-motivo">Motivo do ajuste</label>
-                <input id="ev-motivo" v-model="form.motivo_ajuste" class="input" />
+                <label class="fld" for="ev-titulo">Título</label>
+                <input
+                  id="ev-titulo"
+                  v-model="form.titulo"
+                  class="input"
+                  required
+                  data-testid="planejamento-evento-titulo"
+                />
+              </div>
+              <div>
+                <label class="fld" for="ev-inicio">Data início</label>
+                <input
+                  id="ev-inicio"
+                  v-model="form.data_inicio"
+                  type="date"
+                  class="input"
+                  required
+                />
+              </div>
+              <div>
+                <label class="fld" for="ev-fim">Data fim</label>
+                <input id="ev-fim" v-model="form.data_fim" type="date" class="input" />
+              </div>
+              <div>
+                <label class="fld" for="ev-hi">Hora início</label>
+                <input id="ev-hi" v-model="form.hora_inicio" type="time" class="input" />
+              </div>
+              <div>
+                <label class="fld" for="ev-hf">Hora fim</label>
+                <input id="ev-hf" v-model="form.hora_fim" type="time" class="input" />
+              </div>
+              <div>
+                <label class="fld" for="ev-part">Participantes (média)</label>
+                <input
+                  id="ev-part"
+                  v-model.number="form.participantes_media"
+                  type="number"
+                  min="0"
+                  class="input"
+                />
+              </div>
+              <div>
+                <label class="fld" for="ev-rec">Recorrência (texto)</label>
+                <input
+                  id="ev-rec"
+                  v-model="form.recorrencia_texto"
+                  class="input"
+                  placeholder="Ex.: toda 1ª terça"
+                />
               </div>
             </div>
-          </template>
 
-          <div class="flex justify-end gap-2">
-            <button type="button" class="btn btn-ghost" @click="closeForm">Cancelar</button>
-            <button
-              type="submit"
-              class="btn btn-primary"
-              data-testid="planejamento-evento-salvar"
-              :disabled="saving"
-            >
-              {{ saving ? 'Salvando…' : 'Salvar' }}
-            </button>
-          </div>
-        </form>
-      </section>
+            <div>
+              <span class="fld">Locais do catálogo</span>
+              <div class="flex flex-wrap gap-2 mt-1">
+                <label
+                  v-for="loc in locais"
+                  :key="loc.id"
+                  class="inline-flex items-center gap-1.5 text-[13px] cursor-pointer px-2.5 py-1.5 rounded-lg"
+                  style="border: 1px solid var(--color-line)"
+                >
+                  <input
+                    type="checkbox"
+                    :checked="form.local_ids.includes(loc.id)"
+                    @change="toggleLocal(loc.id)"
+                  />
+                  {{ loc.nome }}
+                </label>
+                <span v-if="!locais.length" class="text-[12.5px]" style="color: var(--color-muted)">
+                  Nenhum local — use texto livre ou cadastre em Agenda Paroquial → Locais.
+                </span>
+              </div>
+            </div>
+
+            <div>
+              <label class="fld" for="ev-local-txt">Local (texto livre)</label>
+              <input
+                id="ev-local-txt"
+                v-model="form.local_texto"
+                class="input"
+                placeholder="Externo / legado"
+              />
+            </div>
+
+            <div>
+              <label class="fld" for="ev-obs">Observações</label>
+              <textarea id="ev-obs" v-model="form.observacoes" class="input min-h-[72px]" rows="2" />
+            </div>
+
+            <template v-if="podeAlterarStatusSolic && editingEvento">
+              <div class="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label class="fld" for="ev-status">Status da solicitação</label>
+                  <select
+                    id="ev-status"
+                    v-model="form.status_solicitacao"
+                    class="input"
+                    data-testid="planejamento-evento-status"
+                  >
+                    <option
+                      v-for="opt in statusSolicitacaoOptions"
+                      :key="opt.value"
+                      :value="opt.value"
+                    >
+                      {{ opt.label }}
+                    </option>
+                  </select>
+                </div>
+                <div>
+                  <label class="fld" for="ev-motivo">Motivo do ajuste</label>
+                  <input id="ev-motivo" v-model="form.motivo_ajuste" class="input" />
+                </div>
+              </div>
+            </template>
+
+            <div class="flex justify-end gap-2">
+              <button type="button" class="btn btn-ghost" @click="closeForm">Cancelar</button>
+              <button
+                type="submit"
+                class="btn btn-primary"
+                data-testid="planejamento-evento-salvar"
+                :disabled="saving"
+              >
+                {{ saving ? 'Salvando…' : 'Salvar' }}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
     </template>
   </div>
 </template>

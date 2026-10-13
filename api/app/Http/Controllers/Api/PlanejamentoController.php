@@ -6,12 +6,14 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StorePlanejamentoAnualRequest;
+use App\Http\Requests\StorePlanejamentoEventoPublicoRequest;
 use App\Http\Requests\StorePlanejamentoEventoRequest;
 use App\Http\Requests\TransitionPlanejamentoStatusRequest;
 use App\Http\Requests\UpdatePlanejamentoAnualRequest;
 use App\Http\Requests\UpdatePlanejamentoEventoRequest;
 use App\Http\Resources\PlanejamentoAnualResource;
 use App\Http\Resources\PlanejamentoEventoResource;
+use App\Http\Resources\PlanejamentoPastoralTokenResource;
 use App\Services\PlanejamentoAccessService;
 use App\Services\PlanejamentoService;
 use Illuminate\Http\JsonResponse;
@@ -148,5 +150,65 @@ class PlanejamentoController extends Controller
         $mes = $request->filled('mes') ? (int) $request->query('mes') : null;
 
         return $this->planejamento->pdf($anual, $mes);
+    }
+
+    public function storePastoralToken(string $id, string $pastoralId): JsonResponse
+    {
+        abort_unless($this->access->canGerir(), 403);
+        $result = $this->planejamento->createOrRotatePastoralToken(
+            $this->planejamento->findAnual($id),
+            $pastoralId
+        );
+
+        return (new PlanejamentoPastoralTokenResource($result['token']))
+            ->additional(['token' => $result['plain']])
+            ->response()
+            ->setStatusCode(201);
+    }
+
+    public function destroyPastoralToken(string $id, string $pastoralId): Response
+    {
+        abort_unless($this->access->canGerir(), 403);
+        $this->planejamento->revokePastoralToken(
+            $this->planejamento->findAnual($id),
+            $pastoralId
+        );
+
+        return response()->noContent();
+    }
+
+    public function showPublico(string $token): JsonResponse
+    {
+        $link = $this->planejamento->findTokenByPlain($token);
+        $ano = $link->planejamento;
+
+        return response()->json([
+            'data' => [
+                'ano' => $ano?->ano,
+                'status' => $ano?->status,
+                'pastoral_id' => $link->pastoral_id,
+                'pastoral_nome' => $link->pastoral?->nome,
+            ],
+        ]);
+    }
+
+    public function indexEventosPublicos(string $token): AnonymousResourceCollection
+    {
+        $link = $this->planejamento->findTokenByPlain($token);
+
+        return PlanejamentoEventoResource::collection(
+            $this->planejamento->listEventosPublicos($link)
+        );
+    }
+
+    public function storeEventoPublico(StorePlanejamentoEventoPublicoRequest $request, string $token): JsonResponse
+    {
+        $link = $this->planejamento->findTokenByPlain($token);
+        $result = $this->planejamento->createEventoPublico($link, $request->validated());
+
+        return (new PlanejamentoEventoResource($result['evento']))
+            ->withConflitos($result['conflitos'])
+            ->response()
+            ->setStatusCode(201);
     }
 }

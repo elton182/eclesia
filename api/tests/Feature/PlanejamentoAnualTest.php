@@ -369,4 +369,67 @@ class PlanejamentoAnualTest extends TestCase
         $this->assertCount(1, $eventos);
         $this->assertSame('Global B', $eventos[0]['titulo']);
     }
+
+    public function test_link_publico_pastoral_coleta(): void
+    {
+        $base = $this->seedBase();
+        $anualId = $base['anual']['id'];
+        $pastoralId = $base['pastoral']['id'];
+
+        Sanctum::actingAs($this->admin);
+        $this->tenantJson('POST', '/api/v1/planejamento/anuais/'.$anualId.'/status', [
+            'status' => 'coleta',
+        ])->assertOk();
+
+        $created = $this->tenantJson(
+            'POST',
+            '/api/v1/planejamento/anuais/'.$anualId.'/pastorais/'.$pastoralId.'/token'
+        )->assertCreated()
+            ->json();
+
+        $plain = $created['token'] ?? $created['data']['token'] ?? null;
+        $this->assertNotEmpty($plain);
+
+        Auth::forgetGuards();
+        $this->app['auth']->forgetGuards();
+
+        $this->withHeader('X-Tenant', 'demo-planejamento')
+            ->getJson('/api/v1/public/planejamento/'.$plain)
+            ->assertOk()
+            ->assertJsonPath('data.pastoral_id', $pastoralId)
+            ->assertJsonPath('data.status', 'coleta');
+
+        $this->withHeader('X-Tenant', 'demo-planejamento')
+            ->postJson('/api/v1/public/planejamento/'.$plain.'/eventos', [
+                'titulo' => 'Via link',
+                'data_inicio' => '2026-04-15',
+                'hora_inicio' => '19:00',
+                'local_texto' => 'Salão',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.titulo', 'Via link')
+            ->assertJsonPath('data.pastoral_id', $pastoralId)
+            ->assertJsonPath('data.status_solicitacao', 'proposta');
+
+        $lista = $this->withHeader('X-Tenant', 'demo-planejamento')
+            ->getJson('/api/v1/public/planejamento/'.$plain.'/eventos')
+            ->assertOk()
+            ->json('data');
+        $this->assertCount(1, $lista);
+
+        Sanctum::actingAs($this->admin);
+        $this->tenantJson('POST', '/api/v1/planejamento/anuais/'.$anualId.'/status', [
+            'status' => 'revisao',
+        ])->assertOk();
+
+        Auth::forgetGuards();
+        $this->app['auth']->forgetGuards();
+        $this->withHeader('X-Tenant', 'demo-planejamento')
+            ->postJson('/api/v1/public/planejamento/'.$plain.'/eventos', [
+                'titulo' => 'Depois da coleta',
+                'data_inicio' => '2026-04-16',
+                'local_texto' => 'Salão',
+            ])
+            ->assertStatus(422);
+    }
 }

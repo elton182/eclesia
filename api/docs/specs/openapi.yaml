@@ -4140,3 +4140,72 @@ paths:
         '401': {description: Não autenticado}
         '403': {description: Sem permissão}
         '422': {description: Status não permite export}
+  /planejamento/anuais/{id}/pastorais/{pastoralId}/token:
+    post:
+      summary: Gerar ou rotacionar link público da pastoral no ano
+      security: [{bearerAuth: [], tenantHeader: [], igrejaHeader: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+        - {name: pastoralId, in: path, required: true, schema: {type: string}}
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      id: {type: string}
+                      pastoral_id: {type: string}
+                      token: {type: string}
+                      token_preview: {type: string}
+                      ativo: {type: boolean}
+                  token: {type: string, description: Token em claro (atalho)}
+    delete:
+      summary: Revogar link da pastoral no ano
+      security: [{bearerAuth: [], tenantHeader: [], igrejaHeader: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+        - {name: pastoralId, in: path, required: true, schema: {type: string}}
+      responses:
+        '204': {description: No Content}
+  /public/planejamento/{token}:
+    get:
+      summary: Dados públicos do link da pastoral
+      parameters:
+        - {name: token, in: path, required: true, schema: {type: string}}
+      responses:
+        '200': {description: OK}
+        '422': {description: Token inválido}
+  /public/planejamento/{token}/eventos:
+    get:
+      summary: Listar eventos da pastoral do token (sem outras pastorais)
+      parameters:
+        - {name: token, in: path, required: true, schema: {type: string}}
+      responses:
+        '200': {description: OK}
+    post:
+      summary: Criar proposta via link (ano em coleta)
+      parameters:
+        - {name: token, in: path, required: true, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [titulo, data_inicio, local_texto]
+              properties:
+                titulo: {type: string}
+                data_inicio: {type: string, format: date}
+                data_fim: {type: string, format: date, nullable: true}
+                hora_inicio: {type: string, nullable: true}
+                hora_fim: {type: string, nullable: true}
+                local_texto: {type: string}
+                observacoes: {type: string, nullable: true}
+      responses:
+        '201': {description: Created}
+        '422': {description: Coleta fechada ou validação}
