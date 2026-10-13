@@ -9,6 +9,6 @@ import EccEventosView from './EccEventosView.vue'
     tipos-escopo="geral"
     detail-route-name="eventos-detail"
     page-title="Eventos da igreja"
-    page-subtitle="Agenda paroquial fora do ECC — missas especiais, festas e encontros gerais."
+    page-subtitle="Eventos gerais fora do ECC — festas, encontros e celebrações."
   />
 </template>

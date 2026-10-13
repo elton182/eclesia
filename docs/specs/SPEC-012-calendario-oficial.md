@@ -2,13 +2,15 @@
 
 **Status:** approved  
 **Data:** 2026-09-18  
-**Atualizado:** 2026-09-20  
-**Plano:** [PLAN-003](../plans/PLAN-003-calendario-oficial-sessao-branding.md)  
+**Atualizado:** 2026-10-13  
+**Plano:** [PLAN-003](../plans/PLAN-003-calendario-oficial-sessao-branding.md), rename UI em [PLAN-004](../plans/PLAN-004-agenda-paroquial-planejamento-anual.md)  
 **ADR:** [ADR-0006](../architecture/ADR-0006-calendario-locais-celebracao.md)
 
 ## Contexto
 
 O padre monta mensalmente o calendário litúrgico oficial (missas, celebrações, festas, casamentos) com celebrantes (padres, diáconos, ministros). Na última semana do mês abre o próximo mês em rascunho, coleta indisponibilidades e fecha gerando PDF no formato da grade oficial.
+
+**Nome de produto (UI):** a partir de PLAN-004, o módulo passa a chamar-se **Agenda Paroquial** no launcher e na navegação. Paths de API `/calendario/*` e código interno podem manter o prefixo `calendario` (sem breaking change). Planejamento das pastorais é módulo separado — [SPEC-016](SPEC-016-planejamento-anual.md).
 
 ## Objetivo
 
@@ -39,7 +41,7 @@ O padre monta mensalmente o calendário litúrgico oficial (missas, celebraçõe
 ## Fora de escopo
 
 - Publicação automática em `evento_agenda`.
-- Calendários de pastorais.
+- Calendários / planejamento de pastorais — ver [SPEC-016](SPEC-016-planejamento-anual.md).
 - App nativo dedicado.
 - Cálculo automático do rótulo litúrgico (orbe / tempo comum etc.).
 

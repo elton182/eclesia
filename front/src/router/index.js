@@ -23,6 +23,9 @@ import CalendarioMensalDetailView from '../views/CalendarioMensalDetailView.vue'
 import CalendarioLocaisView from '../views/CalendarioLocaisView.vue'
 import CalendarioTiposView from '../views/CalendarioTiposView.vue'
 import CalendarioColetaPublicView from '../views/CalendarioColetaPublicView.vue'
+import PlanejamentoView from '../views/PlanejamentoView.vue'
+import PlanejamentoPastoraisView from '../views/PlanejamentoPastoraisView.vue'
+import PlanejamentoPublicView from '../views/PlanejamentoPublicView.vue'
 import SiteAdminView from '../views/SiteAdminView.vue'
 import ConfiguracoesMarcaView from '../views/ConfiguracoesMarcaView.vue'
 import PublicSiteView from '../views/site/PublicSiteView.vue'
@@ -63,6 +66,13 @@ const ModuleLayoutEventosWrapper = {
   },
 }
 
+const ModuleLayoutPlanejamentoWrapper = {
+  name: 'ModuleLayoutPlanejamento',
+  setup() {
+    return () => h(ModuleLayout, { moduleKey: 'planejamento' })
+  },
+}
+
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
@@ -93,6 +103,12 @@ const router = createRouter({
       path: '/calendario/coleta/:token',
       name: 'calendario-coleta-publica',
       component: CalendarioColetaPublicView,
+      meta: { publicSite: true },
+    },
+    {
+      path: '/planejamento/publico/:token',
+      name: 'planejamento-publico',
+      component: PlanejamentoPublicView,
       meta: { publicSite: true },
     },
     {
@@ -250,6 +266,23 @@ const router = createRouter({
           path: 'eventos/:id',
           name: 'eventos-detail',
           component: EventoDetailView,
+        },
+      ],
+    },
+    {
+      path: '/',
+      component: ModuleLayoutPlanejamentoWrapper,
+      meta: { requiresAuthTenantOrAdmin: true },
+      children: [
+        {
+          path: 'planejamento',
+          name: 'planejamento',
+          component: PlanejamentoView,
+        },
+        {
+          path: 'planejamento/pastorais',
+          name: 'planejamento-pastorais',
+          component: PlanejamentoPastoraisView,
         },
       ],
     },

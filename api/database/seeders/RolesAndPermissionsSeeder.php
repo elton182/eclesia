@@ -23,6 +23,7 @@ class RolesAndPermissionsSeeder extends Seeder
         'cadastros-casais',
         'cadastros-eventos',
         'cadastros-calendario',
+        'cadastros-planejamento',
         'lider-equipe',
     ];
 
@@ -35,6 +36,7 @@ class RolesAndPermissionsSeeder extends Seeder
         'cadastros-casais',
         'cadastros-eventos',
         'cadastros-calendario',
+        'cadastros-planejamento',
         'lider-equipe',
     ];
 
@@ -69,6 +71,7 @@ class RolesAndPermissionsSeeder extends Seeder
         'telas.igrejas',
         'telas.site',
         'telas.calendario',
+        'telas.planejamento',
         'telas.auditoria',
     ];
 
@@ -76,6 +79,12 @@ class RolesAndPermissionsSeeder extends Seeder
     public const CALENDARIO_PERMISSIONS = [
         'calendario.gerir',
         'calendario.colaborar',
+    ];
+
+    /** @var list<string> */
+    public const PLANEJAMENTO_PERMISSIONS = [
+        'planejamento.gerir',
+        'planejamento.propor',
     ];
 
     /** @var list<string> */
@@ -127,6 +136,7 @@ class RolesAndPermissionsSeeder extends Seeder
             ...self::IGREJA_PERMISSIONS,
             ...self::ECC_STUB_PERMISSIONS,
             ...self::CALENDARIO_PERMISSIONS,
+            ...self::PLANEJAMENTO_PERMISSIONS,
             ...self::SITE_PERMISSIONS,
         ] as $name) {
             Permission::findOrCreate($name, self::GUARD);
@@ -151,6 +161,7 @@ class RolesAndPermissionsSeeder extends Seeder
             ...self::AUDITORIA_PERMISSIONS,
             ...self::ECC_STUB_PERMISSIONS,
             ...self::CALENDARIO_PERMISSIONS,
+            ...self::PLANEJAMENTO_PERMISSIONS,
             'igrejas.view',
             'igrejas.update',
             'telas.site',
@@ -191,6 +202,11 @@ class RolesAndPermissionsSeeder extends Seeder
             'telas.calendario',
             'calendario.gerir',
             'calendario.colaborar',
+        ]);
+
+        Role::findByName('cadastros-planejamento', self::GUARD)->syncPermissions([
+            'telas.planejamento',
+            'planejamento.gerir',
         ]);
 
         Role::findByName('lider-equipe', self::GUARD)->syncPermissions([

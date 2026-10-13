@@ -6,7 +6,7 @@ import { useAuthAdminStore } from '@/stores/authAdmin'
 import { useTenantStore } from '@/stores/tenant'
 import { useIgrejaStore } from '@/stores/igreja'
 import { useBrandingStore } from '@/stores/branding'
-import { userHasPermission, canSeeEccCasaisNav, canSeeEccEventosNav } from '@/utils/userRoles'
+import { userHasPermission, canSeeEccCasaisNav, canSeeEccEventosNav, canSeePlanejamentoNav } from '@/utils/userRoles'
 import PwaInstallNavButton from '@/components/base/PwaInstallNavButton.vue'
 import fallbackLogo from '@/assets/logo-icon.png'
 
@@ -14,7 +14,7 @@ const props = defineProps({
   moduleKey: {
     type: String,
     required: true,
-    validator: (v) => ['ecc', 'site', 'eventos', 'calendario'].includes(v),
+    validator: (v) => ['ecc', 'site', 'eventos', 'calendario', 'planejamento'].includes(v),
   },
 })
 
@@ -86,14 +86,21 @@ const moduleMeta = computed(() => {
   if (props.moduleKey === 'eventos') {
     return {
       title: 'Eventos',
-      subtitle: 'Agenda paroquial',
+      subtitle: 'Eventos gerais da igreja',
       subtitleMono: false,
     }
   }
   if (props.moduleKey === 'calendario') {
     return {
-      title: 'Calendário',
-      subtitle: 'Calendário oficial mensal',
+      title: 'Agenda Paroquial',
+      subtitle: 'Missas, casamentos e batismos',
+      subtitleMono: false,
+    }
+  }
+  if (props.moduleKey === 'planejamento') {
+    return {
+      title: 'Planejamento Anual',
+      subtitle: 'Pastorais propõem · padres revisam',
       subtitleMono: false,
     }
   }
@@ -124,6 +131,14 @@ const navItems = computed(() => {
       { label: 'Tipos de evento', path: '/calendario/tipos' },
     ]
   }
+  if (props.moduleKey === 'planejamento') {
+    const items = []
+    if (canSeePlanejamentoNav(authTenant.user, { isSuperAdmin: isPlatformAdmin.value })) {
+      items.push({ label: 'Calendário', path: '/planejamento', exact: true })
+    }
+    items.push({ label: 'Pastorais', path: '/planejamento/pastorais' })
+    return items
+  }
   if (props.moduleKey === 'eventos') {
     if (canSeeEccEventosNav(authTenant.user, { isSuperAdmin: isPlatformAdmin.value })) {
       return [{ label: 'Agenda', path: '/eventos', exact: true }]
@@ -149,6 +164,9 @@ function isActive(item) {
     if (item.query?.tab) return route.path === '/site' && q === item.query.tab
   }
   if (item.exact) return route.path === item.path
+  if (props.moduleKey === 'planejamento' && item.path === '/planejamento') {
+    return route.path === '/planejamento'
+  }
   if (props.moduleKey === 'calendario' && item.path === '/calendario') {
     return route.path === '/calendario'
   }

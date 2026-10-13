@@ -97,7 +97,7 @@ onMounted(load)
   >
     <div class="max-w-md mx-auto space-y-5">
       <header class="text-center space-y-1">
-        <p class="page-eyebrow">Calendário oficial</p>
+        <p class="page-eyebrow">Agenda Paroquial</p>
         <h1 class="font-serif text-[28px] font-normal" style="color: var(--color-ink)">
           Indisponibilidades
         </h1>

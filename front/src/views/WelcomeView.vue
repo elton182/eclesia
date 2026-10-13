@@ -6,7 +6,7 @@ import { useAuthAdminStore } from '@/stores/authAdmin'
 import { useTenantStore } from '@/stores/tenant'
 import { useIgrejaStore } from '@/stores/igreja'
 import { useBrandingStore } from '@/stores/branding'
-import { userHasPermission, canSeeEccCasaisNav, canSeeEccEventosNav, canSeeCalendarioNav } from '@/utils/userRoles'
+import { userHasPermission, canSeeEccCasaisNav, canSeeEccEventosNav, canSeeCalendarioNav, canSeePlanejamentoNav } from '@/utils/userRoles'
 import api from '@/services/api'
 import PwaInstallNavButton from '@/components/base/PwaInstallNavButton.vue'
 
@@ -90,6 +90,7 @@ const moduleAccessCount = computed(() => {
   if (canSeeEccCasaisNav(authTenant.user, { isSuperAdmin: isPlatformAdmin.value })) n++
   if (can('telas.site') || isPlatformAdmin.value) n++
   if (showCalendario.value) n++
+  if (showPlanejamento.value) n++
   if (showEventos.value) n++
   return n
 })
@@ -116,6 +117,9 @@ const showEcc = computed(() =>
 )
 const showCalendario = computed(() =>
   canSeeCalendarioNav(authTenant.user, { isSuperAdmin: isPlatformAdmin.value }),
+)
+const showPlanejamento = computed(() =>
+  canSeePlanejamentoNav(authTenant.user, { isSuperAdmin: isPlatformAdmin.value }),
 )
 const showEventos = computed(() =>
   canSeeEccEventosNav(authTenant.user, { isSuperAdmin: isPlatformAdmin.value }),
@@ -383,7 +387,7 @@ function go(path) {
               class="w-[38px] h-[38px] rounded-[9px] flex items-center justify-center font-serif text-[17px] font-medium"
               style="background: var(--color-primary); color: var(--color-on-primary)"
             >
-              C
+              A
             </div>
             <span
               class="text-[11px] font-medium px-2 py-1 rounded-full"
@@ -393,13 +397,48 @@ function go(path) {
             </span>
           </div>
           <div>
-            <div class="font-serif text-[17px] font-medium" style="color: var(--color-ink)">Calendário</div>
+            <div class="font-serif text-[17px] font-medium" style="color: var(--color-ink)">Agenda Paroquial</div>
             <div class="text-[12.5px] leading-relaxed mt-1" style="color: var(--color-muted)">
-              Calendário oficial mensal, coleta e PDF.
+              Missas, casamentos, batismos — grade oficial e PDF.
             </div>
           </div>
           <div class="mt-auto flex gap-3.5 text-[12px]" style="color: var(--color-muted)">
-            <span>Missas, festas e casamentos</span>
+            <span>Oficial mensal</span>
+          </div>
+        </button>
+
+        <button
+          v-if="showPlanejamento"
+          type="button"
+          class="text-left rounded-xl p-[22px] flex flex-col gap-3 cursor-pointer transition-shadow"
+          style="background: var(--color-surface); border: 1px solid var(--color-line)"
+          data-testid="launcher-card-planejamento"
+          @click="go('/planejamento')"
+          @mouseenter="($event.currentTarget.style.borderColor = 'var(--color-primary-hover)')"
+          @mouseleave="($event.currentTarget.style.borderColor = 'var(--color-line)')"
+        >
+          <div class="flex items-start justify-between">
+            <div
+              class="w-[38px] h-[38px] rounded-[9px] flex items-center justify-center font-serif text-[17px] font-medium"
+              style="background: var(--color-accent-dark); color: var(--color-on-primary)"
+            >
+              P
+            </div>
+            <span
+              class="text-[11px] font-medium px-2 py-1 rounded-full"
+              style="color: var(--color-accent-dark); background: var(--color-accent-soft)"
+            >
+              novo
+            </span>
+          </div>
+          <div>
+            <div class="font-serif text-[17px] font-medium" style="color: var(--color-ink)">Planejamento Anual</div>
+            <div class="text-[12.5px] leading-relaxed mt-1" style="color: var(--color-muted)">
+              Pastorais propõem datas; padres revisam e fecham o ano.
+            </div>
+          </div>
+          <div class="mt-auto flex gap-3.5 text-[12px]" style="color: var(--color-muted)">
+            <span>Ano civil · calendário</span>
           </div>
         </button>
 
@@ -416,15 +455,15 @@ function go(path) {
           <div class="flex items-start justify-between">
             <div
               class="w-[38px] h-[38px] rounded-[9px] flex items-center justify-center font-serif text-[17px] font-medium"
-              style="background: var(--color-accent-dark); color: var(--color-on-primary)"
+              style="background: var(--color-primary-hover); color: var(--color-on-primary)"
             >
-              A
+              E
             </div>
           </div>
           <div>
             <div class="font-serif text-[17px] font-medium" style="color: var(--color-ink)">Eventos</div>
             <div class="text-[12.5px] leading-relaxed mt-1" style="color: var(--color-muted)">
-              Agenda paroquial fora do ECC — festas, encontros e celebrações.
+              Eventos gerais fora do ECC — festas, encontros e celebrações.
             </div>
           </div>
           <div class="mt-auto flex gap-3.5 text-[12px]" style="color: var(--color-muted)">
@@ -639,13 +678,33 @@ function go(path) {
           class="w-9 h-9 rounded-lg flex items-center justify-center font-serif text-[16px] font-medium shrink-0"
           style="background: var(--color-primary); color: var(--color-on-primary)"
         >
-          C
+          A
         </div>
         <div class="flex-1 min-w-0">
-          <div class="font-serif text-[15px] font-medium" style="color: var(--color-ink)">Calendário</div>
+          <div class="font-serif text-[15px] font-medium" style="color: var(--color-ink)">Agenda Paroquial</div>
           <div class="text-[12px] mt-0.5" style="color: var(--color-muted)">
             Oficial mensal e PDF
           </div>
+        </div>
+      </button>
+
+      <button
+        v-if="showPlanejamento"
+        type="button"
+        class="flex items-center gap-3.5 rounded-[11px] p-[15px] min-h-11 text-left"
+        style="background: var(--color-surface); border: 1px solid var(--color-line)"
+        data-testid="launcher-card-planejamento-mobile"
+        @click="go('/planejamento')"
+      >
+        <div
+          class="w-9 h-9 rounded-lg flex items-center justify-center font-serif text-[16px] font-medium shrink-0"
+          style="background: var(--color-accent-dark); color: var(--color-on-primary)"
+        >
+          P
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="font-serif text-[15px] font-medium" style="color: var(--color-ink)">Planejamento Anual</div>
+          <div class="text-[12px] mt-0.5" style="color: var(--color-muted)">Pastorais · ano civil</div>
         </div>
       </button>
 
@@ -659,13 +718,13 @@ function go(path) {
       >
         <div
           class="w-9 h-9 rounded-lg flex items-center justify-center font-serif text-[16px] font-medium shrink-0"
-          style="background: var(--color-accent-dark); color: var(--color-on-primary)"
+          style="background: var(--color-primary-hover); color: var(--color-on-primary)"
         >
-          A
+          E
         </div>
         <div class="flex-1 min-w-0">
           <div class="font-serif text-[15px] font-medium" style="color: var(--color-ink)">Eventos</div>
-          <div class="text-[12px] mt-0.5" style="color: var(--color-muted)">Agenda paroquial</div>
+          <div class="text-[12px] mt-0.5" style="color: var(--color-muted)">Eventos gerais</div>
         </div>
       </button>
 

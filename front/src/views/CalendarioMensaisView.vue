@@ -47,7 +47,7 @@ async function load() {
     const { data } = await api.get('/calendario/mensais')
     mensais.value = data.data || data || []
   } catch (e) {
-    innovToast('error', 'Calendário', e.response?.data?.message || 'Falha ao listar')
+    innovToast('error', 'Agenda Paroquial', e.response?.data?.message || 'Falha ao listar')
   } finally {
     loading.value = false
   }
@@ -63,10 +63,10 @@ async function criar() {
       copiar_anterior: true,
     })
     const created = data.data || data
-    innovToast('success', 'Calendário', 'Rascunho criado')
+    innovToast('success', 'Agenda Paroquial', 'Rascunho criado')
     router.push(`/calendario/${created.id}`)
   } catch (e) {
-    innovToast('error', 'Calendário', e.response?.data?.message || 'Falha ao criar')
+    innovToast('error', 'Agenda Paroquial', e.response?.data?.message || 'Falha ao criar')
   } finally {
     saving.value = false
   }
@@ -86,10 +86,10 @@ async function copiarProximo(m, e) {
   try {
     const { data } = await api.post(`/calendario/mensais/${m.id}/copiar-proximo`)
     const created = data.data || data
-    innovToast('success', 'Calendário', `Rascunho de ${labelMesCalendario(created.ano, created.mes)} criado`)
+    innovToast('success', 'Agenda Paroquial', `Rascunho de ${labelMesCalendario(created.ano, created.mes)} criado`)
     router.push(`/calendario/${created.id}`)
   } catch (err) {
-    innovToast('error', 'Calendário', err.response?.data?.message || 'Falha ao copiar')
+    innovToast('error', 'Agenda Paroquial', err.response?.data?.message || 'Falha ao copiar')
   } finally {
     busyId.value = ''
   }
@@ -108,9 +108,9 @@ async function excluir(m, e) {
   try {
     await api.delete(`/calendario/mensais/${m.id}`)
     mensais.value = mensais.value.filter((x) => x.id !== m.id)
-    innovToast('success', 'Calendário', 'Excluído')
+    innovToast('success', 'Agenda Paroquial', 'Excluído')
   } catch (err) {
-    innovToast('error', 'Calendário', err.response?.data?.message || 'Falha ao excluir')
+    innovToast('error', 'Agenda Paroquial', err.response?.data?.message || 'Falha ao excluir')
   } finally {
     busyId.value = ''
   }
@@ -129,10 +129,10 @@ onMounted(load)
         Núcleo
       </p>
       <h1 class="font-serif text-[28px] font-normal" style="color: var(--color-ink)">
-        Calendário oficial
+        Agenda Paroquial
       </h1>
       <p class="text-[14px] mt-1 max-w-xl" style="color: var(--color-muted)">
-        Grade mensal de missas, celebrações e casamentos.
+        Grade mensal de missas, casamentos, batismos e celebrações.
       </p>
     </header>
 

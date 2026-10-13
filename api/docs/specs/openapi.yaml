@@ -3157,3 +3157,256 @@ paths:
                 motivo: {type: string}
       responses:
         '201': {description: Created}
+
+  # --- Planejamento Anual (SPEC-016) ---
+  /planejamento/anos:
+    get:
+      summary: Listar anos de planejamento da igreja
+      security: [{bearerAuth: [], tenantHeader: []}]
+      responses:
+        '200': {description: OK}
+    post:
+      summary: Abrir ano civil de planejamento
+      security: [{bearerAuth: [], tenantHeader: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ano]
+              properties:
+                ano: {type: integer, minimum: 2000, maximum: 2100}
+      responses:
+        '201': {description: Created}
+  /planejamento/anos/{id}:
+    get:
+      summary: Detalhe do ano (com eventos)
+      security: [{bearerAuth: [], tenantHeader: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      responses:
+        '200': {description: OK}
+    put:
+      summary: Atualizar metadados do ano
+      security: [{bearerAuth: [], tenantHeader: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      responses:
+        '200': {description: OK}
+    delete:
+      summary: Excluir ano (somente se sem eventos ou gerir)
+      security: [{bearerAuth: [], tenantHeader: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      responses:
+        '204': {description: No Content}
+  /planejamento/anos/{id}/status:
+    post:
+      summary: Transicionar status do ano (aberto|coleta|fechado)
+      security: [{bearerAuth: [], tenantHeader: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: {type: string, enum: [aberto, coleta, fechado]}
+      responses:
+        '200': {description: OK}
+  /planejamento/anos/{id}/eventos:
+    get:
+      summary: Listar eventos do ano (filtros pastoral_id, status, from, to)
+      security: [{bearerAuth: [], tenantHeader: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+        - {name: pastoral_id, in: query, schema: {type: string}}
+        - {name: status, in: query, schema: {type: string, enum: [proposta, em_revisao, aprovado, rejeitado]}}
+        - {name: from, in: query, schema: {type: string, format: date}}
+        - {name: to, in: query, schema: {type: string, format: date}}
+      responses:
+        '200': {description: OK}
+    post:
+      summary: Criar evento (gerir em aberto/coleta; propor só em coleta e pastoral vinculada)
+      security: [{bearerAuth: [], tenantHeader: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [pastoral_id, titulo, data_inicio]
+              properties:
+                pastoral_id: {type: string}
+                titulo: {type: string}
+                descricao: {type: string, nullable: true}
+                data_inicio: {type: string, format: date-time}
+                data_fim: {type: string, format: date-time, nullable: true}
+                dia_inteiro: {type: boolean, default: true}
+      responses:
+        '201': {description: Created}
+  /planejamento/eventos/{eventoId}:
+    get:
+      summary: Detalhe do evento
+      security: [{bearerAuth: [], tenantHeader: []}]
+      parameters:
+        - {name: eventoId, in: path, required: true, schema: {type: string}}
+      responses:
+        '200': {description: OK}
+    put:
+      summary: Atualizar evento
+      security: [{bearerAuth: [], tenantHeader: []}]
+      parameters:
+        - {name: eventoId, in: path, required: true, schema: {type: string}}
+      responses:
+        '200': {description: OK}
+    patch:
+      summary: Alterar data (drag and drop) e/ou status
+      security: [{bearerAuth: [], tenantHeader: []}]
+      parameters:
+        - {name: eventoId, in: path, required: true, schema: {type: string}}
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data_inicio: {type: string, format: date-time}
+                data_fim: {type: string, format: date-time, nullable: true}
+                status: {type: string, enum: [proposta, em_revisao, aprovado, rejeitado]}
+                notas_revisao: {type: string, nullable: true}
+      responses:
+        '200': {description: OK}
+    delete:
+      summary: Excluir evento
+      security: [{bearerAuth: [], tenantHeader: []}]
+      parameters:
+        - {name: eventoId, in: path, required: true, schema: {type: string}}
+      responses:
+        '204': {description: No Content}
+  /planejamento/anos/{id}/pastorais/{pastoralId}/token:
+    post:
+      summary: Gerar ou rotacionar link tokenizado da pastoral no ano
+      security: [{bearerAuth: [], tenantHeader: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+        - {name: pastoralId, in: path, required: true, schema: {type: string}}
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      id: {type: string}
+                      token: {type: string}
+                      token_preview: {type: string}
+                      pastoral_id: {type: string}
+                      expires_at: {type: string, format: date-time, nullable: true}
+                  token: {type: string}
+    delete:
+      summary: Revogar token ativo da pastoral no ano
+      security: [{bearerAuth: [], tenantHeader: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+        - {name: pastoralId, in: path, required: true, schema: {type: string}}
+      responses:
+        '204': {description: No Content}
+  /planejamento/pastorais/{pastoralId}/usuarios:
+    get:
+      summary: Listar usuários vinculados à pastoral (propor)
+      security: [{bearerAuth: [], tenantHeader: []}]
+      parameters:
+        - {name: pastoralId, in: path, required: true, schema: {type: string}}
+      responses:
+        '200': {description: OK}
+    post:
+      summary: Vincular usuário à pastoral
+      security: [{bearerAuth: [], tenantHeader: []}]
+      parameters:
+        - {name: pastoralId, in: path, required: true, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_id]
+              properties:
+                user_id: {type: string}
+      responses:
+        '201': {description: Created}
+    delete:
+      summary: Desvincular usuário da pastoral
+      security: [{bearerAuth: [], tenantHeader: []}]
+      parameters:
+        - {name: pastoralId, in: path, required: true, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_id]
+              properties:
+                user_id: {type: string}
+      responses:
+        '204': {description: No Content}
+  /public/planejamento/{token}:
+    get:
+      summary: Dados públicos do link da pastoral (ano + pastoral; sem outras pastorais)
+      parameters:
+        - {name: token, in: path, required: true, schema: {type: string}}
+      responses:
+        '200': {description: OK}
+  /public/planejamento/{token}/eventos:
+    get:
+      summary: Listar eventos da pastoral do token
+      parameters:
+        - {name: token, in: path, required: true, schema: {type: string}}
+      responses:
+        '200': {description: OK}
+    post:
+      summary: Criar proposta via link (ano em coleta)
+      parameters:
+        - {name: token, in: path, required: true, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [titulo, data_inicio]
+              properties:
+                titulo: {type: string}
+                descricao: {type: string, nullable: true}
+                data_inicio: {type: string, format: date-time}
+                data_fim: {type: string, format: date-time, nullable: true}
+                dia_inteiro: {type: boolean, default: true}
+      responses:
+        '201': {description: Created}
+  /public/planejamento/{token}/eventos/{eventoId}:
+    put:
+      summary: Atualizar proposta própria via link (status proposta)
+      parameters:
+        - {name: token, in: path, required: true, schema: {type: string}}
+        - {name: eventoId, in: path, required: true, schema: {type: string}}
+      responses:
+        '200': {description: OK}
+    delete:
+      summary: Excluir proposta própria via link
+      parameters:
+        - {name: token, in: path, required: true, schema: {type: string}}
+        - {name: eventoId, in: path, required: true, schema: {type: string}}
+      responses:
+        '204': {description: No Content}

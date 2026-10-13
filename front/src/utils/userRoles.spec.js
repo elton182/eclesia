@@ -9,6 +9,7 @@ import {
   canSeeEccCasaisNav,
   canSeeEccEventosNav,
   canSeeCalendarioNav,
+  canSeePlanejamentoNav,
 } from './userRoles.js'
 
 describe('userRoles', () => {
@@ -17,7 +18,8 @@ describe('userRoles', () => {
     assert.equal(roleLabel('cadastros-equipes'), 'Cadastros · Equipes')
     assert.equal(roleLabel('cadastros-casais'), 'Cadastros · Casais')
     assert.equal(roleLabel('cadastros-eventos'), 'Cadastros · Eventos')
-    assert.equal(roleLabel('cadastros-calendario'), 'Cadastros · Calendário')
+    assert.equal(roleLabel('cadastros-calendario'), 'Cadastros · Agenda Paroquial')
+    assert.equal(roleLabel('cadastros-planejamento'), 'Cadastros · Planejamento Anual')
     assert.equal(roleLabel('lider-equipe'), 'Líder de Equipe')
     assert.equal(roleLabel('admin-tenant'), 'Admin Organização')
   })
@@ -181,5 +183,12 @@ describe('userRoles', () => {
     assert.equal(canSeeCalendarioNav({ roles: [{ name: 'cadastros-calendario' }] }), true)
     assert.equal(canSeeCalendarioNav({ roles: [{ name: 'lider-equipe' }] }), true)
     assert.equal(canSeeCalendarioNav({ roles: [{ name: 'cadastros-usuarios' }] }), false)
+  })
+
+  it('canSeePlanejamentoNav para admin-igreja e cadastros-planejamento', () => {
+    assert.equal(canSeePlanejamentoNav({ roles: [{ name: 'admin-igreja' }] }), true)
+    assert.equal(canSeePlanejamentoNav({ roles: [{ name: 'cadastros-planejamento' }] }), true)
+    assert.equal(canSeePlanejamentoNav({ roles: [{ name: 'cadastros-usuarios' }] }), false)
+    assert.equal(canSeePlanejamentoNav(null, { isSuperAdmin: true }), true)
   })
 })

@@ -229,8 +229,8 @@ export const PORTAL_PREVIEW = {
     {
       chave: 'calendario',
       letra: 'A',
-      nome: 'Calendário',
-      descricao: 'Calendário oficial e horários da igreja.',
+      nome: 'Agenda Paroquial',
+      descricao: 'Missas, casamentos, batismos e horários oficiais.',
       meta: 'mês atual',
       badge: 'ativo',
       cor: '#8A2436',

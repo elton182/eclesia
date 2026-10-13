@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\EventoTipoController;
 use App\Http\Controllers\Api\IgrejaController;
 use App\Http\Controllers\Api\PastoralController;
 use App\Http\Controllers\Api\PessoaFotoController;
+use App\Http\Controllers\Api\PlanejamentoController;
 use App\Http\Controllers\Api\PublicSiteController;
 use App\Http\Controllers\Api\RolePermissionController;
 use App\Http\Controllers\Api\SiteAdminController;
@@ -69,6 +70,15 @@ Route::middleware([
         Route::get('coleta/{token}', [CalendarioController::class, 'showColetaPublica']);
         Route::post('coleta/{token}', [CalendarioController::class, 'storeColetaPublica'])
             ->middleware('throttle:30,1');
+    });
+
+    Route::prefix('public/planejamento')->group(function () {
+        Route::get('{token}', [PlanejamentoController::class, 'showPublico']);
+        Route::get('{token}/eventos', [PlanejamentoController::class, 'indexEventosPublicos']);
+        Route::post('{token}/eventos', [PlanejamentoController::class, 'storeEventoPublico'])
+            ->middleware('throttle:30,1');
+        Route::put('{token}/eventos/{eventoId}', [PlanejamentoController::class, 'updateEventoPublico']);
+        Route::delete('{token}/eventos/{eventoId}', [PlanejamentoController::class, 'destroyEventoPublico']);
     });
 
     // Foto: URL assinada + ?tenant= (img não envia X-Tenant/Bearer). Spec SPEC-006 / ADR-0002.
@@ -172,6 +182,24 @@ Route::middleware([
     Route::post('calendario/mensais/{id}/coleta-links', [CalendarioController::class, 'storeColetaLink']);
     Route::post('calendario/mensais/{id}/indisponibilidades', [CalendarioController::class, 'storeIndisponibilidades']);
     Route::get('calendario/mensais/{id}/pdf', [CalendarioController::class, 'pdf']);
+
+    Route::get('planejamento/anos', [PlanejamentoController::class, 'indexAnos']);
+    Route::post('planejamento/anos', [PlanejamentoController::class, 'storeAno']);
+    Route::get('planejamento/anos/{id}', [PlanejamentoController::class, 'showAno']);
+    Route::put('planejamento/anos/{id}', [PlanejamentoController::class, 'updateAno']);
+    Route::delete('planejamento/anos/{id}', [PlanejamentoController::class, 'destroyAno']);
+    Route::post('planejamento/anos/{id}/status', [PlanejamentoController::class, 'transitionStatus']);
+    Route::get('planejamento/anos/{id}/eventos', [PlanejamentoController::class, 'indexEventos']);
+    Route::post('planejamento/anos/{id}/eventos', [PlanejamentoController::class, 'storeEvento']);
+    Route::get('planejamento/eventos/{eventoId}', [PlanejamentoController::class, 'showEvento']);
+    Route::put('planejamento/eventos/{eventoId}', [PlanejamentoController::class, 'updateEvento']);
+    Route::patch('planejamento/eventos/{eventoId}', [PlanejamentoController::class, 'patchEvento']);
+    Route::delete('planejamento/eventos/{eventoId}', [PlanejamentoController::class, 'destroyEvento']);
+    Route::post('planejamento/anos/{id}/pastorais/{pastoralId}/token', [PlanejamentoController::class, 'storeToken']);
+    Route::delete('planejamento/anos/{id}/pastorais/{pastoralId}/token', [PlanejamentoController::class, 'destroyToken']);
+    Route::get('planejamento/pastorais/{pastoralId}/usuarios', [PlanejamentoController::class, 'indexPastoralUsers']);
+    Route::post('planejamento/pastorais/{pastoralId}/usuarios', [PlanejamentoController::class, 'storePastoralUser']);
+    Route::delete('planejamento/pastorais/{pastoralId}/usuarios', [PlanejamentoController::class, 'destroyPastoralUser']);
 
     Route::post('pessoas/{id}/foto', [PessoaFotoController::class, 'store']);
     Route::delete('pessoas/{id}/foto', [PessoaFotoController::class, 'destroy']);

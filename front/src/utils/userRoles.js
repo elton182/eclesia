@@ -10,7 +10,8 @@ export const ROLE_LABELS = {
   'cadastros-equipes': 'Cadastros · Equipes',
   'cadastros-casais': 'Cadastros · Casais',
   'cadastros-eventos': 'Cadastros · Eventos',
-  'cadastros-calendario': 'Cadastros · Calendário',
+  'cadastros-calendario': 'Cadastros · Agenda Paroquial',
+  'cadastros-planejamento': 'Cadastros · Planejamento Anual',
   'lider-equipe': 'Líder de Equipe',
 }
 
@@ -93,11 +94,21 @@ export function userHasPermission(user, permission, opts = {}) {
   ) {
     return true
   }
+  if (
+    (permission === 'telas.planejamento' ||
+      permission === 'planejamento.gerir' ||
+      permission === 'planejamento.propor') &&
+    (roleNames.includes('admin-igreja') ||
+      roleNames.includes('cadastros-planejamento') ||
+      (permission === 'planejamento.propor' && roleNames.includes('cadastros-planejamento')))
+  ) {
+    return true
+  }
   return false
 }
 
 /**
- * Nav / launcher Calendário oficial.
+ * Nav / launcher Agenda Paroquial (Calendário oficial).
  * @param {{ permissions?: string[], roles?: Array<{ name: string }> }|null|undefined} user
  * @param {{ isSuperAdmin?: boolean }} [opts]
  */
@@ -106,6 +117,19 @@ export function canSeeCalendarioNav(user, opts = {}) {
     userHasPermission(user, 'telas.calendario', opts) ||
     userHasPermission(user, 'calendario.gerir', opts) ||
     userHasPermission(user, 'calendario.colaborar', opts)
+  )
+}
+
+/**
+ * Nav / launcher Planejamento Anual.
+ * @param {{ permissions?: string[], roles?: Array<{ name: string }> }|null|undefined} user
+ * @param {{ isSuperAdmin?: boolean }} [opts]
+ */
+export function canSeePlanejamentoNav(user, opts = {}) {
+  return (
+    userHasPermission(user, 'telas.planejamento', opts) ||
+    userHasPermission(user, 'planejamento.gerir', opts) ||
+    userHasPermission(user, 'planejamento.propor', opts)
   )
 }
 
