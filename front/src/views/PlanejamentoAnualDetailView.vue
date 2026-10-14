@@ -53,6 +53,7 @@ import {
 } from '@/utils/planejamentoRecursos'
 import { getDisponibilidade, listRecursos } from '@/services/planejamentoRecursos'
 import PlanejamentoRecursosPicker from '@/components/planejamento/PlanejamentoRecursosPicker.vue'
+import Hora24Input from '@/components/form/Hora24Input.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useAuthAdminStore } from '@/stores/authAdmin'
 import { userHasPermission } from '@/utils/userRoles'
@@ -987,11 +988,11 @@ onMounted(load)
               </div>
               <div>
                 <label class="fld" for="ev-hi">Hora início</label>
-                <input id="ev-hi" v-model="form.hora_inicio" type="time" class="input" />
+                <Hora24Input id="ev-hi" v-model="form.hora_inicio" />
               </div>
               <div>
                 <label class="fld" for="ev-hf">Hora fim</label>
-                <input id="ev-hf" v-model="form.hora_fim" type="time" class="input" />
+                <Hora24Input id="ev-hf" v-model="form.hora_fim" />
               </div>
               <div>
                 <label class="fld" for="ev-part">Participantes (média)</label>

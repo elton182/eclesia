@@ -6,6 +6,7 @@ import { innovToast } from '@/plugins/toast'
 import { useAuthStore } from '@/stores/auth'
 import { useAuthAdminStore } from '@/stores/authAdmin'
 import { userHasPermission } from '@/utils/userRoles'
+import Hora24Input from '@/components/form/Hora24Input.vue'
 import { buildMonthGrid, groupOcorrenciasByDay, toDayKey } from '@/utils/calendario'
 import {
   filterEventos,
@@ -471,7 +472,7 @@ onMounted(async () => {
           </div>
           <div class="flex-1">
             <label class="block text-xs font-semibold mb-1" style="color: #6B4A50">Hora</label>
-            <input v-model="form.hora" type="time" class="w-full border rounded-lg px-3 py-2 text-sm" style="border-color: #E8DFD6" />
+            <Hora24Input v-model="form.hora" />
           </div>
         </div>
         <label class="block text-xs font-semibold mb-1" style="color: #6B4A50">Local</label>

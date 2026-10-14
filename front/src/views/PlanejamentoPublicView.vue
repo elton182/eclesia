@@ -23,6 +23,7 @@ import {
 } from '@/utils/planejamentoRecursos'
 import { getDisponibilidadePublica } from '@/services/planejamentoRecursos'
 import PlanejamentoRecursosPicker from '@/components/planejamento/PlanejamentoRecursosPicker.vue'
+import Hora24Input from '@/components/form/Hora24Input.vue'
 
 const WEEKDAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 
@@ -420,11 +421,11 @@ onMounted(load)
             <div class="grid grid-cols-2 gap-2">
               <div>
                 <label class="fld" for="pub-hora">Início</label>
-                <input id="pub-hora" v-model="form.hora_inicio" type="time" class="input" />
+                <Hora24Input id="pub-hora" v-model="form.hora_inicio" />
               </div>
               <div>
                 <label class="fld" for="pub-hora-fim">Fim</label>
-                <input id="pub-hora-fim" v-model="form.hora_fim" type="time" class="input" />
+                <Hora24Input id="pub-hora-fim" v-model="form.hora_fim" />
               </div>
             </div>
           </div>
