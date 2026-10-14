@@ -16,7 +16,10 @@ use Illuminate\Contracts\Auth\Authenticatable;
  */
 class EccVisibilityScope
 {
-    public function __construct(private readonly IgrejaContext $igrejaContext) {}
+    public function __construct(
+        private readonly IgrejaContext $igrejaContext,
+        private readonly ViewAsLiderService $viewAsLider,
+    ) {}
 
     /**
      * IDs de equipes visíveis ao usuário autenticado, ou null = sem restrição.
@@ -29,6 +32,11 @@ class EccVisibilityScope
 
         if (! $user instanceof User) {
             return null;
+        }
+
+        $simulated = $this->viewAsLider->restrictedEquipeIds($user);
+        if ($simulated !== null) {
+            return $simulated;
         }
 
         if ($this->userCan('ecc.casais.manage', $user) || $this->userCan('ecc.equipes.manage', $user)) {
@@ -52,6 +60,10 @@ class EccVisibilityScope
 
         if (! $user instanceof User) {
             return false;
+        }
+
+        if ($this->viewAsLider->isActive($user)) {
+            return $this->viewAsLider->allowsPermission($permission);
         }
 
         $previous = getPermissionsTeamId();

@@ -13,8 +13,10 @@ import {
   canSeeEccFinanceiroNav,
   canSeePastoraisNav,
   isSomenteLiderEquipe,
+  isViewAsLider,
 } from '@/utils/userRoles'
 import PwaInstallNavButton from '@/components/base/PwaInstallNavButton.vue'
+import ViewAsLiderBanner from '@/components/ViewAsLiderBanner.vue'
 import fallbackLogo from '@/assets/logo-icon.png'
 
 const props = defineProps({
@@ -121,6 +123,8 @@ const moduleMeta = computed(() => {
 const somenteLider = computed(() =>
   isSomenteLiderEquipe(authTenant.user, { isSuperAdmin: isPlatformAdmin.value }),
 )
+
+const viewAsLider = computed(() => isViewAsLider(authTenant.user))
 
 const navItems = computed(() => {
   if (props.moduleKey === 'ecc' && somenteLider.value) {
@@ -233,10 +237,12 @@ onMounted(async () => {
 
 <template>
   <div
-    class="min-h-screen flex"
+    class="min-h-screen flex flex-col"
     style="background: var(--color-bg)"
     data-testid="module-layout"
   >
+    <ViewAsLiderBanner v-if="viewAsLider" />
+    <div class="flex flex-1 min-h-0">
     <aside
       class="hidden md:flex w-[214px] shrink-0 flex-col gap-5 px-3.5 py-5"
       style="background: var(--color-primary); color: var(--color-on-primary)"
@@ -373,6 +379,7 @@ onMounted(async () => {
       <main class="flex-1 min-w-0 w-full">
         <router-view />
       </main>
+    </div>
     </div>
   </div>
 </template>

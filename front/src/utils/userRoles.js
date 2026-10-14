@@ -198,13 +198,35 @@ export function equipesLideradasIds(user) {
 }
 
 /**
+ * Simulação ativa de visão de líder (SPEC-019).
+ * @param {{ view_as?: { mode?: string }|null }|null|undefined} user
+ */
+export function isViewAsLider(user) {
+  return user?.view_as?.mode === 'lider-equipe'
+}
+
+/**
+ * Admin pode ativar simulação de líder (não disponível durante a própria simulação).
+ * @param {{ roles?: Array<{ name: string }>, view_as?: { mode?: string }|null }|null|undefined} user
+ * @param {{ isSuperAdmin?: boolean }} [opts]
+ */
+export function canActivateViewAsLider(user, opts = {}) {
+  if (opts.isSuperAdmin) return false
+  if (!user || isViewAsLider(user)) return false
+  const roleNames = (user.roles || []).map((r) => r?.name).filter(Boolean)
+  return roleNames.includes('admin-tenant') || roleNames.includes('admin-igreja')
+}
+
+/**
  * Papel exclusivo de líder de equipe (pode liderar N equipes).
- * @param {{ roles?: Array<{ name: string }> }|null|undefined} user
+ * Com view_as ativo, /me já mascara roles para lider-equipe.
+ * @param {{ roles?: Array<{ name: string }>, view_as?: { mode?: string }|null }|null|undefined} user
  * @param {{ isSuperAdmin?: boolean }} [opts]
  */
 export function isSomenteLiderEquipe(user, opts = {}) {
   if (opts.isSuperAdmin) return false
   if (!user) return false
+  if (isViewAsLider(user)) return true
   const names = [...new Set((user.roles || []).map((r) => r?.name).filter(Boolean))]
   return names.length === 1 && names[0] === 'lider-equipe'
 }

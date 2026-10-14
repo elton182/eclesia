@@ -12,9 +12,11 @@ import {
   canSeeEccEventosNav,
   canSeeCalendarioNav,
   canSeePastoraisNav,
+  canActivateViewAsLider,
 } from '@/utils/userRoles'
 import api from '@/services/api'
 import PwaInstallNavButton from '@/components/base/PwaInstallNavButton.vue'
+import SimularLiderModal from '@/components/SimularLiderModal.vue'
 
 const router = useRouter()
 const authTenant = useAuthStore()
@@ -26,6 +28,7 @@ const branding = useBrandingStore()
 const eccCounts = ref({ equipes: null, casais: null })
 const sitePublished = ref(null)
 const userMenuOpen = ref(false)
+const simularLiderOpen = ref(false)
 
 const displayName = computed(
   () => authTenant.user?.name || authAdmin.user?.name || 'bem-vindo(a)',
@@ -141,6 +144,9 @@ const showMarca = computed(() => {
   const roles = (authTenant.user?.roles || []).map((r) => r.name)
   return roles.includes('admin-tenant')
 })
+const showSimularLider = computed(() =>
+  canActivateViewAsLider(authTenant.user, { isSuperAdmin: isPlatformAdmin.value }),
+)
 
 async function loadCounts() {
   if (!tenantStore.slug) return
@@ -562,7 +568,7 @@ function go(path) {
         </div>
 
         <div
-          v-if="showIgrejas || showUsuarios || showAuditoria || showMarca || isPlatformAdmin"
+          v-if="showIgrejas || showUsuarios || showAuditoria || showMarca || showSimularLider || isPlatformAdmin"
           class="rounded-xl p-[22px] flex flex-col gap-3.5"
           style="background: var(--color-primary)"
           data-testid="launcher-card-admin"
@@ -611,6 +617,16 @@ function go(path) {
               @click="go('/auditoria')"
             >
               Auditoria
+            </button>
+            <button
+              v-if="showSimularLider"
+              type="button"
+              class="text-left text-[13.5px] bg-transparent border-0 p-0 cursor-pointer"
+              style="color: color-mix(in srgb, var(--color-on-primary) 80%, transparent)"
+              data-testid="launcher-link-simular-lider"
+              @click="simularLiderOpen = true"
+            >
+              Simular líder de equipe
             </button>
             <button
               v-if="isPlatformAdmin"
@@ -758,7 +774,10 @@ function go(path) {
         </div>
       </div>
 
-      <div v-if="showIgrejas || showUsuarios || showAuditoria || showMarca" class="mt-3 flex flex-col gap-2">
+      <div
+        v-if="showIgrejas || showUsuarios || showAuditoria || showMarca || showSimularLider"
+        class="mt-3 flex flex-col gap-2"
+      >
         <button
           v-if="showIgrejas"
           type="button"
@@ -797,7 +816,19 @@ function go(path) {
         >
           Auditoria →
         </button>
+        <button
+          v-if="showSimularLider"
+          type="button"
+          class="text-left text-[13px] py-2"
+          style="color: var(--color-primary-hover)"
+          data-testid="launcher-link-simular-lider-mobile"
+          @click="simularLiderOpen = true"
+        >
+          Simular líder de equipe →
+        </button>
       </div>
     </div>
+
+    <SimularLiderModal v-model="simularLiderOpen" />
   </div>
 </template>

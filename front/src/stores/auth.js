@@ -59,6 +59,31 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
+   * SPEC-019: ativa simulação de visão de líder de equipe.
+   * @param {string[]} equipeIds
+   */
+  const activateViewAsLider = async (equipeIds) => {
+    const response = await api.post('/web/view-as/lider-equipe', {
+      equipe_ids: equipeIds,
+    })
+    if (response.data?.id || response.data?.email) {
+      setUser(response.data)
+      useBrandingStore().applyFromPayload(response.data.branding)
+    }
+    return response.data
+  }
+
+  /** SPEC-019: encerra simulação de visão. */
+  const clearViewAs = async () => {
+    const response = await api.delete('/web/view-as')
+    if (response.data?.id || response.data?.email) {
+      setUser(response.data)
+      useBrandingStore().applyFromPayload(response.data.branding)
+    }
+    return response.data
+  }
+
+  /**
    * @param {string} tenant Identificador (slug, apelido ou nome)
    * @param {string} email
    * @param {string} password
@@ -125,5 +150,7 @@ export const useAuthStore = defineStore('auth', () => {
     checkAuth,
     clearAuth,
     setUser,
+    activateViewAsLider,
+    clearViewAs,
   }
 })

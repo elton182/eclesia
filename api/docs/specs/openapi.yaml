@@ -546,6 +546,27 @@ components:
         updated_at:
           type: string
           format: date-time
+    ViewAsLider:
+      type: object
+      description: Simulação ativa de visão de líder (SPEC-019)
+      required: [mode, equipe_ids, equipes]
+      properties:
+        mode:
+          type: string
+          enum: [lider-equipe]
+        equipe_ids:
+          type: array
+          items:
+            type: string
+        equipes:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              nome:
+                type: string
     Role:
       type: object
       properties:
@@ -1157,6 +1178,9 @@ paths:
   /web/me:
     post:
       summary: Usuário autenticado (tenant)
+      description: |
+        Com simulação de líder ativa (SPEC-019), `roles`, `permissions` e `equipes_lideradas`
+        são mascarados para o papel efetivo; `view_as` descreve a simulação.
       security:
         - tenantHeader: []
       responses:
@@ -1167,6 +1191,74 @@ paths:
               schema:
                 type: object
                 properties:
+                  branding:
+                    $ref: '#/components/schemas/AppBranding'
+                  view_as:
+                    $ref: '#/components/schemas/ViewAsLider'
+                    nullable: true
+        '401':
+          description: Não autenticado
+  /web/view-as/lider-equipe:
+    post:
+      summary: Ativar simulação de visão de líder de equipe
+      description: |
+        SPEC-019. Requer `admin-tenant` ou `admin-igreja` na igreja atual.
+        Escolhe 1..N equipes da igreja; identidade e auditoria permanecem do admin.
+      security:
+        - tenantHeader: []
+          bearerAuth: []
+        - tenantHeader: []
+          igrejaHeader: []
+          bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [equipe_ids]
+              properties:
+                equipe_ids:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: string
+                    description: ULID da equipe ECC na igreja atual
+      responses:
+        '200':
+          description: Payload equivalente a `/web/me` com máscara de líder + `view_as`
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  view_as:
+                    $ref: '#/components/schemas/ViewAsLider'
+                  branding:
+                    $ref: '#/components/schemas/AppBranding'
+        '401':
+          description: Não autenticado
+        '403':
+          description: Sem permissão (não é admin-tenant / admin-igreja)
+        '422':
+          description: equipe_ids vazio ou inválido para a igreja
+  /web/view-as:
+    delete:
+      summary: Encerrar simulação de visão (view-as)
+      description: SPEC-019. Restaura papéis e permissões reais do admin.
+      security:
+        - tenantHeader: []
+          bearerAuth: []
+      responses:
+        '200':
+          description: Payload equivalente a `/web/me` sem máscara
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  view_as:
+                    nullable: true
                   branding:
                     $ref: '#/components/schemas/AppBranding'
         '401':

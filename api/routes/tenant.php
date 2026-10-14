@@ -108,6 +108,10 @@ Route::middleware([
     // Só usuário do tenant (token no DB do tenant)
     Route::post('web/refresh', [AuthWebController::class, 'refresh']);
     Route::post('web/me', [AuthWebController::class, 'me'])->middleware(['cookie.to.token', 'auth:sanctum', SetIgrejaFromHeader::class]);
+    Route::post('web/view-as/lider-equipe', [AuthWebController::class, 'activateViewAsLider'])
+        ->middleware(['cookie.to.token', 'auth:sanctum', SetIgrejaFromHeader::class]);
+    Route::delete('web/view-as', [AuthWebController::class, 'clearViewAs'])
+        ->middleware(['cookie.to.token', 'auth:sanctum', SetIgrejaFromHeader::class]);
     Route::post('web/logout', [AuthWebController::class, 'logout'])->middleware(['cookie.to.token', 'auth:sanctum']);
 });
 
