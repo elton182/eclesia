@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\PlanejamentoDisponibilidadeRequest;
 use App\Http\Requests\StorePlanejamentoAnualRequest;
 use App\Http\Requests\StorePlanejamentoEventoPublicoRequest;
 use App\Http\Requests\StorePlanejamentoEventoRequest;
@@ -15,6 +16,8 @@ use App\Http\Resources\PlanejamentoAnualResource;
 use App\Http\Resources\PlanejamentoEventoResource;
 use App\Http\Resources\PlanejamentoPastoralTokenResource;
 use App\Services\PlanejamentoAccessService;
+use App\Services\PlanejamentoIntervalo;
+use App\Services\PlanejamentoRecursoService;
 use App\Services\PlanejamentoService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -27,6 +30,7 @@ class PlanejamentoController extends Controller
     public function __construct(
         private readonly PlanejamentoService $planejamento,
         private readonly PlanejamentoAccessService $access,
+        private readonly PlanejamentoRecursoService $recursos,
     ) {}
 
     public function indexAnuais(Request $request): AnonymousResourceCollection
@@ -152,6 +156,26 @@ class PlanejamentoController extends Controller
         return $this->planejamento->pdf($anual, $mes);
     }
 
+    public function disponibilidade(PlanejamentoDisponibilidadeRequest $request, string $id): JsonResponse
+    {
+        abort_unless($this->access->canView(), 403);
+        $anual = $this->planejamento->findAnual($id);
+        $params = $request->validated();
+
+        return response()->json([
+            'data' => $this->recursos->disponibilidade(
+                $anual->id,
+                PlanejamentoIntervalo::deDados(
+                    $params['data_inicio'],
+                    $params['data_fim'] ?? null,
+                    $params['hora_inicio'] ?? null,
+                    $params['hora_fim'] ?? null,
+                ),
+                $params['ignorar_evento_id'] ?? null,
+            ),
+        ]);
+    }
+
     public function storePastoralToken(string $id, string $pastoralId): JsonResponse
     {
         abort_unless($this->access->canGerir(), 403);
@@ -219,5 +243,15 @@ class PlanejamentoController extends Controller
             ->withConflitos($result['conflitos'])
             ->response()
             ->setStatusCode(201);
+    }
+
+    public function disponibilidadePublica(PlanejamentoDisponibilidadeRequest $request, string $token): JsonResponse
+    {
+        $link = $this->planejamento->findTokenByPlain($token);
+        $params = $request->safe()->except('ignorar_evento_id');
+
+        return response()->json([
+            'data' => $this->planejamento->disponibilidadePublica($link, $params),
+        ]);
     }
 }

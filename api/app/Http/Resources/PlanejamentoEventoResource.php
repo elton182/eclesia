@@ -59,6 +59,12 @@ class PlanejamentoEventoResource extends JsonResource
             'local_texto' => $this->local_texto,
             'local_ids' => $this->whenLoaded('locais', fn () => $this->locais->pluck('id')->values()->all()),
             'locais' => $this->whenLoaded('locais', fn () => CalendarioLocalResource::collection($this->locais)),
+            'recursos' => $this->whenLoaded('recursos', fn () => $this->recursos->map(fn ($r) => [
+                'recurso_id' => $r->id,
+                'nome' => $r->nome,
+                'tipo' => $r->tipo,
+                'quantidade' => (int) $r->pivot->quantidade,
+            ])->values()->all()),
             'status_solicitacao' => $this->status_solicitacao,
             'motivo_ajuste' => $this->motivo_ajuste,
             'conflitos' => $this->conflitos,

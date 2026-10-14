@@ -25,7 +25,10 @@ class StorePlanejamentoEventoPublicoRequest extends FormRequest
             'participantes_media' => ['nullable', 'integer', 'min:0'],
             'recorrencia_texto' => ['nullable', 'string', 'max:255'],
             'observacoes' => ['nullable', 'string'],
-            'local_texto' => ['required', 'string', 'max:255'],
+            'local_texto' => ['nullable', 'string', 'max:255'],
+            'recursos' => ['sometimes', 'array', 'max:30'],
+            'recursos.*.recurso_id' => ['required', 'string', 'distinct', 'exists:planejamento_recursos,id'],
+            'recursos.*.quantidade' => ['nullable', 'integer', 'min:1', 'max:9999'],
         ];
     }
 }

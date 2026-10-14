@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\IgrejaController;
 use App\Http\Controllers\Api\PastoralController;
 use App\Http\Controllers\Api\PastoraisController;
 use App\Http\Controllers\Api\PlanejamentoController;
+use App\Http\Controllers\Api\PlanejamentoRecursosController;
 use App\Http\Controllers\Api\PessoaFotoController;
 use App\Http\Controllers\Api\PublicSiteController;
 use App\Http\Controllers\Api\RolePermissionController;
@@ -88,6 +89,8 @@ Route::middleware([
     Route::prefix('public/planejamento')->group(function () {
         Route::get('{token}', [PlanejamentoController::class, 'showPublico']);
         Route::get('{token}/eventos', [PlanejamentoController::class, 'indexEventosPublicos']);
+        Route::get('{token}/disponibilidade', [PlanejamentoController::class, 'disponibilidadePublica'])
+            ->middleware('throttle:60,1');
         Route::post('{token}/eventos', [PlanejamentoController::class, 'storeEventoPublico'])
             ->middleware('throttle:30,1');
     });
@@ -229,6 +232,11 @@ Route::middleware([
     Route::patch('planejamento/eventos/{eventoId}', [PlanejamentoController::class, 'updateEvento']);
     Route::delete('planejamento/eventos/{eventoId}', [PlanejamentoController::class, 'destroyEvento']);
     Route::get('planejamento/anuais/{id}/pdf', [PlanejamentoController::class, 'pdf']);
+    Route::get('planejamento/anuais/{id}/disponibilidade', [PlanejamentoController::class, 'disponibilidade']);
+    Route::get('planejamento/recursos', [PlanejamentoRecursosController::class, 'index']);
+    Route::post('planejamento/recursos', [PlanejamentoRecursosController::class, 'store']);
+    Route::patch('planejamento/recursos/{id}', [PlanejamentoRecursosController::class, 'update']);
+    Route::delete('planejamento/recursos/{id}', [PlanejamentoRecursosController::class, 'destroy']);
     Route::get('planejamento/anuais/{id}/pastorais/tokens', [PlanejamentoController::class, 'indexPastoralTokens']);
     Route::post('planejamento/anuais/{id}/pastorais/{pastoralId}/token', [PlanejamentoController::class, 'storePastoralToken']);
     Route::delete('planejamento/anuais/{id}/pastorais/{pastoralId}/token', [PlanejamentoController::class, 'destroyPastoralToken']);
