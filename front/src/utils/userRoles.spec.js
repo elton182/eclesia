@@ -13,6 +13,8 @@ import {
   canSeePastoraisNav,
   isSomenteLiderEquipe,
   homePathForUser,
+  isViewAsLider,
+  canActivateViewAsLider,
 } from './userRoles.js'
 
 describe('userRoles', () => {
@@ -248,5 +250,38 @@ describe('userRoles', () => {
     assert.equal(isSomenteLiderEquipe({ roles: [{ name: 'lider-equipe' }] }, { isSuperAdmin: true }), false)
     assert.equal(homePathForUser({ roles: [{ name: 'lider-equipe' }] }), '/ecc/minha-equipe')
     assert.equal(homePathForUser({ roles: [{ name: 'admin-igreja' }] }), '/inicio')
+  })
+
+  it('view_as lider mascara home e permite ativação só para admin', () => {
+    assert.equal(isViewAsLider({ view_as: { mode: 'lider-equipe' } }), true)
+    assert.equal(isViewAsLider({ view_as: null }), false)
+    assert.equal(
+      isSomenteLiderEquipe({
+        roles: [{ name: 'lider-equipe' }],
+        view_as: { mode: 'lider-equipe' },
+      }),
+      true,
+    )
+    assert.equal(
+      homePathForUser({
+        roles: [{ name: 'lider-equipe' }],
+        view_as: { mode: 'lider-equipe' },
+      }),
+      '/ecc/minha-equipe',
+    )
+    assert.equal(canActivateViewAsLider({ roles: [{ name: 'admin-tenant' }] }), true)
+    assert.equal(canActivateViewAsLider({ roles: [{ name: 'admin-igreja' }] }), true)
+    assert.equal(canActivateViewAsLider({ roles: [{ name: 'lider-equipe' }] }), false)
+    assert.equal(
+      canActivateViewAsLider({
+        roles: [{ name: 'admin-tenant' }],
+        view_as: { mode: 'lider-equipe' },
+      }),
+      false,
+    )
+    assert.equal(
+      canActivateViewAsLider({ roles: [{ name: 'admin-tenant' }] }, { isSuperAdmin: true }),
+      false,
+    )
   })
 })

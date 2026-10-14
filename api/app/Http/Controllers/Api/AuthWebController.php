@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Exceptions\TenantResolutionException;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\ActivateViewAsLiderRequest;
 use App\Http\Requests\AuthRequest;
 use App\Http\Resources\UserResource;
 use App\Models\User;
@@ -15,6 +16,7 @@ use App\Services\CookieManager;
 use App\Services\IgrejaContext;
 use App\Services\TenantResolver;
 use App\Services\UserService;
+use App\Services\ViewAsLiderService;
 use App\Services\WebAuthService;
 use App\Services\AppBrandingService;
 use Illuminate\Http\JsonResponse;
@@ -36,6 +38,7 @@ class AuthWebController extends Controller
         protected IgrejaContext $igrejaContext,
         protected AuditLogger $auditLogger,
         protected AppBrandingService $appBranding,
+        protected ViewAsLiderService $viewAsLider,
     ) {}
 
     public function auth(AuthRequest $request): JsonResponse
@@ -112,12 +115,66 @@ class AuthWebController extends Controller
             return response()->json(['message' => 'Usuário não autenticado', 'success' => false], 401);
         }
 
+        return response()->json($this->mePayload($user));
+    }
+
+    public function activateViewAsLider(ActivateViewAsLiderRequest $request): JsonResponse
+    {
+        $user = auth('sanctum')->user();
+        if (! $user instanceof User) {
+            return response()->json(['message' => 'Usuário não autenticado', 'success' => false], 401);
+        }
+
+        /** @var list<string> $equipeIds */
+        $equipeIds = $request->validated('equipe_ids');
+        $this->viewAsLider->activate($user, $equipeIds);
+
+        return response()->json($this->mePayload($user));
+    }
+
+    public function clearViewAs(): JsonResponse
+    {
+        $user = auth('sanctum')->user();
+        if (! $user instanceof User) {
+            return response()->json(['message' => 'Usuário não autenticado', 'success' => false], 401);
+        }
+
+        $this->viewAsLider->clear($user);
+
+        return response()->json($this->mePayload($user));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function mePayload(User $user): array
+    {
         $igrejaId = null;
         try {
             $igrejaId = $this->igrejaContext->current()->id;
             setPermissionsTeamId($igrejaId);
         } catch (\Throwable) {
             setPermissionsTeamId(null);
+        }
+
+        $viewAs = $this->viewAsLider->viewAsPayload($user);
+
+        if ($viewAs !== null) {
+            $base = (new UserResource($user))->resolve();
+            $base['roles'] = [[
+                'name' => ViewAsLiderService::MODE,
+                'igreja_id' => $igrejaId,
+            ]];
+            $base['equipes_lideradas'] = $viewAs['equipes'];
+
+            return [
+                'success' => true,
+                ...$base,
+                'permissions' => ViewAsLiderService::LIDER_PERMISSIONS,
+                'igreja_id' => $igrejaId,
+                'branding' => $this->tenantBranding(),
+                'view_as' => $viewAs,
+            ];
         }
 
         $permissions = $user->getAllPermissions()->pluck('name')->values()->all();
@@ -130,13 +187,14 @@ class AuthWebController extends Controller
             $permissions = array_values(array_unique([...$permissions, ...$orgPermissions]));
         }
 
-        return response()->json([
+        return [
             'success' => true,
             ...(new UserResource($user))->resolve(),
             'permissions' => $permissions,
             'igreja_id' => $igrejaId,
             'branding' => $this->tenantBranding(),
-        ]);
+            'view_as' => null,
+        ];
     }
 
     /**
@@ -152,6 +210,8 @@ class AuthWebController extends Controller
         $user = auth('sanctum')->user();
 
         if ($user instanceof User) {
+            $this->viewAsLider->clear($user);
+
             $this->auditLogger->log(
                 action: AuditLogger::ACTION_LOGOUT,
                 auditable: $user,
