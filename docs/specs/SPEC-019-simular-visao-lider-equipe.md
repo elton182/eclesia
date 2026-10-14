@@ -40,5 +40,6 @@ Ver `api/docs/specs/openapi.yaml` — `POST /web/view-as/lider-equipe`, `DELETE 
 ## Notas
 
 - Estado em Cache: `view_as_lider:{tenantId}:{userId}` com `{ igreja_id, equipe_ids }`.
-- Máscara efetiva = permissões do seed `lider-equipe` (`telas.equipes`, `telas.casais`, `ecc.equipes.view`, `ecc.casais.view`, `ecc.casais.atualizar`).
+- Máscara efetiva = permissões do seed `lider-equipe` (`telas.equipes`, `telas.casais`, `ecc.equipes.view`, `ecc.casais.view`, `ecc.casais.atualizar`, `ecc.financeiro.depositos.submeter`).
 - `EccVisibilityScope` respeita a simulação antes do atalho de `admin-tenant` / manage.
+- Front: modal de equipes com campo de pesquisa por nome.

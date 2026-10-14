@@ -10,6 +10,7 @@ use App\Models\Tenant;
 use App\Models\User;
 use App\Services\ViewAsLiderService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\File;
 use Laravel\Sanctum\Sanctum;
@@ -165,6 +166,7 @@ class ViewAsLiderEquipeTest extends TestCase
 
         $this->assertSame([$this->equipeAlphaId], $me['view_as']['equipe_ids']);
         $this->assertContains('ecc.casais.atualizar', $me['permissions']);
+        $this->assertContains('ecc.financeiro.depositos.submeter', $me['permissions']);
         $this->assertNotContains('ecc.casais.manage', $me['permissions']);
         $this->assertCount(1, $me['equipes_lideradas']);
         $this->assertSame($this->equipeAlphaId, $me['equipes_lideradas'][0]['id']);
@@ -217,6 +219,26 @@ class ViewAsLiderEquipeTest extends TestCase
 
         $this->tenantJson('POST', '/api/v1/ecc/casais/'.$this->casalAlphaId.'/swap')
             ->assertForbidden();
+    }
+
+    public function test_simulacao_permite_submeter_deposito_mensal(): void
+    {
+        Sanctum::actingAs($this->admin);
+
+        $this->tenantJson('POST', '/api/v1/web/view-as/lider-equipe', [
+            'equipe_ids' => [$this->equipeAlphaId],
+        ])->assertOk();
+
+        $this->withHeaders([
+            'X-Tenant' => 'paroquia-view-as',
+            'Accept' => 'application/json',
+        ])->post('/api/v1/ecc/financeiro/depositos', [
+            'equipe_id' => $this->equipeAlphaId,
+            'competencia' => '2026-10',
+            'valor' => '100.00',
+            'comprovante' => UploadedFile::fake()->create('c.pdf', 20, 'application/pdf'),
+        ])->assertCreated()
+            ->assertJsonPath('data.status', 'provisionado');
     }
 
     public function test_delete_view_as_restaura_poderes(): void
@@ -297,6 +319,7 @@ class ViewAsLiderEquipeTest extends TestCase
             'ecc.equipes.view',
             'ecc.casais.view',
             'ecc.casais.atualizar',
+            'ecc.financeiro.depositos.submeter',
         ], ViewAsLiderService::LIDER_PERMISSIONS);
     }
 }

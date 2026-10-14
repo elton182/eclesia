@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import InnovModal from '@/components/base/InnovModal.vue'
 import { useAuthStore } from '@/stores/auth'
@@ -21,12 +21,20 @@ const selected = ref([])
 const loading = ref(false)
 const submitting = ref(false)
 const loadError = ref('')
+const busca = ref('')
+
+const equipesFiltradas = computed(() => {
+  const q = busca.value.trim().toLocaleLowerCase('pt-BR')
+  if (!q) return equipes.value
+  return equipes.value.filter((eq) => String(eq.nome || '').toLocaleLowerCase('pt-BR').includes(q))
+})
 
 watch(
   () => props.modelValue,
   async (open) => {
     if (!open) return
     selected.value = []
+    busca.value = ''
     loadError.value = ''
     loading.value = true
     try {
@@ -92,24 +100,44 @@ async function ativar() {
       <p v-else-if="loadError" class="text-[13px] py-2" style="color: var(--color-danger, #b42318)">
         {{ loadError }}
       </p>
-      <ul v-else class="flex flex-col gap-2 max-h-64 overflow-y-auto mb-4" data-testid="simular-lider-lista">
-        <li v-for="eq in equipes" :key="eq.id">
-          <label
-            class="flex items-center gap-2.5 px-3 py-2 rounded-lg cursor-pointer text-[13.5px]"
-            style="border: 1px solid var(--color-line)"
+      <template v-else>
+        <label class="fld" for="simular-lider-busca">Pesquisar equipe</label>
+        <input
+          id="simular-lider-busca"
+          v-model="busca"
+          type="search"
+          class="input mb-3 w-full"
+          placeholder="Digite o nome da equipe…"
+          autocomplete="off"
+          data-testid="simular-lider-busca"
+        />
+        <ul class="flex flex-col gap-2 max-h-64 overflow-y-auto mb-4" data-testid="simular-lider-lista">
+          <li
+            v-if="!equipesFiltradas.length"
+            class="text-[13px] py-2"
+            style="color: var(--color-muted)"
+            data-testid="simular-lider-busca-vazia"
           >
-            <input
-              type="checkbox"
-              class="accent-[var(--color-primary)]"
-              :value="eq.id"
-              :checked="selected.includes(eq.id)"
-              :data-testid="`simular-lider-eq-${eq.id}`"
-              @change="toggle(eq.id)"
-            />
-            <span style="color: var(--color-ink)">{{ eq.nome }}</span>
-          </label>
-        </li>
-      </ul>
+            Nenhuma equipe encontrada para “{{ busca.trim() }}”.
+          </li>
+          <li v-for="eq in equipesFiltradas" :key="eq.id">
+            <label
+              class="flex items-center gap-2.5 px-3 py-2 rounded-lg cursor-pointer text-[13.5px]"
+              style="border: 1px solid var(--color-line)"
+            >
+              <input
+                type="checkbox"
+                class="accent-[var(--color-primary)]"
+                :value="eq.id"
+                :checked="selected.includes(eq.id)"
+                :data-testid="`simular-lider-eq-${eq.id}`"
+                @change="toggle(eq.id)"
+              />
+              <span style="color: var(--color-ink)">{{ eq.nome }}</span>
+            </label>
+          </li>
+        </ul>
+      </template>
 
       <div class="flex justify-end gap-2 pt-1">
         <button type="button" class="btn btn-ghost" data-testid="simular-lider-cancelar" @click="close">

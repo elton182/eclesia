@@ -17,13 +17,14 @@ class ViewAsLiderService
 {
     public const MODE = 'lider-equipe';
 
-    /** @var list<string> */
+    /** @var list<string> — espelha o seed do papel `lider-equipe`. */
     public const LIDER_PERMISSIONS = [
         'telas.equipes',
         'telas.casais',
         'ecc.equipes.view',
         'ecc.casais.view',
         'ecc.casais.atualizar',
+        'ecc.financeiro.depositos.submeter',
     ];
 
     private const CACHE_TTL_SECONDS = 43200; // 12h
