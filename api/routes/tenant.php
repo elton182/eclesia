@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\EccEquipeController;
 use App\Http\Controllers\Api\EccEquipeServicoController;
 use App\Http\Controllers\Api\EccEventoController;
 use App\Http\Controllers\Api\EccFinanceiroController;
+use App\Http\Controllers\Api\EccFinanceiroDepositoController;
 use App\Http\Controllers\Api\EventoTipoController;
 use App\Http\Controllers\Api\IgrejaController;
 use App\Http\Controllers\Api\PastoralController;
@@ -167,6 +168,12 @@ Route::middleware([
     Route::delete('ecc/financeiro/lancamentos/{id}', [EccFinanceiroController::class, 'destroyLancamento']);
     Route::post('ecc/financeiro/transferencias', [EccFinanceiroController::class, 'transferir']);
     Route::post('ecc/financeiro/transportar', [EccFinanceiroController::class, 'transportar']);
+    Route::get('ecc/financeiro/depositos', [EccFinanceiroDepositoController::class, 'index']);
+    Route::post('ecc/financeiro/depositos', [EccFinanceiroDepositoController::class, 'store']);
+    Route::match(['put', 'post'], 'ecc/financeiro/depositos/{id}', [EccFinanceiroDepositoController::class, 'update']);
+    Route::get('ecc/financeiro/depositos/{id}/comprovante', [EccFinanceiroDepositoController::class, 'comprovante']);
+    Route::post('ecc/financeiro/depositos/{id}/aprovar', [EccFinanceiroDepositoController::class, 'aprovar']);
+    Route::post('ecc/financeiro/depositos/{id}/rejeitar', [EccFinanceiroDepositoController::class, 'rejeitar']);
 
     Route::get('eventos/tipos', [EventoTipoController::class, 'index']);
     Route::post('eventos/tipos', [EventoTipoController::class, 'store']);

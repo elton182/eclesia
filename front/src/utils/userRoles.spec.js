@@ -126,6 +126,7 @@ describe('userRoles', () => {
     }
     assert.equal(userHasPermission(lider, 'ecc.casais.view'), true)
     assert.equal(userHasPermission(lider, 'ecc.casais.atualizar'), true)
+    assert.equal(userHasPermission(lider, 'ecc.financeiro.depositos.submeter'), true)
     assert.equal(userHasPermission(lider, 'ecc.casais.manage'), false)
     assert.equal(userHasPermission(lider, 'telas.eventos'), false)
     assert.equal(userHasPermission(lider, 'telas.calendario'), false)

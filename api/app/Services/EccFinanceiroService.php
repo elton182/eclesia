@@ -140,6 +140,9 @@ class EccFinanceiroService
         }
 
         foreach ($lancamentos->where('abertura', true) as $abertura) {
+            if (! $this->contaNoSaldo($abertura)) {
+                continue;
+            }
             $contaId = $abertura->ecc_financeiro_conta_id;
             $delta = $abertura->tipo === EccFinanceiroLancamento::TIPO_ENTRADA
                 ? (float) $abertura->valor
@@ -154,6 +157,7 @@ class EccFinanceiroService
             $doMes = $lancamentos->filter(
                 static fn (EccFinanceiroLancamento $l): bool => (int) $l->data->format('n') === $mes
                     && ! $l->abertura
+                    && ($l->status ?? EccFinanceiroLancamento::STATUS_CONFIRMADO) !== EccFinanceiroLancamento::STATUS_REJEITADO
             );
 
             $totaisPorConta = [];
@@ -176,10 +180,12 @@ class EccFinanceiroService
                     ];
                 }
 
-                if ($lanc->tipo === EccFinanceiroLancamento::TIPO_ENTRADA) {
-                    $totaisPorConta[$contaId]['entradas'] += (float) $lanc->valor;
-                } else {
-                    $totaisPorConta[$contaId]['saidas'] += (float) $lanc->valor;
+                if ($this->contaNoSaldo($lanc)) {
+                    if ($lanc->tipo === EccFinanceiroLancamento::TIPO_ENTRADA) {
+                        $totaisPorConta[$contaId]['entradas'] += (float) $lanc->valor;
+                    } else {
+                        $totaisPorConta[$contaId]['saidas'] += (float) $lanc->valor;
+                    }
                 }
 
                 $itens[] = $this->serializeLancamento($lanc);
@@ -200,8 +206,9 @@ class EccFinanceiroService
             // Inclui aberturas no mês 1 para o extrato
             $aberturasMes = $mes === 1
                 ? $lancamentos->filter(
-                    static fn (EccFinanceiroLancamento $l): bool => $l->abertura
+                    fn (EccFinanceiroLancamento $l): bool => $l->abertura
                         && (int) $l->data->format('n') === 1
+                        && $this->contaNoSaldo($l)
                 )->map(fn (EccFinanceiroLancamento $l): array => $this->serializeLancamento($l))->values()->all()
                 : [];
 
@@ -258,6 +265,7 @@ class EccFinanceiroService
             'valor' => $data['valor'],
             'transferencia_id' => null,
             'abertura' => false,
+            'status' => EccFinanceiroLancamento::STATUS_CONFIRMADO,
         ]);
     }
 
@@ -463,7 +471,15 @@ class EccFinanceiroService
             'valor' => round((float) $lancamento->valor, 2),
             'transferencia_id' => $lancamento->transferencia_id,
             'abertura' => (bool) $lancamento->abertura,
+            'status' => $lancamento->status ?? EccFinanceiroLancamento::STATUS_CONFIRMADO,
         ];
+    }
+
+    private function contaNoSaldo(EccFinanceiroLancamento $lancamento): bool
+    {
+        $status = $lancamento->status ?? EccFinanceiroLancamento::STATUS_CONFIRMADO;
+
+        return $status === EccFinanceiroLancamento::STATUS_CONFIRMADO;
     }
 
     private function igrejaId(): string

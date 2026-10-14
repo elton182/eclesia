@@ -28,7 +28,10 @@ api/public/hot/
 api/public/storage/
 api/storage/*.key
 api/storage/pail/
+api/storage/tenant*/
 api/.phpunit.cache
+# SQLite de tenant (stancl) — não confundir com database/migrations/tenant/
+api/database/tenant*
 
 # Front
 front/node_modules/

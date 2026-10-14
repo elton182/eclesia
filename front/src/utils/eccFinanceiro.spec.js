@@ -29,6 +29,17 @@ describe('eccFinanceiro', () => {
     )
   })
 
+  it('saldoLancamentos ignora provisionado e rejeitado', () => {
+    assert.equal(
+      saldoLancamentos([
+        { id: '1', conta_id: 'banco', tipo: 'entrada', valor: 100, status: 'confirmado' },
+        { id: '2', conta_id: 'banco', tipo: 'entrada', valor: 50, status: 'provisionado' },
+        { id: '3', conta_id: 'banco', tipo: 'entrada', valor: 20, status: 'rejeitado' },
+      ]),
+      100,
+    )
+  })
+
   it('transferência se anula no total geral', () => {
     const lancamentos = [
       { id: 'a', conta_id: 'especie', tipo: 'entrada', valor: 500, transferencia_id: null },

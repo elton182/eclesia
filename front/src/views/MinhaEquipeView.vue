@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '@/services/api'
 import { useTenantStore } from '@/stores/tenant'
@@ -7,6 +7,13 @@ import { useAuthStore } from '@/stores/auth'
 import { innovToast } from '@/plugins/toast'
 import { casalEle, casalEla } from '@/utils/casalDisplay'
 import { equipesLideradasIds } from '@/utils/userRoles'
+import { formatMoney } from '@/utils/eccFinanceiro'
+import {
+  buildDepositoFormData,
+  competenciaAtual,
+  formatCompetencia,
+  labelStatusDeposito,
+} from '@/utils/eccFinanceiroDepositos'
 import LiderEquipeTour from '@/components/ecc/LiderEquipeTour.vue'
 import {
   beginLiderTour,
@@ -24,6 +31,14 @@ const casais = ref([])
 const equipeId = ref('')
 const tourOpen = ref(false)
 const tourRun = ref(0)
+const depositos = ref([])
+const loadingDepositos = ref(false)
+const savingDeposito = ref(false)
+const formDeposito = ref({
+  competencia: competenciaAtual(),
+  valor: '',
+  comprovante: null,
+})
 
 const multipleEquipes = computed(() => equipes.value.length > 1)
 const tourSteps = computed(() => liderEquipeTourSteps({ multipleEquipes: multipleEquipes.value }))
@@ -34,6 +49,10 @@ const equipeAtual = computed(() =>
 
 const casaisDaEquipe = computed(() =>
   casais.value.filter((casal) => String(casal.equipe_id) === String(equipeId.value)),
+)
+
+const depositosDaEquipe = computed(() =>
+  depositos.value.filter((d) => String(d.equipe_id) === String(equipeId.value)),
 )
 
 function contato(casal) {
@@ -53,6 +72,25 @@ function escolherEquipeInicial(lista) {
   return String((preferida || lista[0])?.id || '')
 }
 
+async function loadDepositos() {
+  if (!equipeId.value) {
+    depositos.value = []
+    return
+  }
+  loadingDepositos.value = true
+  try {
+    const { data } = await api.get('/ecc/financeiro/depositos', {
+      params: { equipe_id: equipeId.value },
+    })
+    depositos.value = data?.data || []
+  } catch (e) {
+    depositos.value = []
+    innovToast('error', 'Depósitos', e.response?.data?.message || 'Falha ao carregar depósitos')
+  } finally {
+    loadingDepositos.value = false
+  }
+}
+
 async function load() {
   if (!tenantStore.slug) {
     innovToast('error', 'Organização', 'Nenhuma organização selecionada.')
@@ -70,10 +108,66 @@ async function load() {
     if (!equipes.value.some((equipe) => String(equipe.id) === String(equipeId.value))) {
       equipeId.value = escolherEquipeInicial(equipes.value)
     }
+    await loadDepositos()
   } catch (e) {
     innovToast('error', 'Erro', e.response?.data?.message || 'Falha ao carregar a equipe')
   } finally {
     loading.value = false
+  }
+}
+
+function onComprovanteChange(event) {
+  formDeposito.value.comprovante = event.target?.files?.[0] || null
+}
+
+async function enviarDeposito() {
+  if (!equipeId.value) return
+  if (!formDeposito.value.competencia || !formDeposito.value.valor || !formDeposito.value.comprovante) {
+    innovToast('error', 'Depósito', 'Informe competência, valor e comprovante.')
+    return
+  }
+  savingDeposito.value = true
+  try {
+    const fd = buildDepositoFormData({
+      equipe_id: equipeId.value,
+      competencia: formDeposito.value.competencia,
+      valor: formDeposito.value.valor,
+      comprovante: formDeposito.value.comprovante,
+    })
+    await api.post('/ecc/financeiro/depositos', fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    innovToast('success', 'Depósito', 'Enviado para aprovação no financeiro.')
+    formDeposito.value = {
+      competencia: competenciaAtual(),
+      valor: '',
+      comprovante: null,
+    }
+    await loadDepositos()
+  } catch (e) {
+    const msg = e.response?.data?.errors?.competencia?.[0]
+      || e.response?.data?.message
+      || 'Não foi possível enviar o depósito.'
+    innovToast('error', 'Depósito', msg)
+  } finally {
+    savingDeposito.value = false
+  }
+}
+
+watch(equipeId, () => {
+  if (!loading.value) loadDepositos()
+})
+
+async function baixarComprovante(dep) {
+  try {
+    const { data } = await api.get(`/ecc/financeiro/depositos/${dep.id}/comprovante`, {
+      responseType: 'blob',
+    })
+    const url = URL.createObjectURL(data)
+    window.open(url, '_blank', 'noopener')
+    setTimeout(() => URL.revokeObjectURL(url), 60_000)
+  } catch (e) {
+    innovToast('error', 'Comprovante', e.response?.data?.message || 'Não foi possível abrir o comprovante.')
   }
 }
 
@@ -200,6 +294,129 @@ onMounted(async () => {
         </button>
       </div>
     </div>
+
+    <section
+      class="mt-10"
+      data-testid="minha-equipe-depositos"
+      data-tour="depositos"
+    >
+      <h3 class="font-serif text-[22px] leading-tight" style="color: var(--color-ink)">
+        Depósito mensal
+      </h3>
+      <p class="mt-1 text-[13.5px] leading-relaxed mb-4" style="color: var(--color-muted)">
+        Informe o valor depositado pela equipe e anexe o comprovante. O financeiro confirma após aprovação.
+      </p>
+
+      <form
+        class="rounded-[11px] p-5 mb-5"
+        style="background: var(--color-surface); border: 1px solid var(--color-line)"
+        data-testid="minha-equipe-deposito-form"
+        @submit.prevent="enviarDeposito"
+      >
+        <div class="grid gap-4 sm:grid-cols-3">
+          <div>
+            <label class="fld" for="deposito-competencia">Competência</label>
+            <input
+              id="deposito-competencia"
+              v-model="formDeposito.competencia"
+              type="month"
+              class="input"
+              required
+              data-testid="minha-equipe-deposito-competencia"
+            />
+          </div>
+          <div>
+            <label class="fld" for="deposito-valor">Valor (R$)</label>
+            <input
+              id="deposito-valor"
+              v-model="formDeposito.valor"
+              type="number"
+              min="0.01"
+              step="0.01"
+              class="input"
+              required
+              data-testid="minha-equipe-deposito-valor"
+            />
+          </div>
+          <div>
+            <label class="fld" for="deposito-comprovante">Comprovante</label>
+            <input
+              id="deposito-comprovante"
+              type="file"
+              accept=".pdf,image/jpeg,image/png,.jpg,.jpeg,.png"
+              class="input"
+              required
+              data-testid="minha-equipe-deposito-comprovante"
+              @change="onComprovanteChange"
+            />
+          </div>
+        </div>
+        <div class="mt-4">
+          <button
+            type="submit"
+            class="btn btn-primary"
+            :disabled="savingDeposito"
+            data-testid="minha-equipe-deposito-enviar"
+          >
+            {{ savingDeposito ? 'Enviando…' : 'Enviar depósito' }}
+          </button>
+        </div>
+      </form>
+
+      <div
+        v-if="loadingDepositos"
+        class="text-[13.5px]"
+        style="color: var(--color-muted)"
+      >
+        Carregando depósitos…
+      </div>
+      <div
+        v-else-if="!depositosDaEquipe.length"
+        class="text-[13.5px]"
+        style="color: var(--color-muted)"
+        data-testid="minha-equipe-depositos-vazio"
+      >
+        Nenhum depósito registrado ainda.
+      </div>
+      <ul
+        v-else
+        class="rounded-[11px] overflow-hidden"
+        style="background: var(--color-surface); border: 1px solid var(--color-line)"
+        data-testid="minha-equipe-depositos-lista"
+      >
+        <li
+          v-for="dep in depositosDaEquipe"
+          :key="dep.id"
+          class="flex flex-col gap-1 px-5 py-3 sm:flex-row sm:items-center sm:justify-between"
+          style="border-top: 1px solid var(--color-line)"
+          data-testid="minha-equipe-deposito-item"
+        >
+          <div>
+            <span class="font-medium text-[15px]" style="color: var(--color-ink)">
+              {{ formatCompetencia(dep.competencia) }}
+            </span>
+            <span class="text-[13px] ml-2" style="color: var(--color-muted)">
+              {{ formatMoney(dep.valor) }} · {{ labelStatusDeposito(dep.status) }}
+            </span>
+            <p
+              v-if="dep.status === 'rejeitado' && dep.motivo_rejeicao"
+              class="text-[12.5px] mt-1"
+              style="color: var(--color-danger)"
+            >
+              {{ dep.motivo_rejeicao }}
+            </p>
+          </div>
+          <button
+            type="button"
+            class="btn btn-ghost text-sm w-full sm:w-auto"
+            data-testid="minha-equipe-deposito-comprovante-link"
+            @click="baixarComprovante(dep)"
+          >
+            Ver comprovante
+          </button>
+        </li>
+      </ul>
+    </section>
 
     <LiderEquipeTour
       :open="tourOpen"

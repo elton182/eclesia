@@ -3,11 +3,16 @@ import { ref, computed, onMounted, watch } from 'vue'
 import * as XLSX from 'xlsx'
 import api from '@/services/api'
 import { innovToast } from '@/plugins/toast'
-import { innovConfirm } from '@/plugins/dialog'
+import { innovConfirm, innovPrompt } from '@/plugins/dialog'
 import { useAuthStore } from '@/stores/auth'
 import { useAuthAdminStore } from '@/stores/authAdmin'
 import { userHasPermission } from '@/utils/userRoles'
 import { formatMoney, nomeMes, canConfirmZerarFinanceiro } from '@/utils/eccFinanceiro'
+import {
+  depositosPendentes,
+  formatCompetencia,
+  labelStatusDeposito,
+} from '@/utils/eccFinanceiroDepositos'
 import { parseFluxoCaixaWorkbook } from '@/utils/eccFinanceiroImport'
 import { buildFluxoCaixaWorkbook } from '@/utils/eccFinanceiroExport'
 import EccFinanceiroChart from '@/components/ecc/EccFinanceiroChart.vue'
@@ -22,7 +27,9 @@ const canManage = computed(() =>
 
 const ano = ref(new Date().getFullYear())
 const livro = ref(null)
+const depositos = ref([])
 const loading = ref(false)
+const revisandoId = ref('')
 const saving = ref(false)
 const importing = ref(false)
 const exporting = ref(false)
@@ -61,6 +68,18 @@ const formConta = ref({
 const contas = computed(() => livro.value?.contas || [])
 const meses = computed(() => livro.value?.meses || [])
 const saldoFinal = computed(() => livro.value?.saldo_final ?? 0)
+const pendentes = computed(() => depositosPendentes(depositos.value))
+
+async function loadDepositos() {
+  try {
+    const { data } = await api.get('/ecc/financeiro/depositos', {
+      params: { status: 'provisionado' },
+    })
+    depositos.value = data?.data || []
+  } catch {
+    depositos.value = []
+  }
+}
 
 async function load() {
   const anoAlvo = ano.value
@@ -70,6 +89,7 @@ async function load() {
     // Ignora resposta atrasada se o usuário já trocou o ano.
     if (ano.value !== anoAlvo) return
     livro.value = data.data
+    await loadDepositos()
   } catch (e) {
     if (ano.value !== anoAlvo) return
     innovToast('error', 'Erro', e?.response?.data?.message || 'Não foi possível carregar o financeiro.')
@@ -78,6 +98,63 @@ async function load() {
     if (ano.value === anoAlvo) {
       loading.value = false
     }
+  }
+}
+
+async function baixarComprovante(dep) {
+  try {
+    const { data } = await api.get(`/ecc/financeiro/depositos/${dep.id}/comprovante`, {
+      responseType: 'blob',
+    })
+    const url = URL.createObjectURL(data)
+    window.open(url, '_blank', 'noopener')
+    setTimeout(() => URL.revokeObjectURL(url), 60_000)
+  } catch (e) {
+    innovToast('error', 'Comprovante', e?.response?.data?.message || 'Não foi possível abrir o comprovante.')
+  }
+}
+
+async function aprovarDeposito(dep) {
+  const ok = await innovConfirm({
+    title: 'Confirmar depósito',
+    message: `Confirmar ${formatMoney(dep.valor)} de ${dep.equipe_nome} (${formatCompetencia(dep.competencia)}) no financeiro?`,
+    confirmText: 'Aprovar',
+  })
+  if (!ok) return
+  revisandoId.value = dep.id
+  try {
+    await api.post(`/ecc/financeiro/depositos/${dep.id}/aprovar`)
+    innovToast('success', 'Depósito', 'Confirmado no financeiro.')
+    await load()
+  } catch (e) {
+    innovToast('error', 'Depósito', e?.response?.data?.message || 'Falha ao aprovar.')
+  } finally {
+    revisandoId.value = ''
+  }
+}
+
+async function rejeitarDeposito(dep) {
+  const motivo = await innovPrompt({
+    title: 'Rejeitar depósito',
+    message: 'Informe o motivo da rejeição (o líder poderá reenviar).',
+    confirmText: 'Rejeitar',
+    label: 'Motivo',
+  })
+  if (motivo === null || String(motivo).trim().length < 3) {
+    if (motivo !== null) innovToast('error', 'Depósito', 'Informe um motivo com pelo menos 3 caracteres.')
+    return
+  }
+  revisandoId.value = dep.id
+  try {
+    await api.post(`/ecc/financeiro/depositos/${dep.id}/rejeitar`, {
+      motivo: String(motivo).trim(),
+    })
+    innovToast('success', 'Depósito', 'Rejeitado.')
+    await loadDepositos()
+  } catch (e) {
+    innovToast('error', 'Depósito', e?.response?.data?.message || 'Falha ao rejeitar.')
+  } finally {
+    revisandoId.value = ''
   }
 }
 
@@ -450,6 +527,68 @@ onMounted(load)
 
     <div v-if="loading && !livro" class="text-sm" style="color: var(--color-muted)">Carregando…</div>
 
+    <section
+      v-if="canManage && pendentes.length"
+      class="mb-8 rounded-[11px] p-5"
+      style="background: var(--color-surface); border: 1px solid var(--color-line)"
+      data-testid="ecc-financeiro-depositos-pendentes"
+    >
+      <h2 class="font-serif text-xl font-normal mb-1" style="color: var(--color-ink)">
+        Depósitos pendentes
+      </h2>
+      <p class="text-[13.5px] mb-4" style="color: var(--color-muted)">
+        Contribuições mensais enviadas pelos líderes — aprovar confirma no livro-caixa.
+      </p>
+      <ul class="space-y-3">
+        <li
+          v-for="dep in pendentes"
+          :key="dep.id"
+          class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between py-3"
+          style="border-top: 1px solid var(--color-line)"
+          data-testid="ecc-financeiro-deposito-pendente"
+        >
+          <div>
+            <p class="font-medium text-[15px]" style="color: var(--color-ink)">
+              {{ dep.equipe_nome }} · {{ formatCompetencia(dep.competencia) }}
+            </p>
+            <p class="text-[13px] mt-0.5" style="color: var(--color-muted)">
+              {{ formatMoney(dep.valor) }} · {{ labelStatusDeposito(dep.status) }}
+              <span v-if="dep.conta_nome"> · {{ dep.conta_nome }}</span>
+            </p>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <button
+              type="button"
+              class="btn btn-ghost text-sm"
+              data-testid="ecc-financeiro-deposito-ver"
+              @click="baixarComprovante(dep)"
+            >
+              Comprovante
+            </button>
+            <button
+              type="button"
+              class="btn btn-primary text-sm"
+              :disabled="revisandoId === dep.id"
+              data-testid="ecc-financeiro-deposito-aprovar"
+              @click="aprovarDeposito(dep)"
+            >
+              Aprovar
+            </button>
+            <button
+              type="button"
+              class="btn btn-ghost text-sm"
+              style="color: var(--color-danger)"
+              :disabled="revisandoId === dep.id"
+              data-testid="ecc-financeiro-deposito-rejeitar"
+              @click="rejeitarDeposito(dep)"
+            >
+              Rejeitar
+            </button>
+          </div>
+        </li>
+      </ul>
+    </section>
+
     <template v-if="livro">
       <p
         v-if="loading"
@@ -523,6 +662,11 @@ onMounted(load)
                   {{ l.historico }}
                   <span v-if="l.abertura" class="text-xs ml-1" style="color: var(--color-accent-dark)">(abertura)</span>
                   <span v-if="l.transferencia_id" class="text-xs ml-1" style="color: var(--color-muted)">(transf.)</span>
+                  <span
+                    v-if="l.status === 'provisionado'"
+                    class="text-xs ml-1"
+                    style="color: var(--color-accent-dark)"
+                  >(provisionado)</span>
                 </td>
                 <td class="py-2 pr-3">{{ contas.find((c) => c.id === l.conta_id)?.nome || '—' }}</td>
                 <td class="py-2 pr-3 text-right whitespace-nowrap">

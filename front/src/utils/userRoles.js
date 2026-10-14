@@ -67,6 +67,7 @@ export function userHasPermission(user, permission, opts = {}) {
   }
   if (permission === 'ecc.casais.manage' && roleNames.includes('cadastros-casais')) return true
   if (permission === 'ecc.casais.atualizar' && roleNames.includes('lider-equipe')) return true
+  if (permission === 'ecc.financeiro.depositos.submeter' && roleNames.includes('lider-equipe')) return true
   if (permission === 'ecc.equipes.manage' && roleNames.includes('cadastros-equipes')) return true
   if (permission === 'ecc.eventos.manage' && roleNames.includes('cadastros-eventos')) return true
   if (permission === 'ecc.casais.view' && (roleNames.includes('cadastros-casais') || roleNames.includes('lider-equipe'))) {

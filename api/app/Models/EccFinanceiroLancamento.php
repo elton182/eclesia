@@ -18,6 +18,12 @@ class EccFinanceiroLancamento extends Model
 
     public const TIPO_SAIDA = 'saida';
 
+    public const STATUS_CONFIRMADO = 'confirmado';
+
+    public const STATUS_PROVISIONADO = 'provisionado';
+
+    public const STATUS_REJEITADO = 'rejeitado';
+
     protected $table = 'ecc_financeiro_lancamentos';
 
     /**
@@ -39,6 +45,7 @@ class EccFinanceiroLancamento extends Model
         'valor',
         'transferencia_id',
         'abertura',
+        'status',
     ];
 
     /**

@@ -52,7 +52,7 @@ Regras:
 ## Fora de escopo
 
 - Ligação automática com caixa do evento (SPEC-009).
-- Contribuição mensal por casal.
+- Contribuição mensal por casal (agregado da equipe: [SPEC-020](./SPEC-020-ecc-deposito-mensal-equipe.md)).
 - Integração bancária / PIX / módulo Financeiro da igreja no launcher.
 
 ## Contrato

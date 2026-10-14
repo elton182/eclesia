@@ -16,6 +16,7 @@
 export function saldoLancamentos(lancamentos) {
   let total = 0
   for (const l of lancamentos || []) {
+    if (l.status && l.status !== 'confirmado') continue
     const v = Number(l.valor) || 0
     total += l.tipo === 'saida' ? -v : v
   }
@@ -37,6 +38,7 @@ export function totaisPorConta(lancamentos, contas, opts = {}) {
   }
   for (const l of lancamentos || []) {
     if (opts.skipAbertura && l.abertura) continue
+    if (l.status && l.status !== 'confirmado') continue
     if (!map[l.conta_id]) {
       map[l.conta_id] = { entradas: 0, saidas: 0, saldo: 0 }
     }

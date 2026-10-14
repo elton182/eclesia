@@ -5,6 +5,9 @@
 /public/storage
 /storage/*.key
 /storage/pail
+/storage/tenant*/
+# SQLite de tenant (stancl) — não confundir com database/migrations/tenant/
+/database/tenant*
 /vendor
 .env
 .env.backup

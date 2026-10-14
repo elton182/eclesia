@@ -3518,6 +3518,188 @@ paths:
         '422':
           description: Confirmação inválida
 
+  /ecc/financeiro/depositos:
+    get:
+      summary: Listar depósitos mensais de equipes
+      description: >
+        Líder vê só as próprias equipes. Gestor (ecc.financeiro.view|manage) vê todos.
+        Filtros opcionais status, competencia (YYYY-MM), equipe_id.
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [provisionado, confirmado, rejeitado]
+        - name: competencia
+          in: query
+          schema:
+            type: string
+            pattern: '^\d{4}-\d{2}$'
+        - name: equipe_id
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Lista de depósitos
+        '403':
+          description: Sem permissão
+    post:
+      summary: Submeter depósito mensal da equipe
+      description: >
+        Cria depósito + lançamento de entrada com status provisionado.
+        Permissão ecc.financeiro.depositos.submeter (líder da equipe) ou manage.
+        Comprovante multipart PDF/JPG/PNG até 5 MB.
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [equipe_id, competencia, valor, comprovante]
+              properties:
+                equipe_id:
+                  type: string
+                competencia:
+                  type: string
+                  description: YYYY-MM
+                  pattern: '^\d{4}-\d{2}$'
+                valor:
+                  type: number
+                  minimum: 0.01
+                conta_id:
+                  type: string
+                  description: Opcional; padrão Conta ECC (banco)
+                comprovante:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: Depósito provisionado
+        '403':
+          description: Sem permissão
+        '404':
+          description: Equipe fora do escopo do líder
+        '422':
+          description: Validação / competência já possui depósito ativo
+
+  /ecc/financeiro/depositos/{id}:
+    put:
+      summary: Atualizar depósito ainda provisionado
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                valor:
+                  type: number
+                  minimum: 0.01
+                conta_id:
+                  type: string
+                comprovante:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Atualizado
+        '403':
+          description: Sem permissão
+        '404':
+          description: Não encontrado
+        '422':
+          description: Só provisionado pode ser editado
+
+  /ecc/financeiro/depositos/{id}/comprovante:
+    get:
+      summary: Download do comprovante do depósito
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Arquivo
+        '403':
+          description: Sem permissão
+        '404':
+          description: Não encontrado
+
+  /ecc/financeiro/depositos/{id}/aprovar:
+    post:
+      summary: Confirmar depósito no financeiro
+      description: Exige ecc.financeiro.manage. Status passa a confirmado (conta no saldo).
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Confirmado
+        '403':
+          description: Sem permissão
+        '422':
+          description: Depósito não está provisionado
+
+  /ecc/financeiro/depositos/{id}/rejeitar:
+    post:
+      summary: Rejeitar depósito provisionado
+      description: Exige ecc.financeiro.manage. Libera nova submissão na mesma competência.
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [motivo]
+              properties:
+                motivo:
+                  type: string
+                  minLength: 3
+                  maxLength: 500
+      responses:
+        '200':
+          description: Rejeitado
+        '403':
+          description: Sem permissão
+        '422':
+          description: Validação / não provisionado
+
   /calendario/locais:
     get:
       summary: Listar locais de celebração
