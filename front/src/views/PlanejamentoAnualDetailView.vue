@@ -40,6 +40,19 @@ import {
   proximosStatusPlanejamento,
   unwrapList,
 } from '@/utils/planejamento'
+import {
+  buildRecursosPayload,
+  disponibilidadeParams,
+  emptySelecaoRecursos,
+  formatConflitosRecursos,
+  isErroCapacidade,
+  labelRecursosEvento,
+  moverEventoParaDia,
+  selecaoFromEvento,
+  selecaoTemEspaco,
+} from '@/utils/planejamentoRecursos'
+import { getDisponibilidade, listRecursos } from '@/services/planejamentoRecursos'
+import PlanejamentoRecursosPicker from '@/components/planejamento/PlanejamentoRecursosPicker.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useAuthAdminStore } from '@/stores/authAdmin'
 import { userHasPermission } from '@/utils/userRoles'
@@ -69,6 +82,16 @@ const conflitoAlert = ref('')
 /** @type {import('vue').Ref<Record<string, string>>} */
 const pastoralLinks = ref({})
 const tokenBusy = ref('')
+const recursosCatalogo = ref([])
+const filtroEspaco = ref('')
+const selecaoRecursos = ref(emptySelecaoRecursos())
+const disponibilidade = ref([])
+const dispLoading = ref(false)
+const capacidadeErro = ref('')
+const dragEventoId = ref('')
+const dropAlvo = ref('')
+let dispTimer = null
+let dispSeq = 0
 
 const emptyForm = () => ({
   pastoral_id: '',
@@ -136,6 +159,11 @@ const eventosFiltrados = computed(() => {
   if (filtroStatus.value) {
     list = list.filter((e) => e.status_solicitacao === filtroStatus.value)
   }
+  if (filtroEspaco.value) {
+    list = list.filter((e) =>
+      (e.recursos || []).some((r) => r.recurso_id === filtroEspaco.value),
+    )
+  }
   if (!canVerGlobal.value && myPastoralIds.value.length) {
     list = list.filter((e) => myPastoralIds.value.includes(e.pastoral_id))
   }
@@ -154,6 +182,12 @@ const diaEventos = computed(() => {
   if (!diaSelecionado.value) return []
   return byDay.value.get(diaSelecionado.value) || []
 })
+
+const espacosCatalogo = computed(() => recursosCatalogo.value.filter((r) => r.tipo === 'espaco'))
+const podeArrastar = computed(() => canGerir.value && anoStatus.value !== 'fechado')
+const dispParams = computed(() =>
+  disponibilidadeParams(form.value, editingEvento.value?.id || undefined),
+)
 
 const statusSolicitacaoOptions = computed(() =>
   Object.entries(STATUS_SOLICITACAO).map(([value, label]) => ({ value, label })),
@@ -177,7 +211,8 @@ function openCreate(dayIso) {
   form.value = emptyForm()
   form.value.data_inicio = dayIso || diaSelecionado.value || ''
   form.value.pastoral_id = pastoraisOpcoes.value[0]?.id || ''
-  form.value.local_ids = locais.value[0] ? [locais.value[0].id] : []
+  selecaoRecursos.value = emptySelecaoRecursos()
+  capacidadeErro.value = ''
   if (dayIso) diaSelecionado.value = dayIso
   showForm.value = true
 }
@@ -200,6 +235,8 @@ function openEdit(ev) {
     status_solicitacao: ev.status_solicitacao || 'proposta',
     motivo_ajuste: ev.motivo_ajuste || '',
   }
+  selecaoRecursos.value = selecaoFromEvento(ev)
+  capacidadeErro.value = ''
   showDayModal.value = false
   showForm.value = true
 }
@@ -208,7 +245,36 @@ function closeForm() {
   showForm.value = false
   editingEvento.value = null
   form.value = emptyForm()
+  selecaoRecursos.value = emptySelecaoRecursos()
+  disponibilidade.value = []
+  capacidadeErro.value = ''
 }
+
+async function carregarDisponibilidade() {
+  const params = dispParams.value
+  if (!showForm.value || !anual.value || !params) {
+    disponibilidade.value = []
+    return
+  }
+  const seq = ++dispSeq
+  dispLoading.value = true
+  try {
+    const data = await getDisponibilidade(anual.value.id, params)
+    if (seq === dispSeq) disponibilidade.value = data
+  } catch {
+    if (seq === dispSeq) disponibilidade.value = []
+  } finally {
+    if (seq === dispSeq) dispLoading.value = false
+  }
+}
+
+watch(
+  () => [showForm.value, JSON.stringify(dispParams.value)],
+  () => {
+    clearTimeout(dispTimer)
+    dispTimer = setTimeout(carregarDisponibilidade, 250)
+  },
+)
 
 function closeDayModal() {
   showDayModal.value = false
@@ -277,13 +343,6 @@ async function copiarLinkPastoral(pastoralId) {
   innovToast('success', 'Link', 'Copiado')
 }
 
-function toggleLocal(id) {
-  const set = new Set(form.value.local_ids)
-  if (set.has(id)) set.delete(id)
-  else set.add(id)
-  form.value.local_ids = [...set]
-}
-
 function buildPayload() {
   const f = form.value
   const payload = {
@@ -301,6 +360,7 @@ function buildPayload() {
     observacoes: f.observacoes || null,
     local_ids: f.local_ids,
     local_texto: f.local_texto || null,
+    recursos: buildRecursosPayload(selecaoRecursos.value),
   }
   if (canGerir.value && editingEvento.value) {
     payload.status_solicitacao = f.status_solicitacao
@@ -319,11 +379,12 @@ async function load({ silent = false } = {}) {
   if (!silent) loading.value = true
   try {
     const id = route.params.id
-    const [a, evs, pasts, locsRes] = await Promise.all([
+    const [a, evs, pasts, locsRes, recs] = await Promise.all([
       getAnual(id),
       listEventos(id),
       listPastorais(),
       api.get('/calendario/locais').catch(() => ({ data: [] })),
+      listRecursos().catch(() => []),
     ])
     if (!a) {
       innovToast('error', 'Planejamento', 'Não encontrado')
@@ -334,6 +395,7 @@ async function load({ silent = false } = {}) {
     eventos.value = evs
     pastorais.value = pasts
     locais.value = unwrapList(locsRes.data)
+    recursosCatalogo.value = recs
     if (a.eventos && Array.isArray(a.eventos) && !evs.length) {
       eventos.value = a.eventos
     }
@@ -360,10 +422,11 @@ async function salvarEvento() {
     innovToast('error', 'Evento', 'Informe a data')
     return
   }
-  if (!(payload.local_ids?.length || payload.local_texto)) {
-    innovToast('error', 'Evento', 'Informe ao menos um local ou texto de local')
+  if (!(payload.local_ids?.length || payload.local_texto || selecaoTemEspaco(selecaoRecursos.value))) {
+    innovToast('error', 'Evento', 'Escolha um espaço ou informe o local em texto')
     return
   }
+  capacidadeErro.value = ''
   saving.value = true
   try {
     let result
@@ -378,9 +441,49 @@ async function salvarEvento() {
     showDayModal.value = false
     await load({ silent: true })
   } catch (e) {
-    innovToast('error', 'Evento', e.response?.data?.message || 'Falha ao salvar')
+    if (isErroCapacidade(e)) {
+      capacidadeErro.value = formatConflitosRecursos(e.response.data)
+      innovToast('error', 'Indisponível', capacidadeErro.value)
+      carregarDisponibilidade()
+    } else {
+      innovToast('error', 'Evento', e.response?.data?.message || 'Falha ao salvar')
+    }
   } finally {
     saving.value = false
+  }
+}
+
+function onDragStart(ev, domEvent) {
+  if (!podeArrastar.value || !podeEditar(ev)) return
+  dragEventoId.value = ev.id
+  domEvent.dataTransfer.effectAllowed = 'move'
+  domEvent.dataTransfer.setData('text/plain', ev.id)
+}
+
+function onDragEnd() {
+  dragEventoId.value = ''
+  dropAlvo.value = ''
+}
+
+async function onDropDia(iso) {
+  const id = dragEventoId.value
+  onDragEnd()
+  const ev = eventos.value.find((e) => e.id === id)
+  if (!ev || !iso || String(ev.data_inicio).slice(0, 10) === iso) return
+  const original = { data_inicio: ev.data_inicio, data_fim: ev.data_fim }
+  const destino = moverEventoParaDia(ev, iso)
+  eventos.value = eventos.value.map((e) => (e.id === id ? { ...e, ...destino } : e))
+  try {
+    const result = await updateEvento(id, destino)
+    showConflitos(result.conflitos)
+    innovToast('success', 'Evento', `"${ev.titulo}" movido para ${iso.split('-').reverse().join('/')}`)
+    await load({ silent: true })
+  } catch (e) {
+    eventos.value = eventos.value.map((x) => (x.id === id ? { ...x, ...original } : x))
+    const msg = isErroCapacidade(e)
+      ? formatConflitosRecursos(e.response.data)
+      : e.response?.data?.message || 'Não foi possível mover'
+    innovToast('error', 'Evento não movido', msg)
   }
 }
 
@@ -483,6 +586,15 @@ onMounted(load)
             </button>
           </template>
           <button
+            v-if="canGerir"
+            type="button"
+            class="btn btn-ghost"
+            data-testid="planejamento-link-recursos"
+            @click="router.push('/planejamento/recursos')"
+          >
+            Espaços e recursos
+          </button>
+          <button
             v-if="canGerir || anoStatus === 'fechado' || anoStatus === 'revisao'"
             type="button"
             class="btn btn-primary"
@@ -539,6 +651,18 @@ onMounted(load)
             </option>
           </select>
         </div>
+        <div v-if="espacosCatalogo.length">
+          <label class="fld" for="pl-filtro-espaco">Espaço</label>
+          <select
+            id="pl-filtro-espaco"
+            v-model="filtroEspaco"
+            class="input min-w-[10rem]"
+            data-testid="planejamento-filtro-espaco"
+          >
+            <option value="">Todos</option>
+            <option v-for="r in espacosCatalogo" :key="r.id" :value="r.id">{{ r.nome }}</option>
+          </select>
+        </div>
         <button
           v-if="podeCriar"
           type="button"
@@ -556,42 +680,64 @@ onMounted(load)
             {{ mesTitulo }}
           </h2>
           <p class="text-[12px]" style="color: var(--color-muted)">
-            Clique em um dia para ver eventos e propor
+            Clique em um dia para ver eventos e propor<template v-if="podeArrastar">
+              · arraste um evento para outro dia para mudar a data</template>
           </p>
         </div>
         <div class="grid grid-cols-7 gap-1 text-center text-[11px] mb-1" style="color: var(--color-muted)">
           <div v-for="d in WEEKDAYS" :key="d">{{ d }}</div>
         </div>
         <div class="grid grid-cols-7 gap-1">
-          <button
+          <div
             v-for="(cell, idx) in cells"
             :key="idx"
-            type="button"
-            class="min-h-[72px] md:min-h-[88px] rounded-lg p-1.5 text-left border-0 cursor-pointer"
-            :disabled="!cell.inMonth"
+            :role="cell.inMonth ? 'button' : undefined"
+            :tabindex="cell.inMonth ? 0 : -1"
+            class="min-h-[72px] md:min-h-[88px] rounded-lg p-1.5 text-left"
+            :class="cell.inMonth ? 'cursor-pointer' : ''"
             :style="
               cell.inMonth
                 ? {
                     background:
-                      diaSelecionado === cell.iso
-                        ? 'var(--color-primary-soft)'
-                        : 'var(--color-surface)',
+                      dropAlvo === cell.iso
+                        ? 'var(--color-accent-soft)'
+                        : diaSelecionado === cell.iso
+                          ? 'var(--color-primary-soft)'
+                          : 'var(--color-surface)',
                     color: diaSelecionado === cell.iso ? 'var(--color-on-primary)' : 'var(--color-ink)',
-                    border: '1px solid var(--color-line)',
+                    border:
+                      dropAlvo === cell.iso
+                        ? '1px dashed var(--color-accent-dark)'
+                        : '1px solid var(--color-line)',
                   }
                 : { background: 'transparent', cursor: 'default' }
             "
             :data-testid="cell.iso ? `planejamento-dia-${cell.iso}` : undefined"
             @click="cell.inMonth && selectDay(cell.iso)"
+            @keydown.enter.prevent="cell.inMonth && selectDay(cell.iso)"
+            @dragover.prevent="cell.inMonth && dragEventoId && (dropAlvo = cell.iso)"
+            @dragleave="dropAlvo === cell.iso && (dropAlvo = '')"
+            @drop.prevent="cell.inMonth && onDropDia(cell.iso)"
           >
             <template v-if="cell.inMonth">
               <div class="text-[12px] font-medium mb-0.5">{{ cell.dia }}</div>
               <div
-                v-for="(line, li) in (byDay.get(cell.iso) || []).slice(0, 2).map(labelEventoPlanejamentoPreview)"
-                :key="li"
-                class="text-[10px] truncate leading-tight opacity-90"
+                v-for="ev in (byDay.get(cell.iso) || []).slice(0, 2)"
+                :key="ev.id"
+                class="text-[10px] truncate leading-tight px-1 py-0.5 rounded mt-0.5 font-medium"
+                :class="podeArrastar && podeEditar(ev) ? 'cursor-grab' : ''"
+                :style="{
+                  background: styleStatusSolicitacao(ev.status_solicitacao).bg,
+                  color: styleStatusSolicitacao(ev.status_solicitacao).fg,
+                  opacity: dragEventoId === ev.id ? 0.5 : 1,
+                }"
+                :draggable="podeArrastar && podeEditar(ev)"
+                :title="[ev.titulo, labelRecursosEvento(ev)].filter(Boolean).join(' · ')"
+                data-testid="planejamento-chip"
+                @dragstart="onDragStart(ev, $event)"
+                @dragend="onDragEnd"
               >
-                {{ line }}
+                {{ labelEventoPlanejamentoPreview(ev) }}
               </div>
               <div
                 v-if="(byDay.get(cell.iso) || []).length > 2"
@@ -600,7 +746,7 @@ onMounted(load)
                 +{{ (byDay.get(cell.iso) || []).length - 2 }}
               </div>
             </template>
-          </button>
+          </div>
         </div>
       </div>
 
@@ -722,6 +868,14 @@ onMounted(load)
                       · {{ formatHoraCalendario(ev.hora_inicio) }}
                       <template v-if="ev.hora_fim">–{{ formatHoraCalendario(ev.hora_fim) }}</template>
                     </template>
+                  </div>
+                  <div
+                    v-if="labelRecursosEvento(ev) || ev.local_texto"
+                    class="text-[12px] mt-0.5"
+                    style="color: var(--color-muted)"
+                    data-testid="planejamento-evento-recursos"
+                  >
+                    {{ [labelRecursosEvento(ev), ev.local_texto].filter(Boolean).join(' · ') }}
                   </div>
                   <span
                     class="inline-block mt-1 text-[11px] font-medium px-2 py-0.5 rounded-full"
@@ -860,27 +1014,21 @@ onMounted(load)
               </div>
             </div>
 
-            <div>
-              <span class="fld">Locais do catálogo</span>
-              <div class="flex flex-wrap gap-2 mt-1">
-                <label
-                  v-for="loc in locais"
-                  :key="loc.id"
-                  class="inline-flex items-center gap-1.5 text-[13px] cursor-pointer px-2.5 py-1.5 rounded-lg"
-                  style="border: 1px solid var(--color-line)"
-                >
-                  <input
-                    type="checkbox"
-                    :checked="form.local_ids.includes(loc.id)"
-                    @change="toggleLocal(loc.id)"
-                  />
-                  {{ loc.nome }}
-                </label>
-                <span v-if="!locais.length" class="text-[12.5px]" style="color: var(--color-muted)">
-                  Nenhum local — use texto livre ou cadastre em Agenda Paroquial → Locais.
-                </span>
-              </div>
-            </div>
+            <PlanejamentoRecursosPicker
+              v-model="selecaoRecursos"
+              :disponibilidade="disponibilidade"
+              :loading="dispLoading"
+              :sem-data="!dispParams"
+            />
+
+            <p
+              v-if="capacidadeErro"
+              class="rounded-lg px-3 py-2 text-[13px]"
+              style="background: var(--color-accent-soft); color: var(--color-danger); border: 1px solid var(--color-line)"
+              data-testid="planejamento-capacidade-erro"
+            >
+              {{ capacidadeErro }}
+            </p>
 
             <div>
               <label class="fld" for="ev-local-txt">Local (texto livre)</label>
@@ -888,7 +1036,7 @@ onMounted(load)
                 id="ev-local-txt"
                 v-model="form.local_texto"
                 class="input"
-                placeholder="Externo / legado"
+                placeholder="Use quando o evento for fora dos espaços cadastrados"
               />
             </div>
 

@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import api from '@/services/api'
 import { useTenantStore } from '@/stores/tenant'
@@ -12,6 +12,17 @@ import {
   styleStatusSolicitacao,
 } from '@/utils/planejamento'
 import { innovToast } from '@/plugins/toast'
+import {
+  buildRecursosPayload,
+  disponibilidadeParams,
+  emptySelecaoRecursos,
+  formatConflitosRecursos,
+  isErroCapacidade,
+  labelRecursosEvento,
+  selecaoTemEspaco,
+} from '@/utils/planejamentoRecursos'
+import { getDisponibilidadePublica } from '@/services/planejamentoRecursos'
+import PlanejamentoRecursosPicker from '@/components/planejamento/PlanejamentoRecursosPicker.vue'
 
 const WEEKDAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 
@@ -33,16 +44,25 @@ const emptyForm = () => ({
   titulo: '',
   data_inicio: '',
   hora_inicio: '',
+  hora_fim: '',
   local_texto: '',
   observacoes: '',
 })
 const form = ref(emptyForm())
+const selecaoRecursos = ref(emptySelecaoRecursos())
+const disponibilidade = ref([])
+const dispLoading = ref(false)
+const capacidadeErro = ref('')
+let dispTimer = null
+let dispSeq = 0
 
 const headers = computed(() => ({
   'X-Tenant': tenant.value || tenantStore.slug || '',
 }))
 
 const podePropor = computed(() => meta.value?.status === 'coleta')
+const dispParams = computed(() => disponibilidadeParams(form.value))
+const temEspacos = computed(() => disponibilidade.value.some((d) => d.tipo === 'espaco'))
 const todayIso = new Date().toISOString().slice(0, 10)
 
 const cells = computed(() => (meta.value?.ano ? gradeMesCalendario(meta.value.ano, mesView.value) : []))
@@ -75,8 +95,36 @@ function openDay(iso) {
   if (!iso) return
   diaSelecionado.value = iso
   form.value = { ...emptyForm(), data_inicio: iso }
+  selecaoRecursos.value = emptySelecaoRecursos()
+  capacidadeErro.value = ''
   showDayModal.value = true
 }
+
+async function carregarDisponibilidade() {
+  const params = dispParams.value
+  if (!showDayModal.value || !podePropor.value || !params) {
+    disponibilidade.value = []
+    return
+  }
+  const seq = ++dispSeq
+  dispLoading.value = true
+  try {
+    const data = await getDisponibilidadePublica(token.value, params, headers.value)
+    if (seq === dispSeq) disponibilidade.value = data
+  } catch {
+    if (seq === dispSeq) disponibilidade.value = []
+  } finally {
+    if (seq === dispSeq) dispLoading.value = false
+  }
+}
+
+watch(
+  () => [showDayModal.value, JSON.stringify(dispParams.value)],
+  () => {
+    clearTimeout(dispTimer)
+    dispTimer = setTimeout(carregarDisponibilidade, 250)
+  },
+)
 
 function closeDayModal() {
   showDayModal.value = false
@@ -109,6 +157,11 @@ async function load() {
 }
 
 async function criar() {
+  if (!form.value.local_texto.trim() && !selecaoTemEspaco(selecaoRecursos.value)) {
+    innovToast('error', 'Planejamento', 'Escolha um espaço ou informe o local')
+    return
+  }
+  capacidadeErro.value = ''
   saving.value = true
   try {
     await api.post(
@@ -117,15 +170,24 @@ async function criar() {
         titulo: form.value.titulo,
         data_inicio: form.value.data_inicio,
         hora_inicio: form.value.hora_inicio || null,
-        local_texto: form.value.local_texto,
+        hora_fim: form.value.hora_fim || null,
+        local_texto: form.value.local_texto.trim() || null,
         observacoes: form.value.observacoes || null,
+        recursos: buildRecursosPayload(selecaoRecursos.value),
       },
       { headers: headers.value },
     )
     innovToast('success', 'Planejamento', 'Proposta enviada')
     form.value = { ...emptyForm(), data_inicio: diaSelecionado.value }
+    selecaoRecursos.value = emptySelecaoRecursos()
     await load()
   } catch (err) {
+    if (isErroCapacidade(err)) {
+      capacidadeErro.value = formatConflitosRecursos(err.response.data)
+      innovToast('error', 'Indisponível', capacidadeErro.value)
+      carregarDisponibilidade()
+      return
+    }
     const msg =
       err.response?.data?.message ||
       err.response?.data?.errors?.status?.[0] ||
@@ -269,6 +331,7 @@ onMounted(load)
                 <div class="text-xs mt-1" style="color: var(--color-muted)">
                   {{ String(ev.data_inicio || '').slice(0, 10) }}
                   <template v-if="ev.hora_inicio"> · {{ String(ev.hora_inicio).slice(0, 5) }}</template>
+                  <template v-if="labelRecursosEvento(ev)"> · {{ labelRecursosEvento(ev) }}</template>
                   <template v-if="ev.local_texto"> · {{ ev.local_texto }}</template>
                 </div>
               </div>
@@ -321,7 +384,7 @@ onMounted(load)
             <div class="font-medium text-[14px]" style="color: var(--color-ink)">{{ ev.titulo }}</div>
             <div class="text-[12px] mt-0.5" style="color: var(--color-muted)">
               <template v-if="ev.hora_inicio">{{ String(ev.hora_inicio).slice(0, 5) }} · </template>
-              {{ ev.local_texto || 'Local a definir' }}
+              {{ [labelRecursosEvento(ev), ev.local_texto].filter(Boolean).join(' · ') || 'Local a definir' }}
             </div>
             <span
               class="inline-block mt-1 text-[11px] font-medium px-2 py-0.5 rounded-full"
@@ -354,19 +417,42 @@ onMounted(load)
               <label class="fld" for="pub-data">Data</label>
               <input id="pub-data" v-model="form.data_inicio" type="date" class="input" required />
             </div>
-            <div>
-              <label class="fld" for="pub-hora">Hora</label>
-              <input id="pub-hora" v-model="form.hora_inicio" type="time" class="input" />
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="fld" for="pub-hora">Início</label>
+                <input id="pub-hora" v-model="form.hora_inicio" type="time" class="input" />
+              </div>
+              <div>
+                <label class="fld" for="pub-hora-fim">Fim</label>
+                <input id="pub-hora-fim" v-model="form.hora_fim" type="time" class="input" />
+              </div>
             </div>
           </div>
+          <PlanejamentoRecursosPicker
+            v-if="temEspacos || disponibilidade.length || dispLoading"
+            v-model="selecaoRecursos"
+            :disponibilidade="disponibilidade"
+            :loading="dispLoading"
+            :sem-data="!dispParams"
+          />
+          <p
+            v-if="capacidadeErro"
+            class="rounded-lg px-3 py-2 text-[13px]"
+            style="background: var(--color-accent-soft); color: var(--color-danger)"
+            data-testid="planejamento-publico-capacidade-erro"
+          >
+            {{ capacidadeErro }}
+          </p>
           <div>
-            <label class="fld" for="pub-local">Local</label>
+            <label class="fld" for="pub-local">
+              {{ temEspacos ? 'Outro local (se não for um dos espaços)' : 'Local' }}
+            </label>
             <input
               id="pub-local"
               v-model="form.local_texto"
               class="input"
-              required
-              placeholder="Ex.: Salão paroquial"
+              :required="!temEspacos"
+              placeholder="Ex.: Casa de retiro"
             />
           </div>
           <div>
