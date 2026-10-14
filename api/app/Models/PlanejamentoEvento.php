@@ -83,4 +83,14 @@ class PlanejamentoEvento extends Model
             'calendario_local_id'
         );
     }
+
+    public function recursos(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            PlanejamentoRecurso::class,
+            'planejamento_evento_recurso',
+            'planejamento_evento_id',
+            'planejamento_recurso_id'
+        )->withPivot('quantidade');
+    }
 }

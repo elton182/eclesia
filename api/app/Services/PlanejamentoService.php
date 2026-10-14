@@ -13,6 +13,7 @@ use App\Models\PlanejamentoPastoralToken;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\Response;
@@ -22,6 +23,7 @@ class PlanejamentoService
     public function __construct(
         private readonly IgrejaContext $igrejaContext,
         private readonly PlanejamentoAccessService $access,
+        private readonly PlanejamentoRecursoService $recursos,
     ) {}
 
     public function listAnuais(?int $ano = null): Collection
@@ -134,7 +136,7 @@ class PlanejamentoService
     public function listEventos(PlanejamentoAnual $anual, array $filters = []): Collection
     {
         $query = PlanejamentoEvento::query()
-            ->with(['locais', 'pastoral'])
+            ->with(['locais', 'recursos', 'pastoral'])
             ->where('planejamento_anual_id', $anual->id)
             ->orderBy('data_inicio')
             ->orderBy('hora_inicio');
@@ -172,7 +174,7 @@ class PlanejamentoService
         $igrejaId = $this->igrejaContext->current()->id;
 
         return PlanejamentoEvento::query()
-            ->with(['locais', 'pastoral', 'planejamentoAnual'])
+            ->with(['locais', 'recursos', 'pastoral', 'planejamentoAnual'])
             ->whereKey($id)
             ->whereHas('planejamentoAnual', fn ($q) => $q->where('igreja_id', $igrejaId))
             ->firstOrFail();
@@ -182,10 +184,11 @@ class PlanejamentoService
      * @param  array<string, mixed>  $data
      * @return array{evento: PlanejamentoEvento, conflitos: list<array<string, mixed>>}
      */
-    public function createEvento(PlanejamentoAnual $anual, array $data): array
+    public function createEvento(PlanejamentoAnual $anual, array $data, bool $publico = false): array
     {
         $this->assertPastoralDaIgreja($data['pastoral_id']);
-        $this->assertLocalOuTexto($data);
+        $pedido = $this->recursos->resolverPedido($data['recursos'] ?? []);
+        $this->assertLocalOuTexto($data, $this->recursos->temEspaco($pedido));
         $localIds = $this->resolveLocalIds($data['local_ids'] ?? []);
 
         $isGestor = $this->access->canGerir();
@@ -193,27 +196,47 @@ class PlanejamentoService
             ? $data['status_solicitacao']
             : PlanejamentoEvento::STATUS_PROPOSTA;
 
-        $evento = PlanejamentoEvento::query()->create([
-            'planejamento_anual_id' => $anual->id,
-            'pastoral_id' => $data['pastoral_id'],
-            'titulo' => $data['titulo'],
-            'data_inicio' => $data['data_inicio'],
-            'data_fim' => $data['data_fim'] ?? null,
-            'hora_inicio' => $data['hora_inicio'] ?? null,
-            'hora_fim' => $data['hora_fim'] ?? null,
-            'participantes_media' => $data['participantes_media'] ?? null,
-            'recorrencia_texto' => $data['recorrencia_texto'] ?? null,
-            'observacoes' => $data['observacoes'] ?? null,
-            'local_texto' => $data['local_texto'] ?? null,
-            'status_solicitacao' => $status,
-            'motivo_ajuste' => $isGestor ? ($data['motivo_ajuste'] ?? null) : null,
-        ]);
+        $evento = DB::transaction(function () use ($anual, $data, $pedido, $localIds, $isGestor, $status, $publico) {
+            if ($status !== PlanejamentoEvento::STATUS_RECUSADO) {
+                $this->recursos->assertCapacidade(
+                    $anual->id,
+                    PlanejamentoIntervalo::deDados(
+                        (string) $data['data_inicio'],
+                        $data['data_fim'] ?? null,
+                        $data['hora_inicio'] ?? null,
+                        $data['hora_fim'] ?? null,
+                    ),
+                    $pedido,
+                    null,
+                    $publico,
+                );
+            }
 
-        if ($localIds !== []) {
-            $evento->locais()->sync($localIds);
-        }
+            $evento = PlanejamentoEvento::query()->create([
+                'planejamento_anual_id' => $anual->id,
+                'pastoral_id' => $data['pastoral_id'],
+                'titulo' => $data['titulo'],
+                'data_inicio' => $data['data_inicio'],
+                'data_fim' => $data['data_fim'] ?? null,
+                'hora_inicio' => $data['hora_inicio'] ?? null,
+                'hora_fim' => $data['hora_fim'] ?? null,
+                'participantes_media' => $data['participantes_media'] ?? null,
+                'recorrencia_texto' => $data['recorrencia_texto'] ?? null,
+                'observacoes' => $data['observacoes'] ?? null,
+                'local_texto' => $data['local_texto'] ?? null,
+                'status_solicitacao' => $status,
+                'motivo_ajuste' => $isGestor ? ($data['motivo_ajuste'] ?? null) : null,
+            ]);
 
-        $evento->load(['locais', 'pastoral', 'planejamentoAnual']);
+            if ($localIds !== []) {
+                $evento->locais()->sync($localIds);
+            }
+            $evento->recursos()->sync($this->pivotRecursos($pedido));
+
+            return $evento;
+        });
+
+        $evento->load(['locais', 'recursos', 'pastoral', 'planejamentoAnual']);
         $conflitos = $this->detectarConflitos($evento);
 
         return ['evento' => $evento, 'conflitos' => $conflitos];
@@ -231,15 +254,25 @@ class PlanejamentoService
             $this->assertPastoralDaIgreja($data['pastoral_id']);
         }
 
-        if (array_key_exists('local_ids', $data) || array_key_exists('local_texto', $data)) {
+        $alocadosAtuais = $evento->recursos
+            ->mapWithKeys(fn ($r) => [$r->id => (int) $r->pivot->quantidade])
+            ->all();
+        $recursosAlterados = array_key_exists('recursos', $data);
+        $pedido = $recursosAlterados
+            ? $this->recursos->resolverPedido($data['recursos'] ?? [], array_keys($alocadosAtuais))
+            : $alocadosAtuais;
+
+        if ($recursosAlterados || array_key_exists('local_ids', $data) || array_key_exists('local_texto', $data)) {
             $merged = [
                 'local_ids' => $data['local_ids'] ?? $evento->locais->pluck('id')->all(),
                 'local_texto' => array_key_exists('local_texto', $data)
                     ? $data['local_texto']
                     : $evento->local_texto,
             ];
-            $this->assertLocalOuTexto($merged);
+            $this->assertLocalOuTexto($merged, $this->recursos->temEspaco($pedido));
         }
+
+        $statusAnterior = $evento->status_solicitacao;
 
         $fillable = [
             'pastoral_id', 'titulo', 'data_inicio', 'data_fim', 'hora_inicio', 'hora_fim',
@@ -267,22 +300,53 @@ class PlanejamentoService
             }
         }
 
-        $evento->save();
+        $intervaloAlterado = $evento->isDirty(['data_inicio', 'data_fim', 'hora_inicio', 'hora_fim']);
+        $saiuDeRecusado = $statusAnterior === PlanejamentoEvento::STATUS_RECUSADO
+            && $evento->status_solicitacao !== PlanejamentoEvento::STATUS_RECUSADO;
+        $deveValidar = $evento->status_solicitacao !== PlanejamentoEvento::STATUS_RECUSADO
+            && ($recursosAlterados || $intervaloAlterado || $saiuDeRecusado);
 
-        if (array_key_exists('local_ids', $data)) {
-            $localIds = $this->resolveLocalIds($data['local_ids'] ?? []);
-            $evento->locais()->sync($localIds);
-        }
+        DB::transaction(function () use ($evento, $data, $pedido, $recursosAlterados, $deveValidar) {
+            if ($deveValidar) {
+                $this->recursos->assertCapacidade(
+                    $evento->planejamento_anual_id,
+                    PlanejamentoIntervalo::deEvento($evento),
+                    $pedido,
+                    $evento->id,
+                );
+            }
 
-        $evento->load(['locais', 'pastoral', 'planejamentoAnual']);
+            $evento->save();
+
+            if (array_key_exists('local_ids', $data)) {
+                $localIds = $this->resolveLocalIds($data['local_ids'] ?? []);
+                $evento->locais()->sync($localIds);
+            }
+
+            if ($recursosAlterados) {
+                $evento->recursos()->sync($this->pivotRecursos($pedido));
+            }
+        });
+
+        $evento->load(['locais', 'recursos', 'pastoral', 'planejamentoAnual']);
         $conflitos = $this->detectarConflitos($evento);
 
-        return ['evento' => $evento->refresh()->load(['locais', 'pastoral', 'planejamentoAnual']), 'conflitos' => $conflitos];
+        return ['evento' => $evento->refresh()->load(['locais', 'recursos', 'pastoral', 'planejamentoAnual']), 'conflitos' => $conflitos];
+    }
+
+    /**
+     * @param  array<string, int>  $pedido
+     * @return array<string, array{quantidade: int}>
+     */
+    private function pivotRecursos(array $pedido): array
+    {
+        return collect($pedido)->map(fn (int $q) => ['quantidade' => $q])->all();
     }
 
     public function deleteEvento(PlanejamentoEvento $evento): void
     {
         $evento->locais()->detach();
+        $evento->recursos()->detach();
         $evento->delete();
     }
 
@@ -296,7 +360,7 @@ class PlanejamentoService
 
         // PDF sempre visão completa (gestor / ver_global)
         $eventos = PlanejamentoEvento::query()
-            ->with(['locais', 'pastoral'])
+            ->with(['locais', 'recursos', 'pastoral'])
             ->where('planejamento_anual_id', $anual->id)
             ->when($mes !== null, function ($q) use ($anual, $mes) {
                 $q->whereMonth('data_inicio', $mes)->whereYear('data_inicio', $anual->ano);
@@ -369,44 +433,17 @@ class PlanejamentoService
 
     private function intervaloInicio(PlanejamentoEvento $evento): Carbon
     {
-        $data = $evento->data_inicio->format('Y-m-d');
-        $hora = $this->formatHora($evento->hora_inicio) ?? '00:00';
-
-        return Carbon::parse($data.' '.$hora.':00');
+        return PlanejamentoIntervalo::deEvento($evento)->inicio;
     }
 
     private function intervaloFim(PlanejamentoEvento $evento): Carbon
     {
-        $data = ($evento->data_fim ?? $evento->data_inicio)->format('Y-m-d');
-        $hora = $this->formatHora($evento->hora_fim)
-            ?? $this->formatHora($evento->hora_inicio)
-            ?? '23:59';
-
-        $fim = Carbon::parse($data.' '.$hora.':00');
-        // Se só tem hora_inicio sem hora_fim no mesmo dia, assume 1h
-        if ($evento->hora_fim === null && $evento->hora_inicio !== null && $evento->data_fim === null) {
-            $fim = $this->intervaloInicio($evento)->copy()->addHour();
-        }
-
-        return $fim;
+        return PlanejamentoIntervalo::deEvento($evento)->fim;
     }
 
     private function formatHora(mixed $hora): ?string
     {
-        if ($hora === null || $hora === '') {
-            return null;
-        }
-
-        if ($hora instanceof \DateTimeInterface) {
-            return $hora->format('H:i');
-        }
-
-        $str = (string) $hora;
-        if (preg_match('/^(\d{2}:\d{2})/', $str, $m)) {
-            return $m[1];
-        }
-
-        return $str;
+        return PlanejamentoIntervalo::formatHora($hora);
     }
 
     private function assertPastoralDaIgreja(string $pastoralId): void
@@ -426,14 +463,14 @@ class PlanejamentoService
     /**
      * @param  array{local_ids?: list<string>|null, local_texto?: ?string}  $data
      */
-    private function assertLocalOuTexto(array $data): void
+    private function assertLocalOuTexto(array $data, bool $temEspaco = false): void
     {
         $ids = $data['local_ids'] ?? [];
         $texto = trim((string) ($data['local_texto'] ?? ''));
 
-        if (($ids === [] || $ids === null) && $texto === '') {
+        if (! $temEspaco && ($ids === [] || $ids === null) && $texto === '') {
             throw ValidationException::withMessages([
-                'local_ids' => ['Informe ao menos um local ou texto livre de local.'],
+                'local_ids' => ['Informe ao menos um espaço, local ou texto livre de local.'],
             ]);
         }
     }
@@ -484,6 +521,7 @@ class PlanejamentoService
             [
                 'token_hash' => $hash,
                 'token_preview' => substr($plain, 0, 8),
+                'token_encrypted' => $plain,
                 'expires_at' => null,
                 'revogado_em' => null,
             ]
@@ -493,6 +531,22 @@ class PlanejamentoService
         $token->setAttribute('plain_token', $plain);
 
         return ['token' => $token, 'plain' => $plain];
+    }
+
+    /**
+     * @return Collection<int, PlanejamentoPastoralToken>
+     */
+    public function listPastoralTokens(PlanejamentoAnual $anual): Collection
+    {
+        return PlanejamentoPastoralToken::query()
+            ->where('planejamento_anual_id', $anual->id)
+            ->orderBy('created_at')
+            ->get()
+            ->each(function (PlanejamentoPastoralToken $token) {
+                if ($token->isAtivo() && $token->token_encrypted !== null) {
+                    $token->setAttribute('plain_token', $token->token_encrypted);
+                }
+            });
     }
 
     public function revokePastoralToken(PlanejamentoAnual $anual, string $pastoralId): void
@@ -528,7 +582,7 @@ class PlanejamentoService
     public function listEventosPublicos(PlanejamentoPastoralToken $token): Collection
     {
         return PlanejamentoEvento::query()
-            ->with(['locais', 'pastoral'])
+            ->with(['locais', 'recursos', 'pastoral'])
             ->where('planejamento_anual_id', $token->planejamento_anual_id)
             ->where('pastoral_id', $token->pastoral_id)
             ->orderBy('data_inicio')
@@ -561,6 +615,26 @@ class PlanejamentoService
             'pastoral_id' => $token->pastoral_id,
             'local_ids' => [],
             'local_texto' => $data['local_texto'] ?? null,
-        ]);
+        ], true);
+    }
+
+    /**
+     * @param  array{data_inicio: string, data_fim?: ?string, hora_inicio?: ?string, hora_fim?: ?string}  $params
+     * @return list<array<string, mixed>>
+     */
+    public function disponibilidadePublica(PlanejamentoPastoralToken $token, array $params): array
+    {
+        $anual = $token->planejamento ?? PlanejamentoAnual::query()->findOrFail($token->planejamento_anual_id);
+        $this->igrejaContext->set(Igreja::query()->findOrFail($anual->igreja_id));
+
+        return $this->recursos->disponibilidade(
+            $anual->id,
+            PlanejamentoIntervalo::deDados(
+                $params['data_inicio'],
+                $params['data_fim'] ?? null,
+                $params['hora_inicio'] ?? null,
+                $params['hora_fim'] ?? null,
+            ),
+        );
     }
 }

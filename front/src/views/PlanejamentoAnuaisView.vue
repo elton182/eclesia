@@ -92,6 +92,15 @@ onMounted(load)
       <p class="text-[14px] mt-1 max-w-xl" style="color: var(--color-muted)">
         Coleta de atividades das pastorais, revisão e fechamento do ano — distinto do calendário oficial.
       </p>
+      <button
+        v-if="canGerir"
+        type="button"
+        class="btn btn-ghost mt-3"
+        data-testid="planejamento-link-recursos"
+        @click="router.push('/planejamento/recursos')"
+      >
+        Espaços e recursos
+      </button>
     </header>
 
     <section

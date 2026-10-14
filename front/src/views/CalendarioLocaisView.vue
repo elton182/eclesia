@@ -6,6 +6,7 @@ import { innovConfirm } from '@/plugins/dialog'
 import { useAuthStore } from '@/stores/auth'
 import { useAuthAdminStore } from '@/stores/authAdmin'
 import { userHasPermission } from '@/utils/userRoles'
+import Hora24Input from '@/components/form/Hora24Input.vue'
 
 const DIAS = [
   { value: 0, label: 'Domingo' },
@@ -339,7 +340,7 @@ onMounted(load)
           </div>
           <div>
             <label class="fld" for="slot-hora">Hora</label>
-            <input id="slot-hora" v-model="slotForm.hora" type="time" class="input" />
+            <Hora24Input id="slot-hora" v-model="slotForm.hora" />
           </div>
           <div class="flex flex-wrap gap-2">
             <button

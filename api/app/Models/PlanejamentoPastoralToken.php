@@ -20,14 +20,22 @@ class PlanejamentoPastoralToken extends Model
         'pastoral_id',
         'token_hash',
         'token_preview',
+        'token_encrypted',
         'expires_at',
         'revogado_em',
+    ];
+
+    /** @var list<string> */
+    protected $hidden = [
+        'token_hash',
+        'token_encrypted',
     ];
 
     /** @return array<string, string> */
     protected function casts(): array
     {
         return [
+            'token_encrypted' => 'encrypted',
             'expires_at' => 'datetime',
             'revogado_em' => 'datetime',
         ];

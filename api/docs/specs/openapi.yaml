@@ -425,6 +425,69 @@ components:
           items:
             $ref: '#/components/schemas/PlanejamentoEventoConflito'
           description: Alertas de conflito (mesmo local + horário sobreposto); HTTP 2xx mesmo com itens
+        recursos:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlanejamentoEventoRecurso'
+    PlanejamentoRecurso:
+      type: object
+      properties:
+        id: {type: string}
+        nome: {type: string}
+        tipo: {type: string, enum: [espaco, recurso]}
+        quantidade: {type: integer, minimum: 1}
+        descricao: {type: string, nullable: true}
+        ativo: {type: boolean}
+        ordem: {type: integer}
+    PlanejamentoEventoRecurso:
+      type: object
+      properties:
+        recurso_id: {type: string}
+        nome: {type: string}
+        tipo: {type: string, enum: [espaco, recurso]}
+        quantidade: {type: integer, minimum: 1}
+    PlanejamentoRecursoInput:
+      type: object
+      required: [recurso_id]
+      properties:
+        recurso_id: {type: string}
+        quantidade: {type: integer, minimum: 1, default: 1}
+    PlanejamentoDisponibilidade:
+      type: object
+      properties:
+        recurso_id: {type: string}
+        nome: {type: string}
+        tipo: {type: string, enum: [espaco, recurso]}
+        quantidade: {type: integer}
+        disponivel: {type: integer, description: Quantidade livre no intervalo}
+    PlanejamentoConflitoRecurso:
+      type: object
+      description: Item do 422 de capacidade (SPEC-019). No link público `eventos` é omitido.
+      properties:
+        recurso_id: {type: string}
+        nome: {type: string}
+        tipo: {type: string}
+        quantidade: {type: integer}
+        disponivel: {type: integer}
+        pedido: {type: integer}
+        eventos:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlanejamentoEventoConflito'
+    PlanejamentoErroCapacidade:
+      type: object
+      properties:
+        message: {type: string}
+        errors:
+          type: object
+          properties:
+            recursos:
+              type: array
+              items: {type: string}
+        conflitos_recursos:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlanejamentoConflitoRecurso'
     SiteForm:
       type: object
       properties:
@@ -4099,6 +4162,7 @@ paths:
       summary: Criar evento de planejamento
       description: |
         Conflitos de local/horário retornam em `conflitos[]` com HTTP 201 (não bloqueiam).
+        Espaços/recursos (`recursos[]`) acima da capacidade no intervalo → 422 (SPEC-019).
         Coordenador: só pastorais do pivot; em coleta livre; em revisao só se ajuste_solicitado.
       security: [{bearerAuth: [], tenantHeader: [], igrejaHeader: []}]
       parameters:
@@ -4125,6 +4189,11 @@ paths:
                   type: array
                   items: {type: string}
                   description: ULIDs de calendario_locais (N:N)
+                recursos:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/PlanejamentoRecursoInput'
+                  description: Espaços/recursos alocados (SPEC-019); capacidade estourada → 422
                 status_solicitacao:
                   type: string
                   enum: [proposta, confirmado, ajuste_solicitado, reagendado, recusado, cotidiano]
@@ -4142,7 +4211,12 @@ paths:
                     $ref: '#/components/schemas/PlanejamentoEvento'
         '401': {description: Não autenticado}
         '403': {description: Sem permissão / fora do escopo}
-        '422': {description: Validação}
+        '422':
+          description: Validação ou capacidade de espaço/recurso excedida (SPEC-019)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlanejamentoErroCapacidade'
   /planejamento/eventos/{eventoId}:
     get:
       summary: Detalhe do evento de planejamento
@@ -4187,6 +4261,11 @@ paths:
                 local_ids:
                   type: array
                   items: {type: string}
+                recursos:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/PlanejamentoRecursoInput'
+                  description: Substitui a alocação quando enviado (SPEC-019)
                 status_solicitacao:
                   type: string
                   enum: [proposta, confirmado, ajuste_solicitado, reagendado, recusado, cotidiano]
@@ -4203,7 +4282,12 @@ paths:
                     $ref: '#/components/schemas/PlanejamentoEvento'
         '401': {description: Não autenticado}
         '403': {description: Sem permissão / fora do escopo}
-        '422': {description: Validação}
+        '422':
+          description: Validação ou capacidade de espaço/recurso excedida (SPEC-019)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlanejamentoErroCapacidade'
     delete:
       summary: Excluir evento de planejamento
       security: [{bearerAuth: [], tenantHeader: [], igrejaHeader: []}]
@@ -4232,6 +4316,167 @@ paths:
         '401': {description: Não autenticado}
         '403': {description: Sem permissão}
         '422': {description: Status não permite export}
+  /planejamento/recursos:
+    get:
+      summary: Listar espaços e recursos da igreja (SPEC-019)
+      description: Sem `planejamento.gerir` retorna só itens ativos.
+      security: [{bearerAuth: [], tenantHeader: [], igrejaHeader: []}]
+      parameters:
+        - {name: tipo, in: query, required: false, schema: {type: string, enum: [espaco, recurso]}}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PlanejamentoRecurso'
+        '401': {description: Não autenticado}
+        '403': {description: Sem permissão}
+    post:
+      summary: Criar espaço ou recurso
+      security: [{bearerAuth: [], tenantHeader: [], igrejaHeader: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nome, tipo]
+              properties:
+                nome: {type: string}
+                tipo: {type: string, enum: [espaco, recurso]}
+                quantidade: {type: integer, minimum: 1, description: Ignorado para espaço (sempre 1)}
+                descricao: {type: string, nullable: true}
+                ativo: {type: boolean}
+                ordem: {type: integer}
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PlanejamentoRecurso'
+        '401': {description: Não autenticado}
+        '403': {description: Sem permissão}
+        '422': {description: Validação (nome duplicado na igreja)}
+  /planejamento/recursos/{id}:
+    patch:
+      summary: Atualizar espaço ou recurso
+      security: [{bearerAuth: [], tenantHeader: [], igrejaHeader: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nome: {type: string}
+                tipo: {type: string, enum: [espaco, recurso]}
+                quantidade: {type: integer, minimum: 1}
+                descricao: {type: string, nullable: true}
+                ativo: {type: boolean}
+                ordem: {type: integer}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PlanejamentoRecurso'
+        '401': {description: Não autenticado}
+        '403': {description: Sem permissão}
+        '404': {description: Não encontrado}
+        '422': {description: Validação}
+    delete:
+      summary: Excluir espaço ou recurso
+      description: Se já alocado em algum evento, apenas inativa (200 com o item); senão exclui (204).
+      security: [{bearerAuth: [], tenantHeader: [], igrejaHeader: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      responses:
+        '200':
+          description: Inativado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PlanejamentoRecurso'
+        '204': {description: Excluído}
+        '401': {description: Não autenticado}
+        '403': {description: Sem permissão}
+        '404': {description: Não encontrado}
+  /planejamento/anuais/{id}/disponibilidade:
+    get:
+      summary: Disponibilidade de espaços/recursos no intervalo (SPEC-019)
+      security: [{bearerAuth: [], tenantHeader: [], igrejaHeader: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+        - {name: data_inicio, in: query, required: true, schema: {type: string, format: date}}
+        - {name: data_fim, in: query, required: false, schema: {type: string, format: date}}
+        - {name: hora_inicio, in: query, required: false, schema: {type: string, example: '19:00'}}
+        - {name: hora_fim, in: query, required: false, schema: {type: string}}
+        - {name: ignorar_evento_id, in: query, required: false, schema: {type: string}, description: Evento em edição (não conta como ocupação)}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PlanejamentoDisponibilidade'
+        '401': {description: Não autenticado}
+        '403': {description: Sem permissão}
+        '422': {description: Parâmetros inválidos}
+  /planejamento/anuais/{id}/pastorais/tokens:
+    get:
+      summary: Listar links públicos das pastorais no ano
+      description: |
+        Somente `planejamento.gerir`. O token é guardado cifrado (APP_KEY) e devolvido em claro
+        apenas para links ativos; revogados ou gerados antes da persistência vêm com `token: null`.
+      security: [{bearerAuth: [], tenantHeader: [], igrejaHeader: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: {type: string}
+                        planejamento_anual_id: {type: string}
+                        pastoral_id: {type: string}
+                        token: {type: string, nullable: true}
+                        token_preview: {type: string}
+                        expires_at: {type: string, format: date-time, nullable: true}
+                        revogado_em: {type: string, format: date-time, nullable: true}
+                        ativo: {type: boolean}
+        '401': {description: Não autenticado}
+        '403': {description: Sem permissão}
   /planejamento/anuais/{id}/pastorais/{pastoralId}/token:
     post:
       summary: Gerar ou rotacionar link público da pastoral no ano
@@ -4289,15 +4534,47 @@ paths:
           application/json:
             schema:
               type: object
-              required: [titulo, data_inicio, local_texto]
+              required: [titulo, data_inicio]
+              description: Exige `local_texto` ou ao menos um espaço em `recursos`.
               properties:
                 titulo: {type: string}
                 data_inicio: {type: string, format: date}
                 data_fim: {type: string, format: date, nullable: true}
                 hora_inicio: {type: string, nullable: true}
                 hora_fim: {type: string, nullable: true}
-                local_texto: {type: string}
+                local_texto: {type: string, nullable: true}
                 observacoes: {type: string, nullable: true}
+                recursos:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/PlanejamentoRecursoInput'
       responses:
         '201': {description: Created}
-        '422': {description: Coleta fechada ou validação}
+        '422':
+          description: Coleta fechada, validação ou capacidade excedida (sem dados de outras pastorais)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlanejamentoErroCapacidade'
+  /public/planejamento/{token}/disponibilidade:
+    get:
+      summary: Disponibilidade de espaços/recursos no intervalo (link da pastoral)
+      parameters:
+        - {name: token, in: path, required: true, schema: {type: string}}
+        - {name: data_inicio, in: query, required: true, schema: {type: string, format: date}}
+        - {name: data_fim, in: query, required: false, schema: {type: string, format: date}}
+        - {name: hora_inicio, in: query, required: false, schema: {type: string, example: '19:00'}}
+        - {name: hora_fim, in: query, required: false, schema: {type: string}}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PlanejamentoDisponibilidade'
+        '422': {description: Token inválido ou parâmetros inválidos}

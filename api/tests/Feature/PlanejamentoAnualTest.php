@@ -370,6 +370,52 @@ class PlanejamentoAnualTest extends TestCase
         $this->assertSame('Global B', $eventos[0]['titulo']);
     }
 
+    public function test_links_pastorais_persistem_e_podem_ser_listados(): void
+    {
+        $base = $this->seedBase();
+        $anualId = $base['anual']['id'];
+        $pastoralId = $base['pastoral']['id'];
+        $pastoralBId = $base['pastoralB']['id'];
+
+        Sanctum::actingAs($this->admin);
+        $plain = $this->tenantJson(
+            'POST',
+            '/api/v1/planejamento/anuais/'.$anualId.'/pastorais/'.$pastoralId.'/token'
+        )->assertCreated()->json('token');
+
+        $this->tenantJson(
+            'POST',
+            '/api/v1/planejamento/anuais/'.$anualId.'/pastorais/'.$pastoralBId.'/token'
+        )->assertCreated();
+        $this->tenantJson(
+            'DELETE',
+            '/api/v1/planejamento/anuais/'.$anualId.'/pastorais/'.$pastoralBId.'/token'
+        )->assertNoContent();
+
+        $lista = collect(
+            $this->tenantJson('GET', '/api/v1/planejamento/anuais/'.$anualId.'/pastorais/tokens')
+                ->assertOk()
+                ->json('data')
+        )->keyBy('pastoral_id');
+
+        $this->assertSame($plain, $lista[$pastoralId]['token']);
+        $this->assertTrue($lista[$pastoralId]['ativo']);
+        $this->assertFalse($lista[$pastoralBId]['ativo']);
+        $this->assertNull($lista[$pastoralBId]['token']);
+        $this->assertArrayNotHasKey('token_hash', $lista[$pastoralId]);
+
+        tenancy()->initialize($this->tenant);
+        $raw = \Illuminate\Support\Facades\DB::table('planejamento_pastoral_tokens')
+            ->where('pastoral_id', $pastoralId)
+            ->value('token_encrypted');
+        tenancy()->end();
+        $this->assertNotSame($plain, $raw);
+
+        $this->actingAsRole('coordenador-pastoral', 'coord-tokens@test.local');
+        $this->tenantJson('GET', '/api/v1/planejamento/anuais/'.$anualId.'/pastorais/tokens')
+            ->assertForbidden();
+    }
+
     public function test_link_publico_pastoral_coleta(): void
     {
         $base = $this->seedBase();

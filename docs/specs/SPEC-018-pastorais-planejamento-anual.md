@@ -21,6 +21,7 @@ A tabela `pastorais` já existe para o site público (SPEC-005 / ADR-0003) e evo
 3. Cada pastoral (usuário vinculado) propõe eventos só da(s) sua(s) pastoral(is) durante `coleta` (e ajustes pedidas em `revisao`).
 4. Padre/gestor vê o global, destaca conflitos (mesmo local + horário sobreposto), pede ajuste ou edita, e fecha o ano.
 5. Conflito **não bloqueia** gravação — o padre decide (alerta na UI/API).
+   > Emenda (2026-10-14): conflito de **espaços e recursos** do planejamento bloqueia a gravação — ver [SPEC-019](./SPEC-019-planejamento-espacos-recursos.md). O alerta por `calendario_locais` segue não bloqueante.
 6. Sem ligação automática com o calendário oficial (SPEC-012) nesta versão.
 7. Exportação lista/PDF do ano (ou por mês) quando `fechado` (ou em `revisao`).
 
@@ -71,7 +72,7 @@ A tabela `pastorais` já existe para o site público (SPEC-005 / ADR-0003) e evo
 ## Fora de escopo
 
 - Ligação / publicação automática no calendário oficial (SPEC-012) ou em `evento_agenda`.
-- Bloqueio hard de conflito na gravação.
+- Bloqueio hard de conflito na gravação (por `calendario_locais`; para espaços/recursos ver SPEC-019).
 - ~~Link público sem login~~ — adicionado depois: token por pastoral (`/planejamento/anuais/{id}/pastorais/{id}/token` + `/public/planejamento/{token}`).
 - Recorrência estruturada (RRULE); só texto livre nesta versão.
 - App nativo; importação automática da planilha Google (pode ser seed/manual depois).

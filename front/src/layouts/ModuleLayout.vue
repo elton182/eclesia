@@ -168,6 +168,9 @@ const navItems = computed(() => {
     ) {
       items.push({ label: 'Planejamento anual', path: '/planejamento' })
     }
+    if (can('planejamento.gerir') || isPlatformAdmin.value) {
+      items.push({ label: 'Espaços e recursos', path: '/planejamento/recursos' })
+    }
     return items
   }
   if (props.moduleKey === 'eventos') {
@@ -211,6 +214,7 @@ function isActive(item) {
     return route.path === '/pastorais' || route.path.startsWith('/pastorais/')
   }
   if (props.moduleKey === 'pastorais' && item.path === '/planejamento') {
+    if (route.path.startsWith('/planejamento/recursos')) return false
     return route.path === '/planejamento' || route.path.startsWith('/planejamento/')
   }
   return route.path === item.path || route.path.startsWith(item.path + '/')

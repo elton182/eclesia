@@ -18,7 +18,7 @@ class PlanejamentoPastoralTokenResource extends JsonResource
             'planejamento_anual_id' => $this->planejamento_anual_id,
             'pastoral_id' => $this->pastoral_id,
             'token_preview' => $this->token_preview,
-            'token' => $this->when(isset($this->plain_token), $this->plain_token),
+            'token' => $this->plain_token ?? null,
             'expires_at' => $this->expires_at?->toIso8601String(),
             'revogado_em' => $this->revogado_em?->toIso8601String(),
             'ativo' => $this->isAtivo(),

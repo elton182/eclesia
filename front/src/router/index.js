@@ -31,6 +31,7 @@ import PastoraisView from '../views/PastoraisView.vue'
 import PastoralDetailView from '../views/PastoralDetailView.vue'
 import PlanejamentoAnuaisView from '../views/PlanejamentoAnuaisView.vue'
 import PlanejamentoAnualDetailView from '../views/PlanejamentoAnualDetailView.vue'
+import PlanejamentoRecursosView from '../views/PlanejamentoRecursosView.vue'
 import SiteAdminView from '../views/SiteAdminView.vue'
 import ConfiguracoesMarcaView from '../views/ConfiguracoesMarcaView.vue'
 import PublicSiteView from '../views/site/PublicSiteView.vue'
@@ -286,6 +287,11 @@ const router = createRouter({
           path: 'planejamento',
           name: 'planejamento-anuais',
           component: PlanejamentoAnuaisView,
+        },
+        {
+          path: 'planejamento/recursos',
+          name: 'planejamento-recursos',
+          component: PlanejamentoRecursosView,
         },
         {
           path: 'planejamento/:id',

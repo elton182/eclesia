@@ -104,6 +104,11 @@ export async function createPastoralToken(anualId, pastoralId) {
   }
 }
 
+export async function listPastoralTokens(anualId) {
+  const { data } = await api.get(`/planejamento/anuais/${anualId}/pastorais/tokens`)
+  return unwrapList(data)
+}
+
 export async function revokePastoralToken(anualId, pastoralId) {
   await api.delete(`/planejamento/anuais/${anualId}/pastorais/${pastoralId}/token`)
 }

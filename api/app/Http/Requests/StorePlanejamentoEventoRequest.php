@@ -33,6 +33,9 @@ class StorePlanejamentoEventoRequest extends FormRequest
             'local_texto' => ['nullable', 'string', 'max:255'],
             'local_ids' => ['nullable', 'array'],
             'local_ids.*' => ['string', 'exists:calendario_locais,id'],
+            'recursos' => ['sometimes', 'array', 'max:30'],
+            'recursos.*.recurso_id' => ['required', 'string', 'distinct', 'exists:planejamento_recursos,id'],
+            'recursos.*.quantidade' => ['nullable', 'integer', 'min:1', 'max:9999'],
             'status_solicitacao' => ['sometimes', 'string', Rule::in(PlanejamentoEvento::STATUS_SOLICITACAO)],
             'motivo_ajuste' => ['nullable', 'string'],
         ];

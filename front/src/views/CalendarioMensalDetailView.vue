@@ -22,6 +22,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useAuthAdminStore } from '@/stores/authAdmin'
 import { useTenantStore } from '@/stores/tenant'
 import { userHasPermission } from '@/utils/userRoles'
+import Hora24Input from '@/components/form/Hora24Input.vue'
 
 const WEEKDAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 
@@ -1264,16 +1265,13 @@ onUnmounted(() => {
                 </div>
                 <div>
                   <label class="fld" for="evt-hora">Hora</label>
-                  <input
+                  <Hora24Input
                     id="evt-hora"
                     v-model="eventoForm.hora"
-                    type="time"
-                    step="3600"
-                    class="input"
+                    :step-minutos="60"
                     required
                     data-testid="montagem-evento-hora"
                     @change="onHoraInput"
-                    @blur="onHoraInput"
                   />
                 </div>
                 <div>
