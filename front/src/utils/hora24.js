@@ -1,56 +1,46 @@
 /**
- * Horário sempre em 24h (HH:MM). O input nativo type="time" segue o locale do
- * sistema e pode exibir AM/PM mesmo com a página em pt-BR.
+ * Horário sempre em 24h, num único campo HH:MM.
+ * O input nativo type="time" segue o locale do sistema e pode exibir AM/PM.
  */
 
-/** @param {number} n */
-function pad2(n) {
-  return String(n).padStart(2, '0')
-}
-
-/** @returns {string[]} */
-export function horas24() {
-  return Array.from({ length: 24 }, (_, i) => pad2(i))
-}
-
 /**
- * Minutos no passo pedido. Se o valor atual não cai no passo, entra na lista.
- * @param {number} [step]
- * @param {string} [atual]
- * @returns {string[]}
- */
-export function minutos24(step = 5, atual = '') {
-  const raw = Math.floor(Number(step))
-  const passo = Number.isFinite(raw) && raw >= 1 ? Math.min(60, raw) : 5
-  const lista = []
-  for (let m = 0; m < 60; m += passo) lista.push(pad2(m))
-  if (/^\d{2}$/.test(atual) && !lista.includes(atual)) {
-    lista.push(atual)
-    lista.sort()
-  }
-  return lista
-}
-
-/**
+ * Mantém só dígitos e insere ":" depois da hora. Aceita digitação parcial.
  * @param {unknown} valor
- * @returns {{ hora: string, minuto: string }}
- */
-export function splitHora24(valor) {
-  const m = String(valor ?? '').match(/^(\d{2}):(\d{2})/)
-  if (!m) return { hora: '', minuto: '' }
-  const hora = Number(m[1])
-  const minuto = Number(m[2])
-  if (hora > 23 || minuto > 59) return { hora: '', minuto: '' }
-  return { hora: m[1], minuto: m[2] }
-}
-
-/**
- * @param {string} hora
- * @param {string} minuto
  * @returns {string}
  */
-export function joinHora24(hora, minuto) {
-  const h = splitHora24(`${hora}:${minuto || '00'}`)
-  if (!h.hora) return ''
-  return `${h.hora}:${h.minuto || '00'}`
+export function maskHora24(valor) {
+  const raw = String(valor ?? '')
+  if (raw.includes(':')) {
+    const [horaRaw, minutoRaw = ''] = raw.split(':')
+    const hora = horaRaw.replace(/\D/g, '').slice(0, 2)
+    const minuto = minutoRaw.replace(/\D/g, '').slice(0, 2)
+    return `${hora}:${minuto}`
+  }
+  const digits = raw.replace(/\D/g, '').slice(0, 4)
+  if (digits.length <= 2) return digits
+  return `${digits.slice(0, 2)}:${digits.slice(2)}`
+}
+
+/**
+ * Completa para HH:MM válido, ou devolve vazio. Com passo >= 60, os minutos vão para 00.
+ * @param {unknown} valor
+ * @param {number} [stepMinutos]
+ * @returns {string}
+ */
+export function normalizarHora24(valor, stepMinutos = 1) {
+  const masked = maskHora24(valor)
+  if (!masked) return ''
+
+  const [horaRaw, minutoRaw = ''] = masked.split(':')
+  if (!horaRaw) return ''
+  const hora = Number(horaRaw)
+  const minuto = Number((minutoRaw || '0').padStart(2, '0'))
+  if (!Number.isInteger(hora) || hora > 23 || !Number.isInteger(minuto) || minuto > 59) {
+    return ''
+  }
+
+  const passo = Math.floor(Number(stepMinutos))
+  const minutoFinal = Number.isFinite(passo) && passo >= 60 ? 0 : minuto
+
+  return `${String(hora).padStart(2, '0')}:${String(minutoFinal).padStart(2, '0')}`
 }

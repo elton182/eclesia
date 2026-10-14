@@ -1,70 +1,75 @@
 <script setup>
-import { computed } from 'vue'
-import { horas24, joinHora24, minutos24, splitHora24 } from '@/utils/hora24'
+import { ref, watch } from 'vue'
+import { maskHora24, normalizarHora24 } from '@/utils/hora24'
+
+defineOptions({ inheritAttrs: false })
 
 const props = defineProps({
   modelValue: { type: String, default: '' },
   id: { type: String, default: '' },
   required: { type: Boolean, default: false },
   disabled: { type: Boolean, default: false },
-  /** Passo dos minutos. 60 deixa só a hora cheia. */
-  stepMinutos: { type: Number, default: 5 },
+  /** Passo dos minutos. 60 grava só a hora cheia. */
+  stepMinutos: { type: Number, default: 1 },
 })
 
 const emit = defineEmits(['update:modelValue', 'change'])
 
-const horas = horas24()
-const partes = computed(() => splitHora24(props.modelValue))
-const minutos = computed(() => minutos24(props.stepMinutos, partes.value.minuto))
-const soHora = computed(() => props.stepMinutos >= 60)
+const texto = ref(props.modelValue ? normalizarHora24(props.modelValue) : '')
+const focado = ref(false)
 
-function emitir(valor) {
+watch(
+  () => props.modelValue,
+  (valor) => {
+    if (focado.value) return
+    texto.value = valor ? normalizarHora24(valor) : ''
+  },
+)
+
+function publicar(valor) {
+  if (valor === (props.modelValue || '')) return
   emit('update:modelValue', valor)
   emit('change', valor)
 }
 
-function onHora(event) {
-  const hora = event.target.value
-  if (!hora) {
-    emitir('')
+function onInput(event) {
+  const masked = maskHora24(event.target.value)
+  texto.value = masked
+  if (masked === '') {
+    publicar('')
     return
   }
-  emitir(joinHora24(hora, soHora.value ? '00' : partes.value.minuto || '00'))
+  if (/^\d{2}:\d{2}$/.test(masked)) {
+    const completo = normalizarHora24(masked, props.stepMinutos)
+    if (completo) publicar(completo)
+  }
 }
 
-function onMinuto(event) {
-  if (!partes.value.hora) return
-  emitir(joinHora24(partes.value.hora, event.target.value))
+function onBlur() {
+  focado.value = false
+  const normalizado = normalizarHora24(texto.value, props.stepMinutos)
+  texto.value = normalizado
+  publicar(normalizado)
 }
 </script>
 
 <template>
-  <div class="flex items-center gap-1.5" data-testid="hora24">
-    <select
-      :id="id"
-      class="input"
-      :value="partes.hora"
-      :required="required"
-      :disabled="disabled"
-      aria-label="Hora (0 a 23)"
-      data-testid="hora24-hora"
-      @change="onHora"
-    >
-      <option value="">—</option>
-      <option v-for="h in horas" :key="h" :value="h">{{ h }}</option>
-    </select>
-    <template v-if="!soHora">
-      <span aria-hidden="true" style="color: var(--color-muted)">:</span>
-      <select
-        class="input"
-        :value="partes.minuto || '00'"
-        :disabled="disabled || !partes.hora"
-        aria-label="Minutos"
-        data-testid="hora24-minuto"
-        @change="onMinuto"
-      >
-        <option v-for="m in minutos" :key="m" :value="m">{{ m }}</option>
-      </select>
-    </template>
-  </div>
+  <input
+    :id="id"
+    :value="texto"
+    type="text"
+    inputmode="numeric"
+    autocomplete="off"
+    maxlength="5"
+    placeholder="19:30"
+    class="input"
+    :required="required"
+    :disabled="disabled"
+    aria-label="Horário, 24 horas"
+    data-testid="hora24"
+    v-bind="$attrs"
+    @focus="focado = true"
+    @input="onInput"
+    @blur="onBlur"
+  />
 </template>
