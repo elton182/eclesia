@@ -484,6 +484,7 @@ class PlanejamentoService
             [
                 'token_hash' => $hash,
                 'token_preview' => substr($plain, 0, 8),
+                'token_encrypted' => $plain,
                 'expires_at' => null,
                 'revogado_em' => null,
             ]
@@ -493,6 +494,22 @@ class PlanejamentoService
         $token->setAttribute('plain_token', $plain);
 
         return ['token' => $token, 'plain' => $plain];
+    }
+
+    /**
+     * @return Collection<int, PlanejamentoPastoralToken>
+     */
+    public function listPastoralTokens(PlanejamentoAnual $anual): Collection
+    {
+        return PlanejamentoPastoralToken::query()
+            ->where('planejamento_anual_id', $anual->id)
+            ->orderBy('created_at')
+            ->get()
+            ->each(function (PlanejamentoPastoralToken $token) {
+                if ($token->isAtivo() && $token->token_encrypted !== null) {
+                    $token->setAttribute('plain_token', $token->token_encrypted);
+                }
+            });
     }
 
     public function revokePastoralToken(PlanejamentoAnual $anual, string $pastoralId): void

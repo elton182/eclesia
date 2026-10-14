@@ -166,6 +166,15 @@ class PlanejamentoController extends Controller
             ->setStatusCode(201);
     }
 
+    public function indexPastoralTokens(string $id): AnonymousResourceCollection
+    {
+        abort_unless($this->access->canGerir(), 403);
+
+        return PlanejamentoPastoralTokenResource::collection(
+            $this->planejamento->listPastoralTokens($this->planejamento->findAnual($id))
+        );
+    }
+
     public function destroyPastoralToken(string $id, string $pastoralId): Response
     {
         abort_unless($this->access->canGerir(), 403);

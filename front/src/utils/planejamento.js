@@ -272,3 +272,19 @@ export function pastoralIdsDoUsuario(user) {
   if (Array.isArray(user.pastorais)) return user.pastorais.map((p) => p.id).filter(Boolean)
   return []
 }
+
+/**
+ * Mapa pastoral_id → token em claro dos links ativos (GET .../pastorais/tokens).
+ * @param {Array<{ pastoral_id?: string, token?: string|null, ativo?: boolean }>} tokens
+ * @returns {Record<string, string>}
+ */
+export function mapPastoralLinks(tokens) {
+  /** @type {Record<string, string>} */
+  const out = {}
+  for (const t of Array.isArray(tokens) ? tokens : []) {
+    if (t && t.pastoral_id && t.ativo !== false && t.token) {
+      out[t.pastoral_id] = t.token
+    }
+  }
+  return out
+}

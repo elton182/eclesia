@@ -4140,6 +4140,38 @@ paths:
         '401': {description: Não autenticado}
         '403': {description: Sem permissão}
         '422': {description: Status não permite export}
+  /planejamento/anuais/{id}/pastorais/tokens:
+    get:
+      summary: Listar links públicos das pastorais no ano
+      description: |
+        Somente `planejamento.gerir`. O token é guardado cifrado (APP_KEY) e devolvido em claro
+        apenas para links ativos; revogados ou gerados antes da persistência vêm com `token: null`.
+      security: [{bearerAuth: [], tenantHeader: [], igrejaHeader: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: {type: string}
+                        planejamento_anual_id: {type: string}
+                        pastoral_id: {type: string}
+                        token: {type: string, nullable: true}
+                        token_preview: {type: string}
+                        expires_at: {type: string, format: date-time, nullable: true}
+                        revogado_em: {type: string, format: date-time, nullable: true}
+                        ativo: {type: boolean}
+        '401': {description: Não autenticado}
+        '403': {description: Sem permissão}
   /planejamento/anuais/{id}/pastorais/{pastoralId}/token:
     post:
       summary: Gerar ou rotacionar link público da pastoral no ano

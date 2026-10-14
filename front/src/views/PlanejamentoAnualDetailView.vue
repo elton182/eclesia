@@ -11,6 +11,8 @@ import {
   downloadAnualPdf,
   getAnual,
   listEventos,
+  listPastoralTokens,
+  revokePastoralToken,
   updateEvento,
 } from '@/services/planejamento'
 import { useTenantStore } from '@/stores/tenant'
@@ -33,6 +35,7 @@ import {
   labelStatusPlanejamento,
   labelStatusSolicitacao,
   styleStatusSolicitacao,
+  mapPastoralLinks,
   pastoralIdsDoUsuario,
   proximosStatusPlanejamento,
   unwrapList,
@@ -237,6 +240,36 @@ async function gerarLinkPastoral(pastoral) {
   }
 }
 
+async function carregarLinksPastorais() {
+  if (!canGerir.value || !anual.value) return
+  try {
+    pastoralLinks.value = mapPastoralLinks(await listPastoralTokens(anual.value.id))
+  } catch {
+    pastoralLinks.value = {}
+  }
+}
+
+async function revogarLinkPastoral(pastoral) {
+  if (!canGerir.value || !anual.value) return
+  const ok = await innovConfirm({
+    title: 'Revogar link',
+    message: `O link atual de ${pastoral.nome} deixará de funcionar. Continuar?`,
+    confirmText: 'Revogar',
+  })
+  if (!ok) return
+  tokenBusy.value = pastoral.id
+  try {
+    await revokePastoralToken(anual.value.id, pastoral.id)
+    const { [pastoral.id]: _removido, ...resto } = pastoralLinks.value
+    pastoralLinks.value = resto
+    innovToast('success', 'Link', 'Link revogado')
+  } catch (e) {
+    innovToast('error', 'Link', e.response?.data?.message || 'Falha ao revogar')
+  } finally {
+    tokenBusy.value = ''
+  }
+}
+
 async function copiarLinkPastoral(pastoralId) {
   const url = publicLinkFor(pastoralLinks.value[pastoralId])
   if (!url) return
@@ -304,6 +337,7 @@ async function load({ silent = false } = {}) {
     if (a.eventos && Array.isArray(a.eventos) && !evs.length) {
       eventos.value = a.eventos
     }
+    if (!silent) await carregarLinksPastorais()
   } catch (e) {
     innovToast('error', 'Planejamento', e.response?.data?.message || 'Falha ao carregar')
     if (!silent) router.push('/planejamento')
@@ -617,6 +651,17 @@ onMounted(load)
                 @click="copiarLinkPastoral(p.id)"
               >
                 Copiar
+              </button>
+              <button
+                v-if="pastoralLinks[p.id]"
+                type="button"
+                class="btn btn-ghost text-xs"
+                style="color: var(--color-danger)"
+                :disabled="tokenBusy === p.id"
+                data-testid="planejamento-revogar-link"
+                @click="revogarLinkPastoral(p)"
+              >
+                Revogar
               </button>
             </div>
           </li>

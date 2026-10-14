@@ -229,6 +229,7 @@ Route::middleware([
     Route::patch('planejamento/eventos/{eventoId}', [PlanejamentoController::class, 'updateEvento']);
     Route::delete('planejamento/eventos/{eventoId}', [PlanejamentoController::class, 'destroyEvento']);
     Route::get('planejamento/anuais/{id}/pdf', [PlanejamentoController::class, 'pdf']);
+    Route::get('planejamento/anuais/{id}/pastorais/tokens', [PlanejamentoController::class, 'indexPastoralTokens']);
     Route::post('planejamento/anuais/{id}/pastorais/{pastoralId}/token', [PlanejamentoController::class, 'storePastoralToken']);
     Route::delete('planejamento/anuais/{id}/pastorais/{pastoralId}/token', [PlanejamentoController::class, 'destroyPastoralToken']);
 

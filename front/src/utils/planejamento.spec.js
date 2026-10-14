@@ -18,6 +18,7 @@ import {
   unwrapList,
   unwrapItem,
   pastoralIdsDoUsuario,
+  mapPastoralLinks,
 } from './planejamento.js'
 
 describe('planejamento', () => {
@@ -122,5 +123,18 @@ describe('planejamento', () => {
     assert.deepEqual(unwrapItem({ data: { id: 'a' } }), { id: 'a' })
     assert.deepEqual(pastoralIdsDoUsuario({ pastorais: [{ id: 'p1' }] }), ['p1'])
     assert.deepEqual(pastoralIdsDoUsuario({ pastoral_ids: ['p2'] }), ['p2'])
+  })
+
+  it('mapPastoralLinks mantém só links ativos com token', () => {
+    assert.deepEqual(
+      mapPastoralLinks([
+        { pastoral_id: 'p1', token: 'abc', ativo: true },
+        { pastoral_id: 'p2', token: null, ativo: true },
+        { pastoral_id: 'p3', token: 'zzz', ativo: false },
+        null,
+      ]),
+      { p1: 'abc' },
+    )
+    assert.deepEqual(mapPastoralLinks(undefined), {})
   })
 })
