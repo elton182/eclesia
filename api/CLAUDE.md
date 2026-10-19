@@ -42,7 +42,7 @@ Não usar `Auth::attempt` com e-mail criptografado.
 ## Testes
 
 ```bash
-php artisan test
+php artisan test --parallel
 php artisan test --filter=NomeDoTeste
 php artisan test --coverage --min=80
 ```

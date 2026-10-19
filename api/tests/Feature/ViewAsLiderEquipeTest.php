@@ -112,10 +112,7 @@ class ViewAsLiderEquipeTest extends TestCase
             tenancy()->end();
         }
 
-        $dbPath = database_path('tenant'.$this->tenant->id);
-        if (File::exists($dbPath)) {
-            File::delete($dbPath);
-        }
+        $this->deleteTenantDatabase($this->tenant->id);
 
         parent::tearDown();
     }

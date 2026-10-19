@@ -81,8 +81,11 @@ Variáveis importantes: `APP_KEY` (criptografia LGPD), `DB_*`, `FRONTEND_URL`, `
 ## Testes e CI
 
 ```bash
-# API
-cd api && php artisan test
+# API (paralelo; requer brianium/paratest)
+cd api && php artisan test --parallel
+
+# Coverage (serial)
+cd api && php artisan test --coverage --min=80
 
 # Front
 cd front && npm run test:run

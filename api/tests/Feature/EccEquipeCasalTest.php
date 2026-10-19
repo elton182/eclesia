@@ -10,7 +10,6 @@ use App\Models\Igreja;
 use App\Models\SuperAdmin;
 use App\Models\Tenant;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\File;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -49,10 +48,7 @@ class EccEquipeCasalTest extends TestCase
             tenancy()->end();
         }
 
-        $dbPath = database_path('tenant'.$this->tenant->id);
-        if (File::exists($dbPath)) {
-            File::delete($dbPath);
-        }
+        $this->deleteTenantDatabase($this->tenant->id);
 
         parent::tearDown();
     }

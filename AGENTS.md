@@ -50,7 +50,7 @@ Cada app tem `AGENTS.md` e `CLAUDE.md` na própria raiz.
 
 | App | Comando |
 |-----|---------|
-| api | `php artisan test --coverage --min=80` |
+| api | `php artisan test --parallel` · coverage: `php artisan test --coverage --min=80` |
 | front | `npm run test:run` (e `npm run test:coverage` se existir) — Vitest a configurar se ainda ausente |
 
 Toda alteração relevante exige testes no lado afetado:

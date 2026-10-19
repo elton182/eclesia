@@ -9,7 +9,6 @@ use App\Models\Tenant;
 use App\Models\TenantAlias;
 use App\Services\TenantResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -112,9 +111,6 @@ class TenantAliasTest extends TestCase
         if (tenancy()->initialized) {
             tenancy()->end();
         }
-        $dbPath = database_path('tenant'.$tenantId);
-        if (File::exists($dbPath)) {
-            File::delete($dbPath);
-        }
+        $this->deleteTenantDatabase($tenantId);
     }
 }

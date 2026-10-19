@@ -7,7 +7,6 @@ namespace Tests\Feature;
 use App\Models\SuperAdmin;
 use App\Models\Tenant;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\File;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -93,10 +92,7 @@ class AdminTenantTest extends TestCase
             ->assertJsonPath('data.0.slug', 'paroquia-centro');
 
         // limpa arquivo sqlite do tenant se existir
-        $dbPath = database_path('tenant'.$tenantId);
-        if (File::exists($dbPath)) {
-            File::delete($dbPath);
-        }
+        $this->deleteTenantDatabase($tenantId);
     }
 
     public function test_can_create_tenant_with_database_cache_store(): void
@@ -120,10 +116,7 @@ class AdminTenantTest extends TestCase
             tenancy()->end();
         }
 
-        $dbPath = database_path('tenant'.$tenantId);
-        if (File::exists($dbPath)) {
-            File::delete($dbPath);
-        }
+        $this->deleteTenantDatabase($tenantId);
     }
 
     public function test_tenant_slug_must_be_unique(): void

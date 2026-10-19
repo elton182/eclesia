@@ -82,7 +82,7 @@ Após `/setup-tdd-hooks`: edição em `app/` dispara geração/exigência de tes
 ## Comandos
 
 ```bash
-php artisan test
+php artisan test --parallel
 php artisan test --filter=NomeDoTeste
 php artisan test --coverage --min=80
 php artisan migrate

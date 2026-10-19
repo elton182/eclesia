@@ -14,10 +14,9 @@ jobs:
   api:
     name: API tests
     runs-on: ubuntu-latest
-    # Força sqlite: env do job sobrescreve DB_* do .env.example (mysql).
+    # phpunit.xml força sqlite :memory: (force=true); não usar DB ficheiro partilhado com --parallel.
     env:
       DB_CONNECTION: sqlite
-      DB_DATABASE: ${{ github.workspace }}/api/database/database.sqlite
     defaults:
       run:
         working-directory: api
@@ -28,7 +27,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: "8.3"
-          extensions: mbstring, pdo_sqlite, sqlite3
+          extensions: mbstring, pdo_sqlite, sqlite3, pcntl
           coverage: none
 
       - name: Cache Composer
@@ -41,17 +40,19 @@ jobs:
         run: composer install --prefer-dist --no-interaction --no-progress
 
       - name: Prepare app
+        env:
+          # Só para smoke do migrate; testes forçam :memory: no phpunit.xml.
+          DB_DATABASE: ${{ github.workspace }}/api/database/database.sqlite
         run: |
           cp .env.example .env
           php artisan key:generate
           mkdir -p database
           touch database/database.sqlite
           # Central only. Tenant DBs recebem migrations em TenantCreated (MigrateDatabase).
-          # Em produção o deploy roda também: php artisan tenants:migrate --force
           php artisan migrate --force --no-interaction
 
       - name: Run tests
-        run: php artisan test
+        run: php artisan test --parallel
 
   front:
     name: Front tests

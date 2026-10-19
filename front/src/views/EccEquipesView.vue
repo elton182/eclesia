@@ -24,6 +24,7 @@ const canManage = computed(() =>
 const equipes = ref([])
 const casais = ref([])
 const loading = ref(false)
+const search = ref('')
 /** @type {import('vue').Ref<'list'|'form'>} */
 const mode = ref('list')
 const saving = ref(false)
@@ -31,6 +32,16 @@ const acessoLoadingId = ref(null)
 const equipeForm = ref({ id: null, nome: '', cor: '#6B1C2B' })
 const membrosOpen = ref(false)
 const membrosEquipe = ref(null)
+
+const filteredEquipes = computed(() => {
+  const q = search.value.trim().toLocaleLowerCase('pt-BR')
+  if (!q) return equipes.value
+  return equipes.value.filter((eq) => {
+    const nome = String(eq.nome || '').toLocaleLowerCase('pt-BR')
+    const user = String(eq.acesso_username || '').toLocaleLowerCase('pt-BR')
+    return nome.includes(q) || user.includes(q)
+  })
+})
 
 const ensureTenant = () => {
   if (!tenantStore.slug) {
@@ -166,8 +177,8 @@ onMounted(load)
 </script>
 
 <template>
-  <div class="w-full space-y-5" data-testid="ecc-equipes-view">
-    <div v-if="mode === 'list'" class="space-y-5">
+  <div class="p-6 md:p-[30px] w-full space-y-5" data-testid="ecc-equipes-view">
+    <div v-if="mode === 'list'" class="space-y-5 w-full">
       <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p class="text-[12px] uppercase tracking-wide mb-1" style="color: rgba(42, 20, 24, 0.5)">
@@ -189,6 +200,17 @@ onMounted(load)
         </button>
       </div>
 
+      <div class="flex flex-col gap-3 w-full md:flex-row md:flex-wrap md:items-center">
+        <input
+          v-model="search"
+          type="search"
+          class="input w-full md:flex-1 md:min-w-[220px]"
+          placeholder="Pesquisar equipe ou usuário de acesso…"
+          data-testid="equipes-search"
+          aria-label="Pesquisar equipes"
+        >
+      </div>
+
       <div
         v-if="loading"
         class="p-10 text-center text-[13px]"
@@ -204,17 +226,17 @@ onMounted(load)
         data-testid="equipes-lista"
       >
         <div
-          v-if="!equipes.length"
+          v-if="!filteredEquipes.length"
           class="p-10 text-center"
           style="color: rgba(42, 20, 24, 0.5)"
         >
-          Nenhuma equipe cadastrada.
+          {{ search.trim() ? 'Nenhuma equipe encontrada.' : 'Nenhuma equipe cadastrada.' }}
         </div>
         <div
-          v-for="equipe in equipes"
+          v-for="(equipe, index) in filteredEquipes"
           :key="equipe.id"
-          class="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"
-          style="border-top: 1px solid rgba(42, 20, 24, 0.07)"
+          class="flex flex-col gap-3 px-5 md:px-6 py-5 sm:flex-row sm:items-center sm:justify-between"
+          :style="index > 0 ? 'border-top: 1px solid rgba(42, 20, 24, 0.07)' : undefined"
           data-testid="equipe-row"
         >
           <div class="flex items-center gap-2.5 min-w-0">
