@@ -72,11 +72,7 @@ class AuthWebController extends Controller
             $this->auditLogger->log(
                 action: AuditLogger::ACTION_LOGIN_SUCCESS,
                 auditable: $user,
-                metadata: [
-                    'login_hint' => str_contains($login, '@')
-                        ? $this->auditLogger->emailHint($login)
-                        : 'username',
-                ],
+                metadata: $this->loginAuditMetadata($login),
                 auditableLabel: $user->name,
                 request: $request,
                 actor: $user,
@@ -102,9 +98,7 @@ class AuthWebController extends Controller
         $this->auditLogger->log(
             action: AuditLogger::ACTION_LOGIN_FAILED,
             metadata: [
-                'login_hint' => str_contains($login, '@')
-                    ? $this->auditLogger->emailHint($login)
-                    : 'username',
+                ...$this->loginAuditMetadata($login),
                 'reason' => $user === null ? 'unknown_user' : ($user->is_active ? 'bad_password' : 'inactive'),
             ],
             request: $request,
@@ -374,5 +368,19 @@ class AuthWebController extends Controller
             $request->session()->forget('password_hash_'.$loginKey);
             $request->session()->forget('password_hash_web');
         }
+    }
+
+    /**
+     * SPEC-013: e-mail mascara em email_hint; SPEC-021: username usa login_hint.
+     *
+     * @return array<string, string>
+     */
+    private function loginAuditMetadata(string $login): array
+    {
+        if (str_contains($login, '@')) {
+            return ['email_hint' => $this->auditLogger->emailHint($login)];
+        }
+
+        return ['login_hint' => 'username'];
     }
 }
