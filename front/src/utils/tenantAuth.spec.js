@@ -32,6 +32,7 @@ describe('persistLoginCredentials / loadLoginCredentials', () => {
     assert.deepEqual(loadLoginCredentials(), {
       tenant: 'paroquia',
       email: 'a@b.com',
+      login: 'a@b.com',
     })
   })
 
@@ -40,7 +41,7 @@ describe('persistLoginCredentials / loadLoginCredentials', () => {
     persistLoginCredentials({ tenant: '', email: '' })
     assert.equal(localStorage.getItem(LOGIN_TENANT_STORAGE_KEY), null)
     assert.equal(localStorage.getItem(LOGIN_EMAIL_STORAGE_KEY), null)
-    assert.deepEqual(loadLoginCredentials(), { tenant: '', email: '' })
+    assert.deepEqual(loadLoginCredentials(), { tenant: '', email: '', login: '' })
   })
 })
 
@@ -64,11 +65,11 @@ describe('rememberTenantForLogin', () => {
 })
 
 describe('buildTenantLoginPayload', () => {
-  it('monta payload com tenant e-mail e senha', () => {
-    const p = buildTenantLoginPayload('  paroquia  ', 'a@b.com', 'secret')
+  it('monta payload com tenant, login e senha', () => {
+    const p = buildTenantLoginPayload('  paroquia  ', 'equipe-a', 'secret')
     assert.deepEqual(p, {
       tenant: 'paroquia',
-      email: 'a@b.com',
+      login: 'equipe-a',
       password: 'secret',
     })
   })
@@ -76,17 +77,41 @@ describe('buildTenantLoginPayload', () => {
 
 describe('validateTenantLoginForm', () => {
   it('exige organização', () => {
-    const r = validateTenantLoginForm({ tenant: '', email: 'a@b.com', password: 'x' })
+    const r = validateTenantLoginForm({ tenant: '', login: 'a@b.com', password: 'x' })
     assert.equal(r.ok, false)
   })
 
-  it('aceita formulário completo', () => {
+  it('aceita e-mail como login', () => {
     const r = validateTenantLoginForm({
       tenant: 'demo',
-      email: 'a@b.com',
+      login: 'a@b.com',
       password: 'x',
     })
     assert.equal(r.ok, true)
+  })
+
+  it('aceita username como login', () => {
+    const r = validateTenantLoginForm({
+      tenant: 'demo',
+      login: 'equipe-a',
+      password: 'x',
+    })
+    assert.equal(r.ok, true)
+  })
+})
+
+describe('persistLoginCredentials com login', () => {
+  beforeEach(() => {
+    localStorage.clear()
+  })
+
+  it('persiste username no mesmo storage do e-mail', () => {
+    persistLoginCredentials({ tenant: 'demo', login: 'equipe-a' })
+    assert.deepEqual(loadLoginCredentials(), {
+      tenant: 'demo',
+      email: 'equipe-a',
+      login: 'equipe-a',
+    })
   })
 })
 

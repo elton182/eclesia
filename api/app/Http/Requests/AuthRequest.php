@@ -20,7 +20,8 @@ class AuthRequest extends FormRequest
     {
         return [
             'tenant' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email'],
+            'login' => ['required_without:email', 'nullable', 'string', 'max:255'],
+            'email' => ['required_without:login', 'nullable', 'string', 'max:255'],
             'password' => ['required'],
         ];
     }
@@ -32,6 +33,7 @@ class AuthRequest extends FormRequest
     {
         return [
             'required' => 'O campo :attribute é obrigatório',
+            'required_without' => 'Informe e-mail ou usuário',
         ];
     }
 
@@ -42,8 +44,16 @@ class AuthRequest extends FormRequest
     {
         return [
             'tenant' => 'Organização',
+            'login' => 'E-mail ou usuário',
             'email' => 'E-mail',
             'password' => 'Senha',
         ];
+    }
+
+    public function loginIdentifier(): string
+    {
+        $data = $this->validated();
+
+        return trim((string) ($data['login'] ?? $data['email'] ?? ''));
     }
 }

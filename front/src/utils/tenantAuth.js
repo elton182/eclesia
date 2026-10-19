@@ -3,15 +3,16 @@
  */
 
 export const LOGIN_TENANT_STORAGE_KEY = 'eclesia_login_tenant'
+/** Guarda e-mail ou username do último login (SPEC-021). */
 export const LOGIN_EMAIL_STORAGE_KEY = 'eclesia_login_email'
 
 /**
- * Persiste organização e e-mail do último login bem-sucedido (não a senha).
- * @param {{ tenant?: string, email?: string }} credentials
+ * Persiste organização e login (e-mail ou usuário) do último login bem-sucedido (não a senha).
+ * @param {{ tenant?: string, login?: string, email?: string }} credentials
  */
-export function persistLoginCredentials({ tenant, email } = {}) {
+export function persistLoginCredentials({ tenant, login, email } = {}) {
   const t = String(tenant || '').trim()
-  const e = String(email || '').trim()
+  const e = String(login || email || '').trim()
   if (t) {
     localStorage.setItem(LOGIN_TENANT_STORAGE_KEY, t)
   } else {
@@ -25,18 +26,20 @@ export function persistLoginCredentials({ tenant, email } = {}) {
 }
 
 /**
- * @returns {{ tenant: string, email: string }}
+ * @returns {{ tenant: string, email: string, login: string }}
  */
 export function loadLoginCredentials() {
+  const login = localStorage.getItem(LOGIN_EMAIL_STORAGE_KEY) || ''
   return {
     tenant: localStorage.getItem(LOGIN_TENANT_STORAGE_KEY) || '',
-    email: localStorage.getItem(LOGIN_EMAIL_STORAGE_KEY) || '',
+    email: login,
+    login,
   }
 }
 
 /**
  * Grava só o slug da organização para pré-preencher `/entrar`
- * (não altera o e-mail lembrado).
+ * (não altera o login lembrado).
  * @param {string} tenantSlug
  */
 export function rememberTenantForLogin(tenantSlug) {
@@ -45,17 +48,23 @@ export function rememberTenantForLogin(tenantSlug) {
   localStorage.setItem(LOGIN_TENANT_STORAGE_KEY, t)
 }
 
-export function buildTenantLoginPayload(tenant, email, password) {
+/**
+ * @param {string} tenant
+ * @param {string} login
+ * @param {string} password
+ */
+export function buildTenantLoginPayload(tenant, login, password) {
   return {
     tenant: String(tenant || '').trim(),
-    email: String(email || '').trim(),
+    login: String(login || '').trim(),
     password: String(password || ''),
   }
 }
 
-export function validateTenantLoginForm({ tenant, email, password }) {
-  if (!tenant || !email || !password) {
-    return { ok: false, error: 'Preencha organização, e-mail e senha.' }
+export function validateTenantLoginForm({ tenant, login, email, password }) {
+  const identifier = String(login || email || '').trim()
+  if (!tenant || !identifier || !password) {
+    return { ok: false, error: 'Preencha organização, e-mail ou usuário, e senha.' }
   }
   return { ok: true }
 }

@@ -9,6 +9,7 @@ import { useBrandingStore } from '@/stores/branding'
 import {
   userHasPermission,
   canSeeEccCasaisNav,
+  canSeeEccEquipesNav,
   canSeeEccEventosNav,
   canSeeEccFinanceiroNav,
   canSeePastoraisNav,
@@ -182,6 +183,9 @@ const navItems = computed(() => {
   const items = []
   if (canSeeEccCasaisNav(authTenant.user, { isSuperAdmin: isPlatformAdmin.value })) {
     items.push({ label: 'Casais', path: '/ecc/casais' })
+  }
+  if (canSeeEccEquipesNav(authTenant.user, { isSuperAdmin: isPlatformAdmin.value })) {
+    items.push({ label: 'Equipes', path: '/ecc/equipes' })
   }
   if (canSeeEccEventosNav(authTenant.user, { isSuperAdmin: isPlatformAdmin.value })) {
     items.push({ label: 'Eventos', path: '/ecc/eventos' })

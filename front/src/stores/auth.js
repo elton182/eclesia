@@ -85,10 +85,10 @@ export const useAuthStore = defineStore('auth', () => {
 
   /**
    * @param {string} tenant Identificador (slug, apelido ou nome)
-   * @param {string} email
+   * @param {string} loginIdentifier E-mail ou username (SPEC-021)
    * @param {string} password
    */
-  const login = async (tenant, email, password) => {
+  const login = async (tenant, loginIdentifier, password) => {
     try {
       // Não misturar Bearer de super-admin com auth do tenant
       setAuthToken(null)
@@ -98,7 +98,7 @@ export const useAuthStore = defineStore('auth', () => {
       await api.get('/sanctum/csrf-cookie')
       const response = await api.post('/web/login', {
         tenant,
-        email,
+        login: loginIdentifier,
         password,
       })
 
@@ -142,6 +142,29 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  /**
+   * SPEC-021: troca de senha (primeiro acesso / must_change_password).
+   * @param {{ current_password: string, password: string, password_confirmation: string }} payload
+   */
+  const changePassword = async (payload) => {
+    try {
+      const response = await api.post('/web/change-password', payload)
+      if (response.data?.id || response.data?.email || response.data?.success) {
+        setUser(response.data)
+        useBrandingStore().applyFromPayload(response.data.branding)
+      }
+      return { success: true }
+    } catch (error) {
+      return {
+        success: false,
+        error: error.response?.data?.message
+          || Object.values(error.response?.data?.errors || {}).flat().join(' ')
+          || error.message
+          || 'Erro ao alterar senha',
+      }
+    }
+  }
+
   return {
     user,
     isAuthenticated,
@@ -152,5 +175,6 @@ export const useAuthStore = defineStore('auth', () => {
     setUser,
     activateViewAsLider,
     clearViewAs,
+    changePassword,
   }
 })

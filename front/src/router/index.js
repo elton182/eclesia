@@ -6,15 +6,17 @@ import { useTenantStore } from '../stores/tenant'
 import { useBrandingStore } from '../stores/branding'
 import LandingView from '../views/LandingView.vue'
 import TenantLoginView from '../views/TenantLoginView.vue'
+import ChangePasswordView from '../views/ChangePasswordView.vue'
 import LoginView from '../views/LoginView.vue'
 import WelcomeView from '../views/WelcomeView.vue'
 import MinhaEquipeView from '../views/MinhaEquipeView.vue'
-import { isSomenteLiderEquipe } from '../utils/userRoles'
+import { homePathForUser, isSomenteLiderEquipe } from '../utils/userRoles'
 import TenantsView from '../views/TenantsView.vue'
 import UsersView from '../views/UsersView.vue'
 import AuditoriaView from '../views/AuditoriaView.vue'
 import IgrejasView from '../views/IgrejasView.vue'
 import EccCasaisView from '../views/EccCasaisView.vue'
+import EccEquipesView from '../views/EccEquipesView.vue'
 import EccCasalDetailView from '../views/EccCasalDetailView.vue'
 import EccEventosView from '../views/EccEventosView.vue'
 import EccEventoDetailView from '../views/EccEventoDetailView.vue'
@@ -127,6 +129,12 @@ const router = createRouter({
           component: TenantLoginView,
         },
         {
+          path: 'trocar-senha',
+          name: 'change-password',
+          component: ChangePasswordView,
+          meta: { requiresAuthTenantOrAdmin: true },
+        },
+        {
           path: 'admin/login',
           name: 'admin-login',
           component: LoginView,
@@ -212,7 +220,8 @@ const router = createRouter({
         },
         {
           path: 'ecc/equipes',
-          redirect: { name: 'ecc-casais' },
+          name: 'ecc-equipes',
+          component: EccEquipesView,
         },
         {
           path: 'ecc/casais/:id',
@@ -322,6 +331,16 @@ const router = createRouter({
 
 function nextAfterTenantAuth(to, next) {
   const authTenant = useAuthStore()
+  const mustChange = !!authTenant.user?.must_change_password
+
+  if (mustChange && to.name !== 'change-password') {
+    next({ name: 'change-password' })
+    return
+  }
+  if (!mustChange && to.name === 'change-password') {
+    next(homePathForUser(authTenant.user))
+    return
+  }
   if (to.name === 'inicio' && isSomenteLiderEquipe(authTenant.user)) {
     next({ name: 'ecc-minha-equipe' })
     return
@@ -338,6 +357,10 @@ router.beforeEach(async (to, from, next) => {
     const ok = await authTenant.checkAuth()
     if (!ok) {
       next()
+      return
+    }
+    if (authTenant.user?.must_change_password) {
+      next({ name: 'change-password' })
       return
     }
     next(isSomenteLiderEquipe(authTenant.user) ? { name: 'ecc-minha-equipe' } : HOME_PATH)

@@ -63,7 +63,7 @@ No banco do tenant, escopado por `igreja_id`:
 - [ ] CRUD equipes e casais sob `/api/v1/ecc/...` com `X-Tenant`.
 - [ ] Importação: cria/reusa equipe pelo nome; cria 2 pessoas + casal; retorna contagem e erros por linha.
 - [ ] 401 sem auth; isolamento por tenant (outro slug não vê dados).
-- [ ] Front: página **Casais** (`/ecc/casais`) com gestão secundária de equipes, import Excel/CSV e ficha `/ecc/casais/:id`. `/ecc/equipes` redireciona para Casais.
+- [ ] Front: página **Casais** (`/ecc/casais`) com import Excel/CSV e ficha `/ecc/casais/:id`. Gestão dedicada de equipes em `/ecc/equipes` ([SPEC-021](SPEC-021-ecc-gestao-equipes-acesso.md)).
 
 ## Fora de escopo
 

@@ -36,7 +36,9 @@ class User extends Authenticatable
         'ulid',
         'name',
         'email',
+        'username',
         'password',
+        'must_change_password',
         'is_active',
         'pessoa_id',
     ];
@@ -93,6 +95,33 @@ class User extends Authenticatable
     }
 
     /**
+     * Resolve login por e-mail (LGPD) ou username (SPEC-021).
+     */
+    public static function findByLogin(string $login): ?self
+    {
+        $login = trim($login);
+        if ($login === '') {
+            return null;
+        }
+
+        if (str_contains($login, '@')) {
+            return static::findByEmail($login);
+        }
+
+        return static::query()->where('username', $login)->first();
+    }
+
+    public static function usernameExists(string $username, ?int $exceptId = null): bool
+    {
+        $query = static::query()->where('username', $username);
+        if ($exceptId !== null) {
+            $query->where('id', '!=', $exceptId);
+        }
+
+        return $query->exists();
+    }
+
+    /**
      * @return array<string, string>
      */
     protected function casts(): array
@@ -101,6 +130,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_active' => 'boolean',
+            'must_change_password' => 'boolean',
         ];
     }
 

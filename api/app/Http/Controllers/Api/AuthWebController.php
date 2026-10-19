@@ -8,6 +8,7 @@ use App\Exceptions\TenantResolutionException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\ActivateViewAsLiderRequest;
 use App\Http\Requests\AuthRequest;
+use App\Http\Requests\ChangePasswordRequest;
 use App\Http\Resources\UserResource;
 use App\Models\User;
 use App\Services\AuditLogger;
@@ -23,6 +24,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\ValidationException;
 use Spatie\Permission\Models\Permission;
 use Stancl\Tenancy\Tenancy;
 
@@ -53,7 +55,8 @@ class AuthWebController extends Controller
 
         $this->tenancy->initialize($tenant);
 
-        $user = User::findByEmail($data['email']);
+        $login = $request->loginIdentifier();
+        $user = User::findByLogin($login);
 
         if ($user && $user->is_active && Hash::check($data['password'], $user->password)) {
             // Não usar Auth::login (sessão web): User vive no DB do tenant e o
@@ -69,7 +72,11 @@ class AuthWebController extends Controller
             $this->auditLogger->log(
                 action: AuditLogger::ACTION_LOGIN_SUCCESS,
                 auditable: $user,
-                metadata: ['email_hint' => $this->auditLogger->emailHint($data['email'])],
+                metadata: [
+                    'login_hint' => str_contains($login, '@')
+                        ? $this->auditLogger->emailHint($login)
+                        : 'username',
+                ],
                 auditableLabel: $user->name,
                 request: $request,
                 actor: $user,
@@ -95,7 +102,9 @@ class AuthWebController extends Controller
         $this->auditLogger->log(
             action: AuditLogger::ACTION_LOGIN_FAILED,
             metadata: [
-                'email_hint' => $this->auditLogger->emailHint($data['email']),
+                'login_hint' => str_contains($login, '@')
+                    ? $this->auditLogger->emailHint($login)
+                    : 'username',
                 'reason' => $user === null ? 'unknown_user' : ($user->is_active ? 'bad_password' : 'inactive'),
             ],
             request: $request,
@@ -103,8 +112,31 @@ class AuthWebController extends Controller
         );
 
         return response()->json([
-            'message' => 'E-mail ou senha incorretos.',
+            'message' => 'Usuário ou senha incorretos.',
         ], 403);
+    }
+
+    public function changePassword(ChangePasswordRequest $request): JsonResponse
+    {
+        $user = auth('sanctum')->user();
+
+        if (! $user instanceof User) {
+            return response()->json(['message' => 'Usuário não autenticado', 'success' => false], 401);
+        }
+
+        $data = $request->validated();
+
+        if (! Hash::check($data['current_password'], $user->password)) {
+            throw ValidationException::withMessages([
+                'current_password' => ['Senha atual incorreta.'],
+            ]);
+        }
+
+        $user->password = $data['password'];
+        $user->must_change_password = false;
+        $user->save();
+
+        return response()->json($this->mePayload($user->refresh()));
     }
 
     public function me(): JsonResponse

@@ -25,6 +25,7 @@ class EccEquipe extends Model
         'igreja_id',
         'nome',
         'cor',
+        'acesso_user_id',
     ];
 
     public function igreja(): BelongsTo
@@ -35,6 +36,11 @@ class EccEquipe extends Model
     public function casais(): HasMany
     {
         return $this->hasMany(Casal::class, 'ecc_equipe_id');
+    }
+
+    public function acessoUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'acesso_user_id');
     }
 
     public function lideres(): BelongsToMany

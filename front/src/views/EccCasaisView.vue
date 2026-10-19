@@ -109,17 +109,15 @@ const casais = ref([])
 const equipes = ref([])
 const equipesServico = ref([])
 const loading = ref(false)
-/** @type {import('vue').Ref<'list'|'form'|'equipes'|'equipe-form'>} */
+/** @type {import('vue').Ref<'list'|'form'>} */
 const mode = ref('list')
 const saving = ref(false)
 const swapping = ref(false)
-const savingEquipe = ref(false)
 const importing = ref(false)
 const filterEquipe = ref('')
 const search = ref('')
 const fileInput = ref(null)
 const importErrors = ref([])
-const equipeForm = ref({ id: null, nome: '', cor: '#6B1C2B' })
 
 const applyFiltersFromQuery = () => {
   filterEquipe.value = route.query.equipe ? String(route.query.equipe) : ''
@@ -290,52 +288,6 @@ const openEdit = async (item) => {
     habilidades: item.habilidades || '',
   }
   await beginForm()
-}
-
-const openEquipesPanel = () => {
-  mode.value = 'equipes'
-}
-
-const closeEquipesPanel = () => {
-  mode.value = 'list'
-}
-
-const openEquipeCreate = () => {
-  equipeForm.value = { id: null, nome: '', cor: '#6B1C2B' }
-  mode.value = 'equipe-form'
-}
-
-const openEquipeEdit = (item) => {
-  equipeForm.value = {
-    id: item.id,
-    nome: item.nome,
-    cor: item.cor || '#6B1C2B',
-  }
-  mode.value = 'equipe-form'
-}
-
-const saveEquipe = async () => {
-  savingEquipe.value = true
-  try {
-    if (equipeForm.value.id) {
-      await api.put(`/ecc/equipes/${equipeForm.value.id}`, {
-        nome: equipeForm.value.nome,
-        cor: equipeForm.value.cor,
-      })
-    } else {
-      await api.post('/ecc/equipes', {
-        nome: equipeForm.value.nome,
-        cor: equipeForm.value.cor,
-      })
-    }
-    innovToast('success', 'OK', 'Equipe salva')
-    mode.value = 'equipes'
-    await loadEquipes()
-  } catch (e) {
-    innovToast('error', 'Erro', e.response?.data?.message || 'Falha ao salvar equipe')
-  } finally {
-    savingEquipe.value = false
-  }
 }
 
 const applyEditFromQuery = async () => {
@@ -658,15 +610,14 @@ onUnmounted(() => {
           >
             {{ importing ? 'Importando…' : 'Importar Excel' }}
           </button>
-          <button
+          <router-link
             v-if="canManageEquipes"
-            type="button"
-            class="btn btn-ghost w-full sm:w-auto"
+            to="/ecc/equipes"
+            class="btn btn-ghost w-full sm:w-auto text-center"
             data-testid="casais-gerenciar-equipes"
-            @click="openEquipesPanel"
           >
             Gerenciar equipes
-          </button>
+          </router-link>
           <input
             v-if="canManageCasais"
             ref="fileInput"
@@ -793,142 +744,8 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <!-- Painel gerenciar equipes -->
-    <div
-      v-else-if="mode === 'equipes'"
-      class="w-full space-y-5"
-      data-testid="casais-equipes-panel"
-    >
-      <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h3 class="font-serif text-xl" style="color: #2A1418">Equipes</h3>
-          <p class="text-[13px] mt-1" style="color: rgba(42, 20, 24, 0.62)">
-            Grupos aos quais os casais pertencem.
-          </p>
-        </div>
-        <div class="flex flex-col gap-2 sm:flex-row">
-          <button
-            type="button"
-            class="btn btn-primary w-full sm:w-auto"
-            data-testid="equipes-nova"
-            @click="openEquipeCreate"
-          >
-            Nova equipe
-          </button>
-          <button
-            type="button"
-            class="btn btn-ghost w-full sm:w-auto"
-            data-testid="equipes-fechar"
-            @click="closeEquipesPanel"
-          >
-            Voltar aos casais
-          </button>
-        </div>
-      </div>
-
-      <div
-        class="w-full overflow-hidden rounded-[11px]"
-        style="background: #FFFDFA; border: 1px solid rgba(42, 20, 24, 0.1)"
-      >
-        <div
-          v-if="!equipes.length"
-          class="p-10 text-center"
-          style="color: rgba(42, 20, 24, 0.5)"
-        >
-          Nenhuma equipe cadastrada.
-        </div>
-        <div
-          v-for="equipe in equipes"
-          :key="equipe.id"
-          class="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"
-          style="border-top: 1px solid rgba(42, 20, 24, 0.07)"
-          data-testid="equipe-row"
-        >
-          <div class="flex items-center gap-2.5 min-w-0">
-            <div
-              class="w-[30px] h-[30px] rounded-md flex items-center justify-center font-serif text-[13px] font-medium shrink-0"
-              :style="{ background: '#F3EDE6', color: equipe.cor || '#6B1C2B' }"
-            >
-              {{ (equipe.nome || '?')[0] }}
-            </div>
-            <div class="min-w-0">
-              <div class="text-[13.5px] font-medium truncate" style="color: #2A1418">
-                {{ equipe.nome }}
-              </div>
-              <div class="text-[12.5px]" style="color: rgba(42, 20, 24, 0.62)">
-                {{ equipe.casais_count ?? 0 }} casais
-              </div>
-            </div>
-          </div>
-          <div class="flex flex-wrap gap-2">
-            <button
-              type="button"
-              class="btn btn-ghost"
-              data-testid="equipe-filtrar-casais"
-              @click="filterEquipe = String(equipe.id); closeEquipesPanel()"
-            >
-              Ver casais
-            </button>
-            <button
-              type="button"
-              class="btn btn-ghost"
-              data-testid="equipe-editar"
-              @click="openEquipeEdit(equipe)"
-            >
-              Editar
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Form equipe -->
-    <div
-      v-else-if="mode === 'equipe-form'"
-      class="rounded-[11px] p-6 w-full max-w-md"
-      style="background: #FFFDFA; border: 1px solid rgba(42, 20, 24, 0.1)"
-      data-testid="equipe-form"
-    >
-      <h3 class="font-serif text-xl mb-4">
-        {{ equipeForm.id ? 'Editar equipe' : 'Nova equipe' }}
-      </h3>
-      <form class="space-y-4" @submit.prevent="saveEquipe">
-        <div>
-          <label class="fld" for="eq-nome">Nome</label>
-          <input id="eq-nome" v-model="equipeForm.nome" class="input" required data-testid="equipe-nome">
-        </div>
-        <div>
-          <label class="fld" for="eq-cor">Cor</label>
-          <input
-            id="eq-cor"
-            v-model="equipeForm.cor"
-            type="color"
-            class="h-10 w-20"
-            data-testid="equipe-cor"
-          >
-        </div>
-        <div class="flex flex-col gap-2 sm:flex-row">
-          <button
-            type="submit"
-            class="btn btn-primary w-full sm:w-auto"
-            :disabled="savingEquipe"
-            data-testid="equipe-salvar"
-          >
-            Salvar
-          </button>
-          <button
-            type="button"
-            class="btn btn-ghost w-full sm:w-auto"
-            @click="mode = 'equipes'"
-          >
-            Cancelar
-          </button>
-        </div>
-      </form>
-    </div>
-
     <!-- Form casal em etapas -->
-    <div v-else class="card p-6" data-testid="casal-form">
+    <div v-else-if="mode === 'form'" class="card p-6" data-testid="casal-form">
       <div class="flex flex-wrap items-center justify-between gap-3 mb-2">
         <div>
           <p class="text-[12px] font-medium" style="color: var(--color-accent-dark)" data-testid="casal-form-step-progress">

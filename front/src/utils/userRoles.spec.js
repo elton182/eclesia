@@ -7,6 +7,7 @@ import {
   isLiderEquipeScoped,
   equipesLideradasIds,
   canSeeEccCasaisNav,
+  canSeeEccEquipesNav,
   canSeeEccEventosNav,
   canSeeEccFinanceiroNav,
   canSeeCalendarioNav,
@@ -158,6 +159,22 @@ describe('userRoles', () => {
       false,
     )
     assert.equal(canSeeEccCasaisNav(null, { isSuperAdmin: true }), true)
+  })
+
+  it('canSeeEccEquipesNav para cadastros-equipes e líder', () => {
+    assert.equal(
+      canSeeEccEquipesNav({ roles: [{ name: 'cadastros-equipes' }] }),
+      true,
+    )
+    assert.equal(
+      canSeeEccEquipesNav({ roles: [{ name: 'lider-equipe' }] }),
+      true,
+    )
+    assert.equal(
+      canSeeEccEquipesNav({ roles: [{ name: 'gestor-site' }] }),
+      false,
+    )
+    assert.equal(canSeeEccEquipesNav(null, { isSuperAdmin: true }), true)
   })
 
   it('canSeeEccEventosNav para admin e cadastros-eventos', () => {

@@ -112,10 +112,12 @@ Route::middleware([
     // Só usuário do tenant (token no DB do tenant)
     Route::post('web/refresh', [AuthWebController::class, 'refresh']);
     Route::post('web/me', [AuthWebController::class, 'me'])->middleware(['cookie.to.token', 'auth:sanctum', SetIgrejaFromHeader::class]);
+    Route::post('web/change-password', [AuthWebController::class, 'changePassword'])
+        ->middleware(['cookie.to.token', 'auth:sanctum', SetIgrejaFromHeader::class]);
     Route::post('web/view-as/lider-equipe', [AuthWebController::class, 'activateViewAsLider'])
-        ->middleware(['cookie.to.token', 'auth:sanctum', SetIgrejaFromHeader::class]);
+        ->middleware(['cookie.to.token', 'auth:sanctum', SetIgrejaFromHeader::class, 'password.changed']);
     Route::delete('web/view-as', [AuthWebController::class, 'clearViewAs'])
-        ->middleware(['cookie.to.token', 'auth:sanctum', SetIgrejaFromHeader::class]);
+        ->middleware(['cookie.to.token', 'auth:sanctum', SetIgrejaFromHeader::class, 'password.changed']);
     Route::post('web/logout', [AuthWebController::class, 'logout'])->middleware(['cookie.to.token', 'auth:sanctum']);
 });
 
@@ -124,6 +126,7 @@ Route::middleware([
     'cookie.to.token',
     AuthenticateTenantApi::class,
     SetIgrejaFromHeader::class,
+    'password.changed',
 ])->prefix('api/v1')->group(function () {
     Route::get('roles', [RolePermissionController::class, 'roles']);
     Route::get('permissions', [RolePermissionController::class, 'permissions']);
@@ -135,6 +138,9 @@ Route::middleware([
     Route::delete('users/{user}/roles', [UserController::class, 'removeRole']);
     Route::apiResource('users', UserController::class);
 
+    Route::put('ecc/equipes/{id}/casais', [EccEquipeController::class, 'syncCasais']);
+    Route::post('ecc/equipes/{id}/acesso', [EccEquipeController::class, 'criarAcesso']);
+    Route::post('ecc/equipes/{id}/acesso/reset-senha', [EccEquipeController::class, 'resetSenhaAcesso']);
     Route::apiResource('ecc/equipes', EccEquipeController::class)->names('ecc.equipes');
     Route::get('ecc/equipes-servico', [EccEquipeServicoController::class, 'index']);
     Route::post('ecc/casais/import', [EccCasalController::class, 'import']);

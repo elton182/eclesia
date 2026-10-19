@@ -13,7 +13,7 @@ const router = useRouter()
 const authStore = useAuthStore()
 const remembered = loadLoginCredentials()
 const tenant = ref(remembered.tenant)
-const email = ref(remembered.email)
+const login = ref(remembered.login || remembered.email)
 const password = ref('')
 const showPassword = ref(false)
 const isLoading = ref(false)
@@ -27,7 +27,7 @@ const siteLink = computed(() => {
 const handleLogin = async () => {
   const validation = validateTenantLoginForm({
     tenant: tenant.value,
-    email: email.value,
+    login: login.value,
     password: password.value,
   })
   if (!validation.ok) {
@@ -38,11 +38,15 @@ const handleLogin = async () => {
   isLoading.value = true
   errorMessage.value = ''
 
-  const result = await authStore.login(tenant.value, email.value, password.value)
+  const result = await authStore.login(tenant.value, login.value, password.value)
 
   if (result.success) {
-    persistLoginCredentials({ tenant: tenant.value, email: email.value })
-    router.push(homePathForUser(authStore.user))
+    persistLoginCredentials({ tenant: tenant.value, login: login.value })
+    if (authStore.user?.must_change_password) {
+      router.push({ name: 'change-password' })
+    } else {
+      router.push(homePathForUser(authStore.user))
+    }
   } else {
     errorMessage.value = result.error
   }
@@ -146,19 +150,20 @@ const handleLogin = async () => {
               required
               autocomplete="organization"
               data-testid="tenant-login-org"
-            />
+            >
           </div>
 
-          <label for="email" class="fld">E-mail</label>
+          <label for="login" class="fld">E-mail ou usuário</label>
           <input
-            id="email"
-            v-model="email"
-            type="email"
+            id="login"
+            v-model="login"
+            type="text"
             class="input mb-[18px]"
-            placeholder="seu@email.com"
+            placeholder="seu@email.com ou equipe-a"
             required
+            autocomplete="username"
             data-testid="tenant-login-email"
-          />
+          >
 
           <label for="password" class="fld">Senha</label>
           <div
@@ -174,7 +179,7 @@ const handleLogin = async () => {
               placeholder="••••••••"
               required
               data-testid="tenant-login-password"
-            />
+            >
             <button
               type="button"
               class="px-3.5 text-[12.5px] font-medium shrink-0"

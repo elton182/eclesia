@@ -21,6 +21,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'tenancy.slug' => \App\Http\Middleware\InitializeTenancyBySlug::class,
             'tenancy.path_slug' => \App\Http\Middleware\InitializeTenancyByPathSlug::class,
             'auth.tenant' => \App\Http\Middleware\AuthenticateTenantApi::class,
+            'password.changed' => \App\Http\Middleware\EnsurePasswordChanged::class,
         ]);
 
         // Ordem necessária:

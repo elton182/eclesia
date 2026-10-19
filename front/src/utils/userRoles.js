@@ -151,7 +151,7 @@ export function canSeePastoraisNav(user, opts = {}) {
 }
 
 /**
- * Nav unificada ECC: tela Casais (inclui gestão secundária de equipes).
+ * Nav ECC: tela Casais.
  * @param {{ permissions?: string[], roles?: Array<{ name: string }> }|null|undefined} user
  * @param {{ isSuperAdmin?: boolean }} [opts]
  */
@@ -159,6 +159,19 @@ export function canSeeEccCasaisNav(user, opts = {}) {
   return (
     userHasPermission(user, 'telas.casais', opts) ||
     userHasPermission(user, 'telas.equipes', opts)
+  )
+}
+
+/**
+ * Nav ECC: tela Equipes (SPEC-021).
+ * @param {{ permissions?: string[], roles?: Array<{ name: string }> }|null|undefined} user
+ * @param {{ isSuperAdmin?: boolean }} [opts]
+ */
+export function canSeeEccEquipesNav(user, opts = {}) {
+  return (
+    userHasPermission(user, 'telas.equipes', opts) ||
+    userHasPermission(user, 'ecc.equipes.manage', opts) ||
+    userHasPermission(user, 'ecc.equipes.view', opts)
   )
 }
 

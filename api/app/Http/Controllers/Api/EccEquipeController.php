@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreEccEquipeRequest;
+use App\Http\Requests\SyncEccEquipeCasaisRequest;
 use App\Http\Requests\UpdateEccEquipeRequest;
 use App\Http\Resources\EccEquipeResource;
 use App\Services\EccEquipeService;
@@ -32,7 +33,7 @@ class EccEquipeController extends Controller
     {
         $equipe = $this->equipes->create($request->validated());
 
-        return (new EccEquipeResource($equipe->loadCount('casais')))
+        return (new EccEquipeResource($equipe->load(['acessoUser:id,username'])->loadCount('casais')))
             ->response()
             ->setStatusCode(201);
     }
@@ -58,5 +59,48 @@ class EccEquipeController extends Controller
         $this->equipes->delete($this->equipes->find($id));
 
         return response()->noContent();
+    }
+
+    public function syncCasais(SyncEccEquipeCasaisRequest $request, string $id): EccEquipeResource
+    {
+        $equipe = $this->equipes->find($id);
+        /** @var list<string> $casalIds */
+        $casalIds = $request->validated('casal_ids');
+
+        return new EccEquipeResource($this->equipes->syncCasais($equipe, $casalIds));
+    }
+
+    public function criarAcesso(string $id): JsonResponse
+    {
+        abort_unless($this->visibility->userCan('ecc.equipes.manage'), 403);
+
+        $result = $this->equipes->criarAcesso($this->equipes->find($id));
+
+        return response()->json([
+            'data' => [
+                'username' => $result['username'],
+                'password' => $result['password'],
+                'tem_acesso' => true,
+                'acesso_username' => $result['username'],
+                'equipe' => (new EccEquipeResource($result['equipe']))->resolve(),
+            ],
+        ], 201);
+    }
+
+    public function resetSenhaAcesso(string $id): JsonResponse
+    {
+        abort_unless($this->visibility->userCan('ecc.equipes.manage'), 403);
+
+        $result = $this->equipes->resetSenhaAcesso($this->equipes->find($id));
+
+        return response()->json([
+            'data' => [
+                'username' => $result['username'],
+                'password' => $result['password'],
+                'tem_acesso' => true,
+                'acesso_username' => $result['username'],
+                'equipe' => (new EccEquipeResource($result['equipe']))->resolve(),
+            ],
+        ]);
     }
 }
