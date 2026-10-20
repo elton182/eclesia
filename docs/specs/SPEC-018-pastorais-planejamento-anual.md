@@ -67,6 +67,7 @@ A tabela `pastorais` já existe para o site público (SPEC-005 / ADR-0003) e evo
 
 - [ ] Tela cadastro de pastorais + membros (gated `telas.pastorais` / manage).
 - [ ] Tela calendário de planejamento anual (visão mês/ano); coordenador propõe; gestor revisa com badge de conflito.
+- [ ] Emenda UI gestor: visão semanal/mensal, filtros laterais por pastoral e destaque de conflitos na grade — [SPEC-022](./SPEC-022-planejamento-visao-gestor-calendario.md).
 - [ ] Menu distinto do calendário oficial (SPEC-012).
 
 ## Fora de escopo

@@ -7,6 +7,9 @@ import {
   agruparItensPorData,
   indexarIndisponibilidades,
   gradeMesCalendario,
+  inicioSemanaDomingo,
+  addDiasIso,
+  gradeSemanaCalendario,
   toggleDataSelecionada,
   labelDiaCurto,
   resumoDiaMontagem,
@@ -87,6 +90,28 @@ describe('calendario', () => {
     assert.equal(cells[2].iso, '2026-09-01')
     assert.equal(cells.filter((c) => c.inMonth).length, 30)
     assert.equal(gradeMesCalendario(0, 9).length, 0)
+  })
+
+  it('inicioSemanaDomingo e addDiasIso', () => {
+    // 2026-10-14 = quarta → domingo 11
+    assert.equal(inicioSemanaDomingo('2026-10-14'), '2026-10-11')
+    assert.equal(inicioSemanaDomingo('2026-10-11'), '2026-10-11')
+    assert.equal(addDiasIso('2026-10-11', 7), '2026-10-18')
+    assert.equal(addDiasIso('2026-10-11', -7), '2026-10-04')
+    assert.equal(inicioSemanaDomingo(''), '')
+  })
+
+  it('gradeSemanaCalendario Dom–Sáb', () => {
+    const cells = gradeSemanaCalendario('2026-10-14', { ano: 2026, mes: 10 })
+    assert.equal(cells.length, 7)
+    assert.equal(cells[0].iso, '2026-10-11')
+    assert.equal(cells[6].iso, '2026-10-17')
+    assert.equal(cells.every((c) => c.inMonth), true)
+    const cruzando = gradeSemanaCalendario('2026-09-28', { ano: 2026, mes: 10 })
+    assert.equal(cruzando[0].iso, '2026-09-27')
+    assert.equal(cruzando[0].inMonth, false)
+    assert.equal(cruzando[4].iso, '2026-10-01')
+    assert.equal(cruzando[4].inMonth, true)
   })
 
   it('alterna datas selecionadas e formata label curto', () => {
