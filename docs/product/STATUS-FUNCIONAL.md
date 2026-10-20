@@ -236,7 +236,7 @@ Marca do **site** ≠ marca do **app** (ver branding abaixo).
 | Detalhe da pastoral | `/pastorais/:id` |
 | Anos de planejamento | `/planejamento` — status `rascunho → coleta → revisao → fechado` |
 | Eventos por pastoral | Propostas no detalhe do ano `/planejamento/:id` |
-| Visão gestor (SPEC-022) | Toggle mensal/semanal; tags laterais por pastoral; conflitos destacados na grade |
+| Visão gestor (SPEC-022) | Toggle mensal/semanal (grade horária); tags laterais recolhíveis; conflitos na grade |
 | Conflitos de local/horário | Alerta na gravação + destaque na grade (não bloqueia) |
 | PDF | Export do planejamento |
 | Link/token público | Existe no código para coleta por pastoral |
