@@ -119,6 +119,199 @@ export function filterEventosPorMes(eventos, mes) {
 }
 
 /**
+ * Filtra eventos cuja data_inicio cai na semana Dom–Sáb iniciada em `semanaInicioIso`.
+ * @param {Array<{ data_inicio?: string }>|null|undefined} eventos
+ * @param {string} semanaInicioIso YYYY-MM-DD (domingo)
+ * @returns {typeof eventos}
+ */
+export function filterEventosPorSemana(eventos, semanaInicioIso) {
+  const start = (semanaInicioIso || '').slice(0, 10)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(start)) return [...(eventos || [])]
+  const end = (() => {
+    const [y, m, d] = start.split('-').map(Number)
+    const dt = new Date(y, m - 1, d + 6)
+    return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`
+  })()
+  return (eventos || []).filter((ev) => {
+    const day = (ev.data_inicio || '').slice(0, 10)
+    return day >= start && day <= end
+  })
+}
+
+/** Paleta estável para tags de pastoral (visão gestor). */
+export const PASTORAL_CORES = Object.freeze([
+  '#4E1220',
+  '#B4703F',
+  '#2a6b5a',
+  '#2a4a7a',
+  '#8a2424',
+  '#5c4a2a',
+  '#3d5a40',
+  '#6B1C2B',
+  '#7a3e5c',
+  '#1f5a6b',
+])
+
+/**
+ * Cor de tag para pastoral pelo índice na lista.
+ * @param {number} index
+ * @returns {string}
+ */
+export function corPastoralPorIndice(index) {
+  const i = Number(index)
+  if (!Number.isFinite(i) || i < 0) return PASTORAL_CORES[0]
+  return PASTORAL_CORES[i % PASTORAL_CORES.length]
+}
+
+/**
+ * Mapa pastoral_id → cor a partir da lista ordenada.
+ * @param {Array<{ id?: string }>|null|undefined} pastorais
+ * @returns {Record<string, string>}
+ */
+export function mapaCoresPastorais(pastorais) {
+  /** @type {Record<string, string>} */
+  const out = {}
+  ;(pastorais || []).forEach((p, idx) => {
+    if (p?.id) out[p.id] = corPastoralPorIndice(idx)
+  })
+  return out
+}
+
+/**
+ * Mantém só eventos de pastorais marcadas como visíveis.
+ * Se `visiveis` for null/undefined, não filtra.
+ * @param {Array<{ pastoral_id?: string }>|null|undefined} eventos
+ * @param {Set<string>|string[]|null|undefined} visiveis
+ * @returns {typeof eventos}
+ */
+export function filterEventosPorPastoraisVisiveis(eventos, visiveis) {
+  if (visiveis == null) return [...(eventos || [])]
+  const set = visiveis instanceof Set ? visiveis : new Set(visiveis)
+  if (!set.size) return []
+  return (eventos || []).filter((ev) => ev.pastoral_id && set.has(ev.pastoral_id))
+}
+
+/**
+ * Alterna id no conjunto (imuta → novo Set).
+ * @param {Set<string>|string[]|null|undefined} atuais
+ * @param {string} id
+ * @returns {Set<string>}
+ */
+export function togglePastoralVisivel(atuais, id) {
+  const next = new Set(atuais instanceof Set ? atuais : atuais || [])
+  if (!id) return next
+  if (next.has(id)) next.delete(id)
+  else next.add(id)
+  return next
+}
+
+/**
+ * @param {{ local_ids?: string[], locais?: Array<{ id?: string }|string> }|null|undefined} evento
+ * @returns {string[]}
+ */
+export function localIdsDoEvento(evento) {
+  if (!evento) return []
+  if (Array.isArray(evento.local_ids) && evento.local_ids.length) {
+    return evento.local_ids.filter(Boolean).map(String)
+  }
+  return (evento.locais || [])
+    .map((l) => (typeof l === 'string' ? l : l?.id))
+    .filter(Boolean)
+    .map(String)
+}
+
+/**
+ * Intervalo [inicio, fim) em ms — espelha PlanejamentoIntervalo da API.
+ * @param {{
+ *   data_inicio?: string,
+ *   data_fim?: string|null,
+ *   hora_inicio?: string|null,
+ *   hora_fim?: string|null,
+ * }} evento
+ * @returns {{ inicio: number, fim: number }|null}
+ */
+export function intervaloEventoMs(evento) {
+  const dataInicio = (evento?.data_inicio || '').slice(0, 10)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dataInicio)) return null
+  const dataFimRaw = evento?.data_fim ? String(evento.data_fim).slice(0, 10) : null
+  const dataFim = dataFimRaw && /^\d{4}-\d{2}-\d{2}$/.test(dataFimRaw) ? dataFimRaw : null
+  const horaInicio = formatHoraCurta(evento?.hora_inicio) || null
+  const horaFim = formatHoraCurta(evento?.hora_fim) || null
+
+  const inicio = Date.parse(`${dataInicio}T${horaInicio || '00:00'}:00`)
+  if (Number.isNaN(inicio)) return null
+
+  if (horaFim === null && horaInicio !== null && dataFim === null) {
+    return { inicio, fim: inicio + 60 * 60 * 1000 }
+  }
+
+  const fim = Date.parse(`${dataFim || dataInicio}T${horaFim || horaInicio || '23:59'}:00`)
+  if (Number.isNaN(fim)) return null
+  return { inicio, fim }
+}
+
+/**
+ * Anota cada evento com `tem_conflito` e `conflitos[]` (local + horário sobreposto).
+ * Não muta a lista original.
+ * @param {Array|null|undefined} eventos
+ * @returns {Array}
+ */
+export function anotarConflitosEventos(eventos) {
+  const list = Array.isArray(eventos) ? eventos : []
+  /** @type {Array<{ ev: any, locais: string[], intervalo: { inicio: number, fim: number }|null }>} */
+  const prepared = list.map((ev) => ({
+    ev,
+    locais: localIdsDoEvento(ev),
+    intervalo: intervaloEventoMs(ev),
+  }))
+
+  return prepared.map((row, i) => {
+    /** @type {Array<Record<string, unknown>>} */
+    const conflitos = []
+    if (row.locais.length && row.intervalo) {
+      for (let j = 0; j < prepared.length; j++) {
+        if (i === j) continue
+        const other = prepared[j]
+        if (!other.intervalo || !other.locais.length) continue
+        const shared = row.locais.filter((id) => other.locais.includes(id))
+        if (!shared.length) continue
+        const a = row.intervalo
+        const b = other.intervalo
+        if (a.inicio < b.fim && b.inicio < a.fim) {
+          conflitos.push({
+            id: other.ev.id,
+            titulo: other.ev.titulo,
+            pastoral_id: other.ev.pastoral_id,
+            pastoral_nome: other.ev.pastoral_nome || other.ev.pastoral?.nome,
+            data_inicio: (other.ev.data_inicio || '').slice(0, 10),
+            data_fim: other.ev.data_fim ? String(other.ev.data_fim).slice(0, 10) : null,
+            hora_inicio: formatHoraCurta(other.ev.hora_inicio) || null,
+            hora_fim: formatHoraCurta(other.ev.hora_fim) || null,
+            local_ids: shared,
+          })
+        }
+      }
+    }
+    return {
+      ...row.ev,
+      tem_conflito: conflitos.length > 0,
+      conflitos,
+    }
+  })
+}
+
+/**
+ * Conta eventos com conflito na lista (já anotada ou com conflitos[]).
+ * @param {Array<{ tem_conflito?: boolean, conflitos?: unknown[] }>|null|undefined} eventos
+ * @returns {number}
+ */
+export function contarEventosComConflito(eventos) {
+  return (eventos || []).filter(
+    (ev) => ev.tem_conflito === true || (Array.isArray(ev.conflitos) && ev.conflitos.length > 0),
+  ).length
+}
+
+/**
  * Coordenador pode propor novo evento neste status do ano?
  * @param {string} anoStatus
  * @param {{ canGerir?: boolean, canPropor?: boolean }} perms

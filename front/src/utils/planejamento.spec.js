@@ -8,6 +8,15 @@ import {
   proximosStatusPlanejamento,
   groupEventosByDay,
   filterEventosPorMes,
+  filterEventosPorSemana,
+  filterEventosPorPastoraisVisiveis,
+  togglePastoralVisivel,
+  corPastoralPorIndice,
+  mapaCoresPastorais,
+  localIdsDoEvento,
+  intervaloEventoMs,
+  anotarConflitosEventos,
+  contarEventosComConflito,
   canCriarEventoPlanejamento,
   canEditarEventoPlanejamento,
   canAlterarStatusSolicitacao,
@@ -48,6 +57,83 @@ describe('planejamento', () => {
     assert.equal(byDay.get('2026-03-10').length, 2)
     assert.equal(filterEventosPorMes(eventos, 3).length, 2)
     assert.equal(filterEventosPorMes(eventos, 4).length, 1)
+  })
+
+  it('filterEventosPorSemana Dom–Sáb', () => {
+    const eventos = [
+      { id: '1', data_inicio: '2026-10-10' }, // sáb anterior
+      { id: '2', data_inicio: '2026-10-11' }, // dom
+      { id: '3', data_inicio: '2026-10-14' },
+      { id: '4', data_inicio: '2026-10-18' }, // dom seguinte
+    ]
+    const semana = filterEventosPorSemana(eventos, '2026-10-11')
+    assert.deepEqual(
+      semana.map((e) => e.id),
+      ['2', '3'],
+    )
+  })
+
+  it('filtro e toggle de pastorais visíveis + cores', () => {
+    const eventos = [
+      { id: '1', pastoral_id: 'p1' },
+      { id: '2', pastoral_id: 'p2' },
+      { id: '3', pastoral_id: 'p1' },
+    ]
+    assert.equal(filterEventosPorPastoraisVisiveis(eventos, ['p1']).length, 2)
+    assert.equal(filterEventosPorPastoraisVisiveis(eventos, new Set()).length, 0)
+    assert.equal(filterEventosPorPastoraisVisiveis(eventos, null).length, 3)
+    const toggled = togglePastoralVisivel(['p1', 'p2'], 'p1')
+    assert.equal(toggled.has('p1'), false)
+    assert.equal(toggled.has('p2'), true)
+    assert.equal(corPastoralPorIndice(0), '#4E1220')
+    assert.equal(mapaCoresPastorais([{ id: 'p1' }, { id: 'p2' }]).p2, corPastoralPorIndice(1))
+  })
+
+  it('anotarConflitosEventos detecta sobreposição de local/horário', () => {
+    assert.deepEqual(localIdsDoEvento({ locais: [{ id: 'l1' }] }), ['l1'])
+    const intervalo = intervaloEventoMs({
+      data_inicio: '2026-05-01',
+      hora_inicio: '19:00',
+      hora_fim: '21:00',
+    })
+    assert.ok(intervalo)
+    assert.equal(intervalo.fim - intervalo.inicio, 2 * 60 * 60 * 1000)
+
+    const anotados = anotarConflitosEventos([
+      {
+        id: 'a',
+        titulo: 'Retiro',
+        pastoral_id: 'p1',
+        data_inicio: '2026-05-01',
+        hora_inicio: '19:00',
+        hora_fim: '21:00',
+        local_ids: ['sala'],
+      },
+      {
+        id: 'b',
+        titulo: 'Ensaio',
+        pastoral_id: 'p2',
+        pastoral_nome: 'Música',
+        data_inicio: '2026-05-01',
+        hora_inicio: '20:00',
+        hora_fim: '22:00',
+        local_ids: ['sala'],
+      },
+      {
+        id: 'c',
+        titulo: 'Outro local',
+        pastoral_id: 'p3',
+        data_inicio: '2026-05-01',
+        hora_inicio: '20:00',
+        hora_fim: '22:00',
+        local_ids: ['outro'],
+      },
+    ])
+    assert.equal(anotados.find((e) => e.id === 'a').tem_conflito, true)
+    assert.equal(anotados.find((e) => e.id === 'b').tem_conflito, true)
+    assert.equal(anotados.find((e) => e.id === 'c').tem_conflito, false)
+    assert.equal(contarEventosComConflito(anotados), 2)
+    assert.match(anotados.find((e) => e.id === 'a').conflitos[0].titulo, /Ensaio/)
   })
 
   it('canCriarEventoPlanejamento por papel e status', () => {

@@ -173,6 +173,66 @@ export function indexarIndisponibilidades(list) {
 }
 
 /**
+ * Domingo (início de semana) que contém a data ISO.
+ * @param {string} iso YYYY-MM-DD
+ * @returns {string} YYYY-MM-DD
+ */
+export function inicioSemanaDomingo(iso) {
+  if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return ''
+  const [y, m, d] = iso.split('-').map(Number)
+  const date = new Date(y, m - 1, d)
+  if (Number.isNaN(date.getTime())) return ''
+  date.setDate(date.getDate() - date.getDay())
+  const yy = date.getFullYear()
+  const mm = String(date.getMonth() + 1).padStart(2, '0')
+  const dd = String(date.getDate()).padStart(2, '0')
+  return `${yy}-${mm}-${dd}`
+}
+
+/**
+ * Soma dias a uma data ISO (calendário civil local).
+ * @param {string} iso YYYY-MM-DD
+ * @param {number} dias
+ * @returns {string}
+ */
+export function addDiasIso(iso, dias) {
+  if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return ''
+  const [y, m, d] = iso.split('-').map(Number)
+  const date = new Date(y, m - 1, d)
+  if (Number.isNaN(date.getTime())) return ''
+  date.setDate(date.getDate() + Number(dias || 0))
+  const yy = date.getFullYear()
+  const mm = String(date.getMonth() + 1).padStart(2, '0')
+  const dd = String(date.getDate()).padStart(2, '0')
+  return `${yy}-${mm}-${dd}`
+}
+
+/**
+ * Sete células Dom–Sáb a partir do domingo da semana.
+ * @param {string} semanaInicioIso YYYY-MM-DD (domingo)
+ * @param {{ ano?: number, mes?: number }} [opts] se ano/mês informados, marca inMonth
+ * @returns {Array<{ iso: string, dia: number, inMonth: boolean }>}
+ */
+export function gradeSemanaCalendario(semanaInicioIso, opts = {}) {
+  const start = inicioSemanaDomingo(semanaInicioIso) || semanaInicioIso
+  if (!start || !/^\d{4}-\d{2}-\d{2}$/.test(start)) return []
+  const anoRef = opts.ano != null ? Number(opts.ano) : null
+  const mesRef = opts.mes != null ? Number(opts.mes) : null
+  /** @type {Array<{ iso: string, dia: number, inMonth: boolean }>} */
+  const cells = []
+  for (let i = 0; i < 7; i++) {
+    const iso = addDiasIso(start, i)
+    const [, mm, dd] = iso.split('-').map(Number)
+    const inMonth =
+      anoRef == null || mesRef == null
+        ? true
+        : Number(iso.slice(0, 4)) === anoRef && mm === mesRef
+    cells.push({ iso, dia: dd, inMonth })
+  }
+  return cells
+}
+
+/**
  * Células da grade mensal (Dom–Sáb). Fora do mês → iso null.
  * @param {number} ano
  * @param {number} mes 1–12

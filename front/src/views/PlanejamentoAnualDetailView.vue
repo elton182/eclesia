@@ -20,24 +20,34 @@ import { innovToast } from '@/plugins/toast'
 import { innovConfirm } from '@/plugins/dialog'
 import {
   MES_NOMES,
+  addDiasIso,
   formatHoraCalendario,
   gradeMesCalendario,
+  gradeSemanaCalendario,
+  inicioSemanaDomingo,
+  labelDiaCurto,
 } from '@/utils/calendario'
 import {
   STATUS_SOLICITACAO,
+  anotarConflitosEventos,
   canAlterarStatusSolicitacao,
   canCriarEventoPlanejamento,
   canEditarEventoPlanejamento,
+  contarEventosComConflito,
   filterEventosPorMes,
+  filterEventosPorPastoraisVisiveis,
+  filterEventosPorSemana,
   formatConflitosAlert,
   groupEventosByDay,
   labelEventoPlanejamentoPreview,
   labelStatusPlanejamento,
   labelStatusSolicitacao,
-  styleStatusSolicitacao,
+  mapaCoresPastorais,
   mapPastoralLinks,
   pastoralIdsDoUsuario,
   proximosStatusPlanejamento,
+  styleStatusSolicitacao,
+  togglePastoralVisivel,
   unwrapList,
 } from '@/utils/planejamento'
 import {
@@ -73,7 +83,16 @@ const eventos = ref([])
 const pastorais = ref([])
 const locais = ref([])
 const mesView = ref(new Date().getMonth() + 1)
-const filtroPastoral = ref('')
+/** @type {import('vue').Ref<'mes'|'semana'>} */
+const visaoCalendario = ref('mes')
+const semanaInicio = ref(
+  inicioSemanaDomingo(
+    `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}`,
+  ),
+)
+/** @type {import('vue').Ref<Set<string>>} */
+const pastoraisVisiveis = ref(new Set())
+const pastoraisFiltroInicializado = ref(false)
 const filtroStatus = ref('')
 const diaSelecionado = ref('')
 const showDayModal = ref(false)
@@ -152,10 +171,20 @@ const pastoraisOpcoes = computed(() => {
   return pastorais.value.filter((p) => myPastoralIds.value.includes(p.id))
 })
 
+const pastoraisPainel = computed(() => {
+  if (canVerGlobal.value) return pastorais.value
+  return pastoraisOpcoes.value
+})
+
+const coresPastorais = computed(() => mapaCoresPastorais(pastoraisPainel.value))
+
 const eventosFiltrados = computed(() => {
-  let list = filterEventosPorMes(eventos.value, mesView.value)
-  if (filtroPastoral.value) {
-    list = list.filter((e) => e.pastoral_id === filtroPastoral.value)
+  let list =
+    visaoCalendario.value === 'semana'
+      ? filterEventosPorSemana(eventos.value, semanaInicio.value)
+      : filterEventosPorMes(eventos.value, mesView.value)
+  if (canVerGlobal.value || pastoraisPainel.value.length) {
+    list = filterEventosPorPastoraisVisiveis(list, pastoraisVisiveis.value)
   }
   if (filtroStatus.value) {
     list = list.filter((e) => e.status_solicitacao === filtroStatus.value)
@@ -174,10 +203,26 @@ const eventosFiltrados = computed(() => {
 const byDay = computed(() => groupEventosByDay(eventosFiltrados.value))
 const cells = computed(() => {
   if (!anual.value) return []
+  if (visaoCalendario.value === 'semana') {
+    return gradeSemanaCalendario(semanaInicio.value, {
+      ano: anual.value.ano,
+      mes: mesView.value,
+    })
+  }
   return gradeMesCalendario(anual.value.ano, mesView.value)
 })
 
 const mesTitulo = computed(() => `${MES_NOMES[mesView.value] || mesView.value} ${anual.value?.ano || ''}`)
+
+const periodoTitulo = computed(() => {
+  if (visaoCalendario.value !== 'semana' || !semanaInicio.value) return mesTitulo.value
+  const fim = addDiasIso(semanaInicio.value, 6)
+  return `${labelDiaCurto(semanaInicio.value)} – ${labelDiaCurto(fim)} · ${anual.value?.ano || ''}`
+})
+
+const conflitosVisiveisCount = computed(() => contarEventosComConflito(eventosFiltrados.value))
+
+const maxChipsPorDia = computed(() => (visaoCalendario.value === 'semana' ? 8 : 2))
 
 const diaEventos = computed(() => {
   if (!diaSelecionado.value) return []
@@ -195,7 +240,7 @@ const statusSolicitacaoOptions = computed(() =>
 )
 
 function eventoTemConflito(ev) {
-  return Array.isArray(ev.conflitos) && ev.conflitos.length > 0
+  return ev?.tem_conflito === true || (Array.isArray(ev?.conflitos) && ev.conflitos.length > 0)
 }
 
 function podeEditar(ev) {
@@ -205,6 +250,83 @@ function podeEditar(ev) {
 function pastoralNome(id) {
   return pastorais.value.find((p) => p.id === id)?.nome || ''
 }
+
+function pastoralCor(id) {
+  return coresPastorais.value[id] || 'var(--color-primary)'
+}
+
+function chipStyle(ev) {
+  const cor = pastoralCor(ev.pastoral_id)
+  const conflito = eventoTemConflito(ev)
+  return {
+    background: conflito ? 'var(--color-accent-soft)' : `${cor}22`,
+    color: conflito ? 'var(--color-accent-dark)' : cor,
+    border: conflito ? '1px solid var(--color-accent-dark)' : `1px solid ${cor}55`,
+    opacity: dragEventoId.value === ev.id ? 0.5 : 1,
+  }
+}
+
+/** ids conhecidos no último sync (para detectar pastorais novas) */
+const pastoraisIdsConhecidos = ref(/** @type {Set<string>} */ (new Set()))
+
+function syncPastoraisVisiveis(list) {
+  const ids = (list || []).map((p) => p.id).filter(Boolean)
+  if (!pastoraisFiltroInicializado.value) {
+    pastoraisVisiveis.value = new Set(ids)
+    pastoraisIdsConhecidos.value = new Set(ids)
+    pastoraisFiltroInicializado.value = true
+    return
+  }
+  const prev = pastoraisVisiveis.value
+  const known = pastoraisIdsConhecidos.value
+  const next = new Set()
+  for (const id of ids) {
+    if (prev.has(id)) next.add(id)
+    else if (!known.has(id)) next.add(id)
+  }
+  pastoraisVisiveis.value = next
+  pastoraisIdsConhecidos.value = new Set(ids)
+}
+
+function marcarTodasPastorais() {
+  pastoraisVisiveis.value = new Set(pastoraisPainel.value.map((p) => p.id).filter(Boolean))
+}
+
+function desmarcarTodasPastorais() {
+  pastoraisVisiveis.value = new Set()
+}
+
+function onTogglePastoral(id) {
+  pastoraisVisiveis.value = togglePastoralVisivel(pastoraisVisiveis.value, id)
+}
+
+function setVisao(modo) {
+  visaoCalendario.value = modo === 'semana' ? 'semana' : 'mes'
+  if (visaoCalendario.value === 'semana' && anual.value) {
+    const ancora =
+      diaSelecionado.value ||
+      `${anual.value.ano}-${String(mesView.value).padStart(2, '0')}-01`
+    semanaInicio.value = inicioSemanaDomingo(ancora)
+  }
+}
+
+function navegarSemana(delta) {
+  semanaInicio.value = addDiasIso(semanaInicio.value, delta * 7)
+  const mid = addDiasIso(semanaInicio.value, 3)
+  if (mid) {
+    const m = Number(mid.slice(5, 7))
+    if (m >= 1 && m <= 12) mesView.value = m
+  }
+}
+
+watch(mesView, (mes) => {
+  if (!anual.value || visaoCalendario.value !== 'semana') return
+  const ancora = `${anual.value.ano}-${String(mes).padStart(2, '0')}-01`
+  const atual = semanaInicio.value || ''
+  if (!atual.startsWith(`${anual.value.ano}-${String(mes).padStart(2, '0')}`)) {
+    semanaInicio.value = inicioSemanaDomingo(ancora)
+  }
+})
 
 function openCreate(dayIso) {
   if (!podeCriar.value) return
@@ -393,8 +515,17 @@ async function load({ silent = false } = {}) {
       return
     }
     anual.value = a
-    eventos.value = evs
+    eventos.value = anotarConflitosEventos(evs)
     pastorais.value = pasts
+    syncPastoraisVisiveis(
+      canVerGlobal.value
+        ? pasts
+        : pasts.filter((p) => !myPastoralIds.value.length || myPastoralIds.value.includes(p.id)),
+    )
+    if (visaoCalendario.value === 'semana') {
+      const ancora = `${a.ano}-${String(mesView.value).padStart(2, '0')}-01`
+      if (!semanaInicio.value) semanaInicio.value = inicioSemanaDomingo(ancora)
+    }
     locais.value = unwrapList(locsRes.data)
     recursosCatalogo.value = recs
     if (a.eventos && Array.isArray(a.eventos) && !evs.length) {
@@ -623,6 +754,18 @@ onMounted(load)
         </button>
       </div>
 
+      <div
+        v-if="conflitosVisiveisCount > 0"
+        class="rounded-xl px-4 py-3 text-[13.5px] flex flex-wrap items-center gap-2"
+        style="background: var(--color-accent-soft); color: var(--color-accent-dark); border: 1px solid var(--color-line)"
+        data-testid="planejamento-conflitos-resumo"
+      >
+        <span class="font-medium">{{ conflitosVisiveisCount }} evento(s) com conflito de local/horário</span>
+        <span class="text-[12px]" style="color: var(--color-muted)">
+          Destacados na grade — a gravação não é bloqueada por este tipo de conflito.
+        </span>
+      </div>
+
       <div class="card p-4 md:p-5 flex flex-wrap gap-3 items-end">
         <div>
           <label class="fld" for="pl-mes">Mês</label>
@@ -632,12 +775,34 @@ onMounted(load)
             </option>
           </select>
         </div>
-        <div v-if="canVerGlobal">
-          <label class="fld" for="pl-filtro-past">Pastoral</label>
-          <select id="pl-filtro-past" v-model="filtroPastoral" class="input min-w-[12rem]">
-            <option value="">Todas</option>
-            <option v-for="p in pastorais" :key="p.id" :value="p.id">{{ p.nome }}</option>
-          </select>
+        <div>
+          <span class="fld">Visão</span>
+          <div
+            class="flex rounded-lg overflow-hidden"
+            style="border: 1px solid var(--color-line)"
+            role="group"
+            aria-label="Visão do calendário"
+            data-testid="planejamento-visao-toggle"
+          >
+            <button
+              type="button"
+              class="btn !rounded-none !px-3 text-xs"
+              :class="visaoCalendario === 'mes' ? 'btn-primary' : 'btn-ghost'"
+              data-testid="planejamento-visao-mes"
+              @click="setVisao('mes')"
+            >
+              Mensal
+            </button>
+            <button
+              type="button"
+              class="btn !rounded-none !px-3 text-xs"
+              :class="visaoCalendario === 'semana' ? 'btn-primary' : 'btn-ghost'"
+              data-testid="planejamento-visao-semana"
+              @click="setVisao('semana')"
+            >
+              Semanal
+            </button>
+          </div>
         </div>
         <div>
           <label class="fld" for="pl-filtro-st">Status</label>
@@ -675,78 +840,190 @@ onMounted(load)
         </button>
       </div>
 
-      <div class="card p-4 md:p-5" data-testid="planejamento-grade">
-        <div class="flex flex-wrap items-end justify-between gap-2 mb-4">
-          <h2 class="font-serif text-[18px] font-medium" style="color: var(--color-ink)">
-            {{ mesTitulo }}
-          </h2>
-          <p class="text-[12px]" style="color: var(--color-muted)">
-            Clique em um dia para ver eventos e propor<template v-if="podeArrastar">
-              · arraste um evento para outro dia para mudar a data</template>
-          </p>
-        </div>
-        <div class="grid grid-cols-7 gap-1 text-center text-[11px] mb-1" style="color: var(--color-muted)">
-          <div v-for="d in WEEKDAYS" :key="d">{{ d }}</div>
-        </div>
-        <div class="grid grid-cols-7 gap-1">
-          <div
-            v-for="(cell, idx) in cells"
-            :key="idx"
-            :role="cell.inMonth ? 'button' : undefined"
-            :tabindex="cell.inMonth ? 0 : -1"
-            class="min-h-[72px] md:min-h-[88px] rounded-lg p-1.5 text-left"
-            :class="cell.inMonth ? 'cursor-pointer' : ''"
-            :style="
-              cell.inMonth
-                ? {
-                    background:
-                      dropAlvo === cell.iso
-                        ? 'var(--color-accent-soft)'
-                        : diaSelecionado === cell.iso
-                          ? 'var(--color-primary-soft)'
-                          : 'var(--color-surface)',
-                    color: diaSelecionado === cell.iso ? 'var(--color-on-primary)' : 'var(--color-ink)',
-                    border:
-                      dropAlvo === cell.iso
-                        ? '1px dashed var(--color-accent-dark)'
-                        : '1px solid var(--color-line)',
-                  }
-                : { background: 'transparent', cursor: 'default' }
-            "
-            :data-testid="cell.iso ? `planejamento-dia-${cell.iso}` : undefined"
-            @click="cell.inMonth && selectDay(cell.iso)"
-            @keydown.enter.prevent="cell.inMonth && selectDay(cell.iso)"
-            @dragover.prevent="cell.inMonth && dragEventoId && (dropAlvo = cell.iso)"
-            @dragleave="dropAlvo === cell.iso && (dropAlvo = '')"
-            @drop.prevent="cell.inMonth && onDropDia(cell.iso)"
-          >
-            <template v-if="cell.inMonth">
-              <div class="text-[12px] font-medium mb-0.5">{{ cell.dia }}</div>
-              <div
-                v-for="ev in (byDay.get(cell.iso) || []).slice(0, 2)"
-                :key="ev.id"
-                class="text-[10px] truncate leading-tight px-1 py-0.5 rounded mt-0.5 font-medium"
-                :class="podeArrastar && podeEditar(ev) ? 'cursor-grab' : ''"
-                :style="{
-                  background: styleStatusSolicitacao(ev.status_solicitacao).bg,
-                  color: styleStatusSolicitacao(ev.status_solicitacao).fg,
-                  opacity: dragEventoId === ev.id ? 0.5 : 1,
-                }"
-                :draggable="podeArrastar && podeEditar(ev)"
-                :title="[ev.titulo, labelRecursosEvento(ev)].filter(Boolean).join(' · ')"
-                data-testid="planejamento-chip"
-                @dragstart="onDragStart(ev, $event)"
-                @dragend="onDragEnd"
+      <div class="flex flex-col lg:flex-row gap-4 items-start">
+        <aside
+          v-if="pastoraisPainel.length"
+          class="card p-4 w-full lg:w-56 shrink-0"
+          data-testid="planejamento-filtro-pastorais"
+        >
+          <div class="flex items-center justify-between gap-2 mb-3">
+            <h2 class="font-serif text-[16px] font-medium m-0" style="color: var(--color-ink)">
+              Pastorais
+            </h2>
+            <div class="flex gap-1">
+              <button
+                type="button"
+                class="btn btn-ghost !py-0.5 !px-2 text-[11px]"
+                data-testid="planejamento-pastorais-todas"
+                @click="marcarTodasPastorais"
               >
-                {{ labelEventoPlanejamentoPreview(ev) }}
-              </div>
-              <div
-                v-if="(byDay.get(cell.iso) || []).length > 2"
-                class="text-[10px] opacity-70"
+                Todas
+              </button>
+              <button
+                type="button"
+                class="btn btn-ghost !py-0.5 !px-2 text-[11px]"
+                data-testid="planejamento-pastorais-nenhuma"
+                @click="desmarcarTodasPastorais"
               >
-                +{{ (byDay.get(cell.iso) || []).length - 2 }}
-              </div>
-            </template>
+                Nenhuma
+              </button>
+            </div>
+          </div>
+          <ul class="list-none p-0 m-0 space-y-1.5">
+            <li v-for="p in pastoraisPainel" :key="p.id">
+              <label
+                class="flex items-center gap-2 cursor-pointer rounded-md px-1.5 py-1.5 text-[13px]"
+                style="color: var(--color-ink)"
+                :data-testid="`planejamento-pastoral-check-${p.id}`"
+              >
+                <input
+                  type="checkbox"
+                  class="shrink-0"
+                  :checked="pastoraisVisiveis.has(p.id)"
+                  @change="onTogglePastoral(p.id)"
+                />
+                <span
+                  class="inline-block w-2.5 h-2.5 rounded-sm shrink-0"
+                  :style="{ background: pastoralCor(p.id) }"
+                  aria-hidden="true"
+                />
+                <span class="truncate">{{ p.nome }}</span>
+              </label>
+            </li>
+          </ul>
+        </aside>
+
+        <div class="card p-4 md:p-5 flex-1 min-w-0 w-full" data-testid="planejamento-grade">
+          <div class="flex flex-wrap items-end justify-between gap-2 mb-4">
+            <div class="flex flex-wrap items-center gap-2">
+              <template v-if="visaoCalendario === 'semana'">
+                <button
+                  type="button"
+                  class="btn btn-ghost !px-2 text-xs"
+                  data-testid="planejamento-semana-prev"
+                  @click="navegarSemana(-1)"
+                >
+                  ←
+                </button>
+                <h2 class="font-serif text-[18px] font-medium m-0" style="color: var(--color-ink)">
+                  {{ periodoTitulo }}
+                </h2>
+                <button
+                  type="button"
+                  class="btn btn-ghost !px-2 text-xs"
+                  data-testid="planejamento-semana-next"
+                  @click="navegarSemana(1)"
+                >
+                  →
+                </button>
+              </template>
+              <h2
+                v-else
+                class="font-serif text-[18px] font-medium m-0"
+                style="color: var(--color-ink)"
+              >
+                {{ mesTitulo }}
+              </h2>
+            </div>
+            <p class="text-[12px]" style="color: var(--color-muted)">
+              Clique em um dia para ver eventos e propor<template v-if="podeArrastar">
+                · arraste um evento para outro dia para mudar a data</template>
+            </p>
+          </div>
+          <div class="grid grid-cols-7 gap-1 text-center text-[11px] mb-1" style="color: var(--color-muted)">
+            <div v-for="d in WEEKDAYS" :key="d">{{ d }}</div>
+          </div>
+          <div class="grid grid-cols-7 gap-1">
+            <div
+              v-for="(cell, idx) in cells"
+              :key="idx"
+              :role="cell.iso && (visaoCalendario === 'semana' || cell.inMonth) ? 'button' : undefined"
+              :tabindex="cell.iso && (visaoCalendario === 'semana' || cell.inMonth) ? 0 : -1"
+              class="rounded-lg p-1.5 text-left"
+              :class="[
+                visaoCalendario === 'semana' ? 'min-h-[120px] md:min-h-[160px]' : 'min-h-[72px] md:min-h-[88px]',
+                cell.iso && (visaoCalendario === 'semana' || cell.inMonth) ? 'cursor-pointer' : '',
+              ]"
+              :style="
+                cell.iso && (visaoCalendario === 'semana' || cell.inMonth)
+                  ? {
+                      background:
+                        dropAlvo === cell.iso
+                          ? 'var(--color-accent-soft)'
+                          : diaSelecionado === cell.iso
+                            ? 'var(--color-primary-soft)'
+                            : 'var(--color-surface)',
+                      color:
+                        diaSelecionado === cell.iso ? 'var(--color-on-primary)' : 'var(--color-ink)',
+                      border:
+                        dropAlvo === cell.iso
+                          ? '1px dashed var(--color-accent-dark)'
+                          : (byDay.get(cell.iso) || []).some(eventoTemConflito)
+                            ? '1.5px solid var(--color-accent-dark)'
+                            : '1px solid var(--color-line)',
+                      opacity: visaoCalendario === 'semana' && !cell.inMonth ? 0.55 : 1,
+                    }
+                  : { background: 'transparent', cursor: 'default' }
+              "
+              :data-testid="cell.iso ? `planejamento-dia-${cell.iso}` : undefined"
+              @click="cell.iso && (visaoCalendario === 'semana' || cell.inMonth) && selectDay(cell.iso)"
+              @keydown.enter.prevent="
+                cell.iso && (visaoCalendario === 'semana' || cell.inMonth) && selectDay(cell.iso)
+              "
+              @dragover.prevent="
+                cell.iso &&
+                  (visaoCalendario === 'semana' || cell.inMonth) &&
+                  dragEventoId &&
+                  (dropAlvo = cell.iso)
+              "
+              @dragleave="dropAlvo === cell.iso && (dropAlvo = '')"
+              @drop.prevent="
+                cell.iso && (visaoCalendario === 'semana' || cell.inMonth) && onDropDia(cell.iso)
+              "
+            >
+              <template v-if="cell.iso && (visaoCalendario === 'semana' || cell.inMonth)">
+                <div class="text-[12px] font-medium mb-0.5 flex items-center justify-between gap-1">
+                  <span>{{ cell.dia }}</span>
+                  <span
+                    v-if="(byDay.get(cell.iso) || []).some(eventoTemConflito)"
+                    class="text-[9px] font-semibold uppercase tracking-wide"
+                    style="color: var(--color-accent-dark)"
+                    data-testid="planejamento-dia-conflito"
+                  >
+                    Conflito
+                  </span>
+                </div>
+                <div
+                  v-for="ev in (byDay.get(cell.iso) || []).slice(0, maxChipsPorDia)"
+                  :key="ev.id"
+                  class="text-[10px] truncate leading-tight px-1 py-0.5 rounded mt-0.5 font-medium"
+                  :class="podeArrastar && podeEditar(ev) ? 'cursor-grab' : ''"
+                  :style="chipStyle(ev)"
+                  :draggable="podeArrastar && podeEditar(ev)"
+                  :title="
+                    [
+                      ev.titulo,
+                      pastoralNome(ev.pastoral_id),
+                      labelRecursosEvento(ev),
+                      eventoTemConflito(ev) ? 'Conflito de agenda' : '',
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')
+                  "
+                  :data-testid="eventoTemConflito(ev) ? 'planejamento-chip-conflito' : 'planejamento-chip'"
+                  @dragstart="onDragStart(ev, $event)"
+                  @dragend="onDragEnd"
+                >
+                  {{ labelEventoPlanejamentoPreview(ev) }}
+                </div>
+                <div
+                  v-if="(byDay.get(cell.iso) || []).length > maxChipsPorDia"
+                  class="text-[10px] opacity-70"
+                >
+                  +{{ (byDay.get(cell.iso) || []).length - maxChipsPorDia }}
+                </div>
+              </template>
+            </div>
           </div>
         </div>
       </div>
