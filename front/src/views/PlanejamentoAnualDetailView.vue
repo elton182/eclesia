@@ -1123,8 +1123,10 @@ onMounted(load)
               >
                 <div
                   class="grid gap-0"
-                  style="grid-template-columns: 3.25rem repeat(7, minmax(0, 1fr))"
-                  :style="{ minHeight: `${alturaGradeHoraria}px` }"
+                  :style="{
+                    gridTemplateColumns: '3.25rem repeat(7, minmax(0, 1fr))',
+                    minHeight: `${alturaGradeHoraria}px`,
+                  }"
                 >
                   <div
                     class="relative"
