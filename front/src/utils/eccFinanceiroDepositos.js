@@ -66,3 +66,16 @@ export function buildDepositoFormData(fields) {
   if (fields.comprovante) fd.append('comprovante', fields.comprovante)
   return fd
 }
+
+/** Tipos aceitos ao anexar arquivo (galeria / disco). */
+export const COMPROVANTE_ACCEPT_ARQUIVO = '.pdf,image/jpeg,image/png,.jpg,.jpeg,.png'
+
+/**
+ * Texto de ajuda / nome do comprovante selecionado.
+ * @param {File|{ name?: string }|null|undefined} file
+ * @returns {string}
+ */
+export function labelComprovanteSelecionado(file) {
+  if (file?.name) return String(file.name)
+  return 'PDF, JPG ou PNG · até 5 MB · arquivo ou foto na hora'
+}

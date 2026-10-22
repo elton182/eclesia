@@ -63,6 +63,7 @@ Regras:
 - [x] `POST /ecc/financeiro/depositos/{id}/rejeitar` — body `motivo`; `manage` → `rejeitado`.
 - [x] Livro anual: totais **ignoram** `provisionado` e `rejeitado`.
 - [x] Front líder: formulário + lista em `/ecc/minha-equipe`.
+- [x] Front líder: comprovante por **arquivo** (PDF/JPG/PNG) ou **tirar foto** na hora (`capture=environment`).
 - [x] Front gestor: fila “Depósitos pendentes” em `/ecc/financeiro` com aprovar/rejeitar + ver comprovante.
 - [x] Testes API (401/403/422/sucesso/isolamento) + testes do util de depósitos no front.
 

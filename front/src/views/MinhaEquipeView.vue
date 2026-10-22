@@ -15,6 +15,7 @@ import {
   labelStatusDeposito,
 } from '@/utils/eccFinanceiroDepositos'
 import LiderEquipeTour from '@/components/ecc/LiderEquipeTour.vue'
+import ComprovanteAnexoField from '@/components/ecc/ComprovanteAnexoField.vue'
 import {
   beginLiderTour,
   liderEquipeTourSteps,
@@ -114,10 +115,6 @@ async function load() {
   } finally {
     loading.value = false
   }
-}
-
-function onComprovanteChange(event) {
-  formDeposito.value.comprovante = event.target?.files?.[0] || null
 }
 
 async function enviarDeposito() {
@@ -304,7 +301,8 @@ onMounted(async () => {
         Depósito mensal
       </h3>
       <p class="mt-1 text-[13.5px] leading-relaxed mb-4" style="color: var(--color-muted)">
-        Informe o valor depositado pela equipe e anexe o comprovante. O financeiro confirma após aprovação.
+        Informe o valor depositado pela equipe e anexe o comprovante (arquivo ou foto na hora).
+        O financeiro confirma após aprovação.
       </p>
 
       <form
@@ -313,7 +311,7 @@ onMounted(async () => {
         data-testid="minha-equipe-deposito-form"
         @submit.prevent="enviarDeposito"
       >
-        <div class="grid gap-4 sm:grid-cols-3">
+        <div class="grid gap-4 sm:grid-cols-2">
           <div>
             <label class="fld" for="deposito-competencia">Competência</label>
             <input
@@ -338,16 +336,12 @@ onMounted(async () => {
               data-testid="minha-equipe-deposito-valor"
             />
           </div>
-          <div>
-            <label class="fld" for="deposito-comprovante">Comprovante</label>
-            <input
-              id="deposito-comprovante"
-              type="file"
-              accept=".pdf,image/jpeg,image/png,.jpg,.jpeg,.png"
-              class="input"
+          <div class="sm:col-span-2">
+            <ComprovanteAnexoField
+              id="minha-equipe-deposito-comprovante"
+              v-model="formDeposito.comprovante"
+              :disabled="savingDeposito"
               required
-              data-testid="minha-equipe-deposito-comprovante"
-              @change="onComprovanteChange"
             />
           </div>
         </div>
