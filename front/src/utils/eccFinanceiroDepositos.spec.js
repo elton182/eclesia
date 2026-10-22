@@ -6,6 +6,8 @@ import {
   formatCompetencia,
   depositosPendentes,
   buildDepositoFormData,
+  labelComprovanteSelecionado,
+  COMPROVANTE_ACCEPT_ARQUIVO,
 } from './eccFinanceiroDepositos.js'
 
 describe('eccFinanceiroDepositos', () => {
@@ -42,5 +44,15 @@ describe('eccFinanceiroDepositos', () => {
     assert.equal(fd.get('competencia'), '2026-10')
     assert.equal(fd.get('valor'), '150.5')
     assert.ok(fd.get('comprovante') instanceof File)
+  })
+
+  it('labelComprovanteSelecionado e accept de arquivo', () => {
+    assert.match(COMPROVANTE_ACCEPT_ARQUIVO, /pdf/)
+    assert.match(COMPROVANTE_ACCEPT_ARQUIVO, /image\/jpeg/)
+    assert.equal(
+      labelComprovanteSelecionado({ name: 'pix.jpg' }),
+      'pix.jpg',
+    )
+    assert.match(labelComprovanteSelecionado(null), /foto na hora/)
   })
 })
