@@ -63,6 +63,14 @@ class PublicSiteController extends Controller
         ]);
     }
 
+    public function manifest(string $tenantSlug): Response
+    {
+        return response($this->html->renderAccessManifest($tenantSlug), 200, [
+            'Content-Type' => 'application/manifest+json; charset=UTF-8',
+            'Cache-Control' => 'public, max-age=60',
+        ]);
+    }
+
     public function page(string $slug): SitePageResource
     {
         return new SitePageResource($this->site->publicPage($slug));

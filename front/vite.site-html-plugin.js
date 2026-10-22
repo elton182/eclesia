@@ -1,9 +1,11 @@
 /**
- * Em dev/preview, GET /site/:tenantSlug[/:pageSlug] devolve o HTML SEO da API
- * (SPEC-005 / ADR-0003) com o entry do Vue injetado.
+ * Em dev/preview:
+ * - GET /site/:tenantSlug[/:pageSlug] → HTML SEO da API + entry Vue (SPEC-005 / ADR-0003)
+ * - GET /site/:tenantSlug/manifest.webmanifest → manifest de acesso (SPEC-023 / ADR-0009)
  *
  * Produção com dist/ estático: proxy equivalente
- *   /site/* → {API}/api/v1/public/site/html/{tenantSlug}[/{pageSlug}]
+ *   /site/:slug/manifest.webmanifest → API /api/v1/public/site/manifest/:slug
+ *   /site/:slug[/:page] → API /api/v1/public/site/html/...
  */
 
 import { readFileSync, existsSync } from 'node:fs'
@@ -66,6 +68,30 @@ export function siteHtmlPrerenderPlugin(options = {}) {
         }
 
         const pathOnly = (req.url || '/').split('?')[0] || '/'
+
+        const manifestMatch = pathOnly.match(/^\/site\/([^/]+)\/manifest\.webmanifest\/?$/)
+        if (manifestMatch) {
+          const tenantSlug = decodeURIComponent(manifestMatch[1])
+          if (!tenantSlug || tenantSlug.includes('.')) {
+            next()
+            return
+          }
+          const upstream = new URL(
+            `api/v1/public/site/manifest/${encodeURIComponent(tenantSlug)}`,
+            apiBase,
+          )
+          const upstreamRes = await fetch(upstream)
+          const body = await upstreamRes.text()
+          res.statusCode = upstreamRes.status
+          res.setHeader(
+            'Content-Type',
+            upstreamRes.headers.get('content-type') || 'application/manifest+json; charset=UTF-8',
+          )
+          res.setHeader('Cache-Control', 'public, max-age=60')
+          res.end(body)
+          return
+        }
+
         const match = pathOnly.match(/^\/site\/([^/]+)(?:\/([^/]+))?\/?$/)
         if (!match) {
           next()
@@ -75,6 +101,10 @@ export function siteHtmlPrerenderPlugin(options = {}) {
         const tenantSlug = decodeURIComponent(match[1])
         const pageSlug = match[2] ? decodeURIComponent(match[2]) : null
         if (!tenantSlug || tenantSlug.includes('.')) {
+          next()
+          return
+        }
+        if (pageSlug && pageSlug.includes('.')) {
           next()
           return
         }

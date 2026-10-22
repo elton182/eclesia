@@ -133,6 +133,10 @@ class SitePublicHtmlTest extends TestCase
         $this->assertStringContainsString('property="og:title" content="Home São José"', $html);
         $this->assertStringContainsString('rel="canonical" href="http://front.test/site/org-html"', $html);
         $this->assertStringContainsString('rel="sitemap"', $html);
+        $this->assertStringContainsString(
+            'rel="manifest" href="http://front.test/site/org-html/manifest.webmanifest"',
+            $html,
+        );
         $this->assertStringContainsString('Bem-vindo à Matriz', $html);
         $this->assertStringContainsString('Nossa comunidade de fé', $html);
         $this->assertStringContainsString('Texto seguro', $html);
@@ -201,6 +205,44 @@ class SitePublicHtmlTest extends TestCase
         }
 
         $this->get('/api/v1/public/site/html/tenant-inexistente')
+            ->assertStatus(400);
+    }
+
+    public function test_access_manifest_returns_404_when_unpublished(): void
+    {
+        $this->get('/api/v1/public/site/manifest/org-html')
+            ->assertNotFound();
+    }
+
+    public function test_access_manifest_binds_tenant_start_url_and_identity(): void
+    {
+        $this->publishHomeWithBlocks();
+
+        $response = $this->get('/api/v1/public/site/manifest/org-html');
+        $response->assertOk();
+        $this->assertStringContainsString(
+            'application/manifest+json',
+            (string) $response->headers->get('Content-Type'),
+        );
+
+        $manifest = $response->json();
+        $this->assertIsArray($manifest);
+        $this->assertSame('/acesso/org-html', $manifest['id']);
+        $this->assertSame('Org Html', $manifest['name']);
+        $this->assertSame('/entrar?tenant=org-html', $manifest['start_url']);
+        $this->assertSame('/', $manifest['scope']);
+        $this->assertSame('standalone', $manifest['display']);
+        $this->assertSame('#4E1220', $manifest['theme_color']);
+        $this->assertSame('http://front.test/icons/icon-192x192.png', $manifest['icons'][0]['src'] ?? null);
+    }
+
+    public function test_access_manifest_unknown_tenant(): void
+    {
+        if (tenancy()->initialized) {
+            tenancy()->end();
+        }
+
+        $this->get('/api/v1/public/site/manifest/tenant-inexistente')
             ->assertStatus(400);
     }
 }

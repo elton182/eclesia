@@ -49,6 +49,23 @@ export function rememberTenantForLogin(tenantSlug) {
 }
 
 /**
+ * Lê `?tenant=` da query de `/entrar` (atalho PWA / deep link).
+ * @param {Record<string, unknown>|URLSearchParams|null|undefined} query
+ * @returns {string}
+ */
+export function resolveTenantFromLoginQuery(query) {
+  if (!query) return ''
+  if (typeof query.get === 'function') {
+    return String(query.get('tenant') || '').trim()
+  }
+  const raw = query.tenant
+  if (Array.isArray(raw)) {
+    return String(raw[0] || '').trim()
+  }
+  return String(raw || '').trim()
+}
+
+/**
  * @param {string} tenant
  * @param {string} login
  * @param {string} password

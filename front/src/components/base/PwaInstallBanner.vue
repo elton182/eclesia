@@ -1,4 +1,6 @@
 <script setup>
+import { computed } from 'vue'
+import { useRoute } from 'vue-router'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import { faTimes } from '@fortawesome/free-solid-svg-icons'
 import { library } from '@fortawesome/fontawesome-svg-core'
@@ -6,7 +8,12 @@ import { usePwaInstall } from '@/composables/usePwaInstall'
 
 library.add(faTimes)
 
+const route = useRoute()
 const { showBanner, installing, install, dismissBanner } = usePwaInstall()
+
+/** No site público o CTA é o atalho da paróquia (SPEC-023), não o PWA genérico. */
+const onPublicSite = computed(() => String(route.path || '').startsWith('/site/'))
+const visible = computed(() => showBanner.value && !onPublicSite.value)
 
 async function onInstall() {
   await install()
@@ -15,7 +22,7 @@ async function onInstall() {
 
 <template>
   <div
-    v-if="showBanner"
+    v-if="visible"
     class="fixed bottom-4 left-4 right-4 z-50 mx-auto flex max-w-md items-center gap-3 rounded-xl px-4 py-3 shadow-lg md:left-auto"
     style="background: var(--color-primary); color: #F7EDE0"
     role="status"

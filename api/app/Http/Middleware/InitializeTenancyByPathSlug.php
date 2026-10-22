@@ -12,7 +12,7 @@ use Stancl\Tenancy\Tenancy;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Inicializa tenancy pelo slug no path (rotas públicas HTML/sitemap — ADR-0003).
+ * Inicializa tenancy pelo slug no path (rotas públicas HTML/sitemap/manifest — ADR-0003 / ADR-0009).
  */
 class InitializeTenancyByPathSlug
 {

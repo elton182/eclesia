@@ -36,7 +36,7 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 |
 | Login resolve tenant pelo body (sem X-Tenant). Demais rotas exigem X-Tenant.
-| HTML/sitemap SEO: tenancy pelo slug no path (ADR-0003).
+| HTML/sitemap/manifest: tenancy pelo slug no path (ADR-0003 / ADR-0009).
 | Recursos autenticados: SuperAdmin (token central) OU User (token do tenant).
 |
 */
@@ -52,6 +52,7 @@ Route::middleware([
     Route::get('html/{tenantSlug}', [PublicSiteController::class, 'htmlHome']);
     Route::get('html/{tenantSlug}/{pageSlug}', [PublicSiteController::class, 'htmlPage']);
     Route::get('sitemap/{tenantSlug}', [PublicSiteController::class, 'sitemap']);
+    Route::get('manifest/{tenantSlug}', [PublicSiteController::class, 'manifest']);
 });
 
 Route::middleware([
