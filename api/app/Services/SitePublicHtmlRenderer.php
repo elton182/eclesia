@@ -15,8 +15,13 @@ class SitePublicHtmlRenderer
 {
     private const CACHE_TTL_SECONDS = 120;
 
+    private const DEFAULT_THEME_COLOR = '#4E1220';
+
+    private const DEFAULT_BACKGROUND_COLOR = '#F7F4EF';
+
     public function __construct(
         private readonly SiteService $site,
+        private readonly AppBrandingService $branding,
     ) {}
 
     public function renderHome(string $tenantSlug): string
@@ -45,6 +50,74 @@ class SitePublicHtmlRenderer
                 $settings,
                 $page,
             );
+        });
+    }
+
+    /**
+     * Web App Manifest do atalho de acesso (SPEC-023 / ADR-0009).
+     */
+    public function renderAccessManifest(string $tenantSlug): string
+    {
+        $settings = $this->site->assertPublished();
+
+        $version = (int) Cache::get(SiteService::SEO_CACHE_VERSION_KEY, 0);
+        $cacheKey = 'site_access_manifest:'.$tenantSlug.':'.$version;
+
+        return Cache::remember($cacheKey, self::CACHE_TTL_SECONDS, function () use ($tenantSlug, $settings) {
+            $front = rtrim((string) config('app.frontend_url'), '/');
+            $name = $this->brandTitle($settings);
+            $short = $this->shortAppName($name);
+            $branding = $this->branding->brandingPayload();
+            $cores = is_array($branding['cores'] ?? null) ? $branding['cores'] : [];
+            $theme = is_string($cores['primary'] ?? null) && preg_match('/^#[0-9A-Fa-f]{6}$/', $cores['primary'])
+                ? $cores['primary']
+                : self::DEFAULT_THEME_COLOR;
+
+            $icons = [
+                [
+                    'src' => $front.'/icons/icon-192x192.png',
+                    'sizes' => '192x192',
+                    'type' => 'image/png',
+                    'purpose' => 'any',
+                ],
+                [
+                    'src' => $front.'/icons/icon-512x512.png',
+                    'sizes' => '512x512',
+                    'type' => 'image/png',
+                    'purpose' => 'any',
+                ],
+                [
+                    'src' => $front.'/icons/maskable-192x192.png',
+                    'sizes' => '192x192',
+                    'type' => 'image/png',
+                    'purpose' => 'maskable',
+                ],
+                [
+                    'src' => $front.'/icons/maskable-512x512.png',
+                    'sizes' => '512x512',
+                    'type' => 'image/png',
+                    'purpose' => 'maskable',
+                ],
+            ];
+
+            $manifest = [
+                'id' => '/acesso/'.$tenantSlug,
+                'name' => $name,
+                'short_name' => $short,
+                'description' => 'Acesso à gestão de '.$name,
+                'lang' => 'pt-BR',
+                'dir' => 'ltr',
+                'start_url' => '/entrar?tenant='.rawurlencode($tenantSlug),
+                'scope' => '/',
+                'display' => 'standalone',
+                'orientation' => 'any',
+                'theme_color' => $theme,
+                'background_color' => self::DEFAULT_BACKGROUND_COLOR,
+                'categories' => ['productivity', 'business'],
+                'icons' => $icons,
+            ];
+
+            return (string) json_encode($manifest, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
         });
     }
 
@@ -111,6 +184,7 @@ class SitePublicHtmlRenderer
             : $base.'/site/'.$tenantSlug.'/'.$pageSlug;
         $apiBase = rtrim((string) config('app.url'), '/');
         $sitemapHref = $apiBase.'/api/v1/public/site/sitemap/'.$tenantSlug;
+        $manifestHref = $base.'/site/'.$tenantSlug.'/manifest.webmanifest';
 
         $main = $this->renderMain($settings, $page);
 
@@ -123,6 +197,7 @@ class SitePublicHtmlRenderer
             .'  <meta name="description" content="'.e($seo['description']).'">'."\n"
             .'  <link rel="canonical" href="'.e($canonical).'">'."\n"
             .'  <link rel="sitemap" type="application/xml" href="'.e($sitemapHref).'">'."\n"
+            .'  <link rel="manifest" href="'.e($manifestHref).'">'."\n"
             .'  <meta property="og:type" content="website">'."\n"
             .'  <meta property="og:title" content="'.e($seo['title']).'">'."\n"
             .'  <meta property="og:description" content="'.e($seo['description']).'">'."\n"
@@ -160,6 +235,16 @@ class SitePublicHtmlRenderer
         }
 
         return (string) ($settings->titulo ?: 'Site');
+    }
+
+    private function shortAppName(string $name): string
+    {
+        $trimmed = trim($name);
+        if ($trimmed === '') {
+            return 'Acesso';
+        }
+
+        return (string) Str::limit($trimmed, 12, '');
     }
 
     private function renderMain(SiteSetting $settings, ?SitePage $page): string

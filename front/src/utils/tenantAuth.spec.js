@@ -8,6 +8,7 @@ import {
   persistLoginCredentials,
   loadLoginCredentials,
   rememberTenantForLogin,
+  resolveTenantFromLoginQuery,
   LOGIN_TENANT_STORAGE_KEY,
   LOGIN_EMAIL_STORAGE_KEY,
 } from './tenantAuth.js'
@@ -61,6 +62,22 @@ describe('rememberTenantForLogin', () => {
     persistLoginCredentials({ tenant: 'paroquia', email: 'a@b.com' })
     rememberTenantForLogin('   ')
     assert.equal(localStorage.getItem(LOGIN_TENANT_STORAGE_KEY), 'paroquia')
+  })
+})
+
+describe('resolveTenantFromLoginQuery', () => {
+  it('lê tenant de objeto query do vue-router', () => {
+    assert.equal(resolveTenantFromLoginQuery({ tenant: '  paroquia  ' }), 'paroquia')
+  })
+
+  it('aceita URLSearchParams e array', () => {
+    assert.equal(resolveTenantFromLoginQuery(new URLSearchParams('tenant=demo')), 'demo')
+    assert.equal(resolveTenantFromLoginQuery({ tenant: ['a', 'b'] }), 'a')
+  })
+
+  it('vazio quando ausente', () => {
+    assert.equal(resolveTenantFromLoginQuery({}), '')
+    assert.equal(resolveTenantFromLoginQuery(null), '')
   })
 })
 

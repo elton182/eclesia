@@ -11,6 +11,8 @@ info:
     Dados pessoais criptografados em repouso (LGPD).
     Site público do tenant: `/public/site*` (X-Tenant, sem auth) — SPEC-005 / ADR-0003.
     SEO HTML/sitemap: `/public/site/html/{tenantSlug}` e `/public/site/sitemap/{tenantSlug}`
+    (tenancy pelo path). Manifest PWA de acesso: `/public/site/manifest/{tenantSlug}`
+    (SPEC-023 / ADR-0009; servir no front em `/site/{slug}/manifest.webmanifest`).
     (tenancy pelo slug no path; sem X-Tenant).
 servers:
   - url: http://localhost:8000/api/v1
@@ -2625,6 +2627,54 @@ paths:
             application/xml:
               schema:
                 type: string
+        '404':
+          description: Site não publicado
+  /public/site/manifest/{tenantSlug}:
+    get:
+      summary: Web App Manifest do atalho de acesso do tenant
+      description: |
+        Sem X-Tenant (slug no path). JSON instalável com start_url `/entrar?tenant={slug}`.
+        Em produção o front deve expor o mesmo documento em `/site/{slug}/manifest.webmanifest`
+        (same-origin). SPEC-023 / ADR-0009.
+      parameters:
+        - name: tenantSlug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: application/manifest+json
+          content:
+            application/manifest+json:
+              schema:
+                type: object
+                required: [id, name, short_name, start_url, scope, display, icons]
+                properties:
+                  id:
+                    type: string
+                    example: /acesso/sao-jose
+                  name:
+                    type: string
+                  short_name:
+                    type: string
+                  start_url:
+                    type: string
+                    example: /entrar?tenant=sao-jose
+                  scope:
+                    type: string
+                    example: /
+                  display:
+                    type: string
+                    example: standalone
+                  theme_color:
+                    type: string
+                  background_color:
+                    type: string
+                  icons:
+                    type: array
+                    items:
+                      type: object
         '404':
           description: Site não publicado
   /site/settings:

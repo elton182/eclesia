@@ -1,14 +1,17 @@
 <script setup>
-import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, watch, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import {
   validateTenantLoginForm,
   loadLoginCredentials,
   persistLoginCredentials,
+  rememberTenantForLogin,
+  resolveTenantFromLoginQuery,
 } from '../utils/tenantAuth'
 import { homePathForUser } from '../utils/userRoles'
 
+const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 const remembered = loadLoginCredentials()
@@ -18,11 +21,32 @@ const password = ref('')
 const showPassword = ref(false)
 const isLoading = ref(false)
 const errorMessage = ref('')
+/** Organização veio do atalho PWA / deep link `?tenant=` (SPEC-023). */
+const tenantLocked = ref(false)
 
 const siteLink = computed(() => {
   const slug = tenant.value.trim()
   return slug ? `/site/${slug}` : '/'
 })
+
+function applyTenantFromQuery() {
+  const fromQuery = resolveTenantFromLoginQuery(route.query)
+  if (!fromQuery) {
+    tenantLocked.value = false
+    return
+  }
+  tenant.value = fromQuery
+  rememberTenantForLogin(fromQuery)
+  tenantLocked.value = true
+}
+
+onMounted(applyTenantFromQuery)
+watch(() => route.query.tenant, applyTenantFromQuery)
+
+function unlockTenant() {
+  tenantLocked.value = false
+  router.replace({ path: '/entrar', query: {} })
+}
 
 const handleLogin = async () => {
   const validation = validateTenantLoginForm({
@@ -150,8 +174,26 @@ const handleLogin = async () => {
               required
               autocomplete="organization"
               data-testid="tenant-login-org"
+              :readonly="tenantLocked"
             >
           </div>
+          <p
+            v-if="tenantLocked"
+            class="text-[12px] -mt-3 mb-[18px]"
+            style="color: rgba(42, 20, 24, 0.62)"
+            data-testid="tenant-login-org-locked"
+          >
+            Organização do seu atalho.
+            <button
+              type="button"
+              class="underline bg-transparent border-0 p-0 cursor-pointer text-[12px]"
+              style="color: #8A2436"
+              data-testid="tenant-login-org-unlock"
+              @click="unlockTenant"
+            >
+              Trocar
+            </button>
+          </p>
 
           <label for="login" class="fld">E-mail ou usuário</label>
           <input

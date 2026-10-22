@@ -7,7 +7,12 @@ import { normalizeBlocks, resolveMenuLinks, resolveSeo, applyDocumentSeo } from 
 import { rememberTenantForLogin } from '@/utils/tenantAuth'
 import { applyBrandCores } from '@/utils/branding'
 import { useBrandingStore } from '@/stores/branding'
+import {
+  applyTenantAccessManifest,
+  restoreDefaultManifest,
+} from '@/utils/tenantAccessManifest'
 import SiteBlockRenderer from '@/components/site/SiteBlockRenderer.vue'
+import SiteAccessInstallButton from '@/components/site/SiteAccessInstallButton.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -66,6 +71,8 @@ async function load() {
     )
     applyDocumentSeo(seo)
     applyBrandCores(settings.value?.cores)
+    applyTenantAccessManifest(tenantSlug.value)
+    rememberTenantForLogin(tenantSlug.value)
   } catch (e) {
     error.value = e.response?.status === 404
       ? 'Site não publicado ou página não encontrada.'
@@ -82,6 +89,7 @@ watch(() => [route.params.tenantSlug, route.params.pageSlug], load)
 onUnmounted(() => {
   // Não apagar cores do app se a sessão já carregou branding (evita vinho default pós-login)
   brandingStore.reapply()
+  restoreDefaultManifest()
 })
 
 function onSiteLogin() {
@@ -150,8 +158,9 @@ function onSiteLogin() {
           >Fale conosco</a>
         </nav>
 
+        <SiteAccessInstallButton :org-name="brandTitle" />
         <RouterLink
-          to="/entrar"
+          :to="`/entrar?tenant=${encodeURIComponent(tenantSlug)}`"
           class="no-underline px-3.5 py-2 rounded-md font-medium text-[13px] shrink-0"
           style="border: 1px solid var(--color-primary-soft); color: var(--color-primary-soft)"
           data-testid="site-login"

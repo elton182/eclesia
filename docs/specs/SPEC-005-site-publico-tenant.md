@@ -41,7 +41,7 @@ Cada organização (tenant) precisa de um site público com informações, comun
 
 - Domínio custom (`paroquia.org`)
 - Blog completo, e-mail marketing, multi-idioma do site
-- Editor drag-and-drop avançado; PWA do site
+- Editor drag-and-drop avançado; PWA offline do CMS do site (atalho de **acesso** com tenant fixo: [SPEC-023](SPEC-023-atalho-pwa-acesso-tenant.md))
 - Membros/reuniões de pastorais
 - Coedição do CMS global por admin-igreja
 - JSON-LD / dados estruturados; editor “Domínio e SEO” (stub)
