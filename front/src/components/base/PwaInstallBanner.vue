@@ -29,7 +29,7 @@ async function onInstall() {
     data-testid="pwa-install-banner"
   >
     <div class="min-w-0 flex-1">
-      <p class="text-sm font-semibold">Instalar Eclésias</p>
+      <p class="text-sm font-semibold">Instalar Apostolus</p>
       <p class="text-xs opacity-80">Acesse mais rápido, como um app no seu dispositivo.</p>
     </div>
     <button

@@ -37,7 +37,7 @@ const brandLogo = computed(() => branding.logoUrl || fallbackLogo)
 const brandAlt = computed(() =>
   branding.logoUrl
     ? tenantStore.name || tenantStore.slug || 'Logo'
-    : 'Eclésia',
+    : 'Apostolus',
 )
 
 const isAdminArea = computed(() => route.path.startsWith('/admin') || route.path.startsWith('/ecc'))

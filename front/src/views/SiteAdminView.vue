@@ -1040,7 +1040,7 @@ const showLegacyChrome = computed(() => tab.value !== 'pages')
                 style="background: #F3EDE6; border-bottom: 1px solid rgba(42, 20, 24, 0.1)"
               >
                 <span class="font-mono text-[9.5px]" style="color: rgba(42, 20, 24, 0.62)">
-                  eclesias.com.br/site/{{ tenantStore.slug || '…' }}
+                  apostolus.com.br/site/{{ tenantStore.slug || '…' }}
                 </span>
               </div>
               <div class="flex-1 min-h-0 overflow-y-auto overscroll-contain">

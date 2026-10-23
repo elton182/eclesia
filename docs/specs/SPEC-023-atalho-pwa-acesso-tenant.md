@@ -28,11 +28,11 @@ O login do tenant exige o identificador da organização (slug). Membros da par�
 - [x] 404 se site não publicado; tenant inexistente → erro de identificação (mesmo padrão HTML/sitemap).
 - [x] HTML SEO da home/página inclui `<link rel="manifest" href="…/site/{slug}/manifest.webmanifest">` (URL no host do front).
 - [x] Front (dev/preview): `GET /site/{slug}/manifest.webmanifest` faz proxy do JSON da API (produção: proxy equivalente).
-- [x] Rota dedicada `/site/{slug}/instalar` com CTA de instalação (prompt nativo ou passo a passo iOS/Android); `instalar` é segmento reservado (não é pageSlug do CMS).
+- [x] Rota dedicada `/site/{slug}/instalar` (`instalar` é segmento reservado, não é pageSlug do CMS).
+- [x] Fluxo em dois passos: **1)** login (org = slug da URL + e-mail/usuário + senha); **2)** só após sessão válida, CTA de instalação (prompt nativo ou passo a passo iOS/Android). Se `must_change_password`, redireciona para troca de senha.
 - [x] No site público: link compacto no header aponta para `/instalar`; banner genérico “Instalar Eclésias” não aparece em `/site/*`.
 - [x] A página `/instalar` serve HTML com `<link rel="manifest">` do tenant no **primeiro paint**
-  (`GET /api/v1/public/site/install-html/{slug}` + proxy front), para o browser poder emitir
-  `beforeinstallprompt` e o botão abrir o popup nativo (quando o SO/navegador permitir; iOS não tem essa API).
+  (`GET /api/v1/public/site/install-html/{slug}` + proxy front).
 - [x] `GET /entrar?tenant={slug}` pré-preenche e persiste a organização (`rememberTenantForLogin`); campo organização fica somente leitura enquanto o query estiver presente.
 
 ## Fora de escopo

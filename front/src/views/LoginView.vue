@@ -40,7 +40,7 @@ const handleLogin = async () => {
   >
   <div class="card p-8 space-y-6 w-full max-w-md" data-testid="login-card">
     <div class="text-center space-y-3">
-      <img :src="logoUrl" alt="Eclésia" class="mx-auto h-28 w-auto object-contain" />
+      <img :src="logoUrl" alt="Apostolus" class="mx-auto h-28 w-auto object-contain" />
       <p class="text-sm" style="color: var(--color-muted)">
         Acesso administrativo da plataforma
       </p>

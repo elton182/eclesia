@@ -116,7 +116,7 @@ function onSelect(idx) {
           class="px-4 py-4 text-[10px] flex justify-between gap-2"
           style="background: var(--color-ink); color: rgba(255, 253, 250, 0.6)"
         >
-          <span>{{ brandTitle }} · Eclesias</span>
+          <span>{{ brandTitle }} · Apostolus</span>
         </footer>
       </div>
     </div>

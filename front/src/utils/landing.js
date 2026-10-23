@@ -5,16 +5,18 @@
  * chave resolvida para o ícone do Font Awesome dentro da view.
  */
 
+import { PLATFORM_BRAND } from './brand.js'
+
 export const MARCA = {
-  nome: 'Eclésias',
-  tagline: 'Gestão inteligente para Igrejas e Paróquias',
+  nome: PLATFORM_BRAND.nome,
+  tagline: PLATFORM_BRAND.tagline,
 }
 
 export const HERO = {
   eyebrow: 'Plataforma de gestão eclesial',
   titulo: 'Toda a vida da sua paróquia organizada em um só lugar',
   descricao:
-    'O Eclésias reúne pessoas, equipes, eventos, calendário e finanças da sua ' +
+    `O ${PLATFORM_BRAND.nome} reúne pessoas, equipes, eventos, calendário e finanças da sua ` +
     'comunidade em uma plataforma web modular. Sua organização ativa apenas ' +
     'os módulos que usa — e cada igreja enxerga só o que é dela.',
   destaques: [
@@ -215,7 +217,7 @@ export const PORTAL_PREVIEW = {
   saudacao: 'Bom dia',
   tituloDesktop: 'Onde você quer trabalhar hoje, Maria?',
   tituloMobile: 'Olá, Maria',
-  urlBar: 'app.eclesias.com.br/inicio',
+  urlBar: 'app.apostolus.com.br/inicio',
   modulos: [
     {
       chave: 'ecc',

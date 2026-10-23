@@ -1,9 +1,9 @@
 openapi: 3.0.3
 info:
-  title: Eclesia API
+  title: Apostolus API
   version: 0.8.0
   description: |
-    API multi-tenant do Eclesia (gestão eclesial).
+    API multi-tenant do Apostolus (gestão eclesial).
     Contexto central (landlord): `/admin/*`.
     Contexto tenant: header `X-Tenant` (slug) + auth web/Sanctum.
     Igreja atual: header `X-Igreja` (ULID) validado contra o acesso do ator → IgrejaContext.

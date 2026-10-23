@@ -52,10 +52,10 @@ function badgeStyle(badge) {
             style="border-color: #C88A5E; color: #F0D8C2"
             aria-hidden="true"
           >
-            E
+            A
           </span>
           <span class="font-serif text-[12px] font-medium shrink-0" style="color: #FFFDFA">
-            Eclesias
+            Apostolus
           </span>
           <span class="w-px h-3.5 shrink-0" style="background: rgba(255, 253, 250, 0.2)"></span>
           <span
@@ -159,9 +159,9 @@ function badgeStyle(badge) {
               style="border-color: #C88A5E; color: #F0D8C2"
               aria-hidden="true"
             >
-              E
+              A
             </span>
-            <span class="font-serif text-[10px] font-medium" style="color: #FFFDFA">Eclesias</span>
+            <span class="font-serif text-[10px] font-medium" style="color: #FFFDFA">Apostolus</span>
           </div>
           <span
             class="w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-medium"
