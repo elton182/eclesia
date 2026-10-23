@@ -4,6 +4,7 @@ import api from '@/services/api'
 import { innovToast } from '@/plugins/toast'
 import { innovConfirm } from '@/plugins/dialog'
 import { buildSyncRolesPayload, roleLabel } from '@/utils/userRoles'
+import { displayUserLogin, validateUserLoginFields } from '@/utils/userLogin'
 import { filterEquipesBySearch } from '@/utils/eccFilters'
 import { useIgrejaStore } from '@/stores/igreja'
 
@@ -19,6 +20,7 @@ const form = ref({
   id: null,
   name: '',
   email: '',
+  username: '',
   password: '',
   is_active: true,
 })
@@ -64,7 +66,7 @@ const loadEquipes = async () => {
 }
 
 const openCreate = () => {
-  form.value = { id: null, name: '', email: '', password: '', is_active: true }
+  form.value = { id: null, name: '', email: '', username: '', password: '', is_active: true }
   mode.value = 'form'
 }
 
@@ -72,7 +74,8 @@ const openEdit = (user) => {
   form.value = {
     id: user.id,
     name: user.name,
-    email: user.email,
+    email: user.email || '',
+    username: user.username || '',
     password: '',
     is_active: user.is_active !== false,
   }
@@ -113,24 +116,36 @@ watch(
 )
 
 const save = async () => {
+  const login = validateUserLoginFields({
+    email: form.value.email,
+    username: form.value.username,
+  })
+  if (!login.ok) {
+    innovToast('error', 'Erro', login.message)
+    return
+  }
+
   saving.value = true
   try {
     if (form.value.id) {
       const payload = {
         name: form.value.name,
-        email: form.value.email,
+        email: login.email,
+        username: login.username,
         is_active: form.value.is_active,
       }
       if (form.value.password) payload.password = form.value.password
       await api.patch(`/users/${form.value.id}`, payload)
       innovToast('success', 'OK', 'Usuário atualizado')
     } else {
-      await api.post('/users', {
+      const payload = {
         name: form.value.name,
-        email: form.value.email,
         password: form.value.password,
         is_active: form.value.is_active,
-      })
+      }
+      if (login.email) payload.email = login.email
+      if (login.username) payload.username = login.username
+      await api.post('/users', payload)
       innovToast('success', 'OK', 'Usuário criado')
     }
     mode.value = 'list'
@@ -200,7 +215,7 @@ onMounted(load)
       <p class="page-eyebrow">Organização</p>
       <h2 class="text-3xl" style="color: var(--color-primary)">Usuários</h2>
       <p class="mt-1 text-[14.5px]" style="color: var(--color-muted)">
-        Cadastre usuários e marque os perfis (N papéis por usuário).
+        Cadastre usuários com e-mail e/ou login (username) e marque os perfis.
       </p>
     </div>
 
@@ -224,7 +239,9 @@ onMounted(load)
             <div class="flex items-center gap-4 flex-wrap">
               <div class="flex-1 min-w-0">
                 <div class="font-semibold">{{ user.name }}</div>
-                <div class="text-sm" style="color: var(--color-muted)">{{ user.email }}</div>
+                <div class="text-sm" style="color: var(--color-muted)" data-testid="user-login">
+                  {{ displayUserLogin(user) }}
+                </div>
               </div>
               <span
                 class="text-xs font-semibold px-2 py-1 rounded-lg"
@@ -269,15 +286,30 @@ onMounted(load)
           <input id="user-name" v-model="form.name" class="input" required data-testid="user-name" />
         </div>
         <div>
+          <label class="fld" for="user-username">Login (username)</label>
+          <input
+            id="user-username"
+            v-model="form.username"
+            type="text"
+            class="input"
+            autocomplete="username"
+            placeholder="opcional se houver e-mail"
+            data-testid="user-username"
+          />
+        </div>
+        <div>
           <label class="fld" for="user-email">E-mail</label>
           <input
             id="user-email"
             v-model="form.email"
             type="email"
             class="input"
-            required
+            placeholder="opcional se houver login"
             data-testid="user-email"
           />
+          <p class="mt-1 text-xs" style="color: var(--color-muted)">
+            Informe e-mail, login ou ambos. O acesso pode ser feito com qualquer um.
+          </p>
         </div>
         <div>
           <label class="fld" for="user-password">

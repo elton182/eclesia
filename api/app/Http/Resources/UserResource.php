@@ -21,7 +21,7 @@ class UserResource extends JsonResource
         return [
             'id' => $this->ulid,
             'name' => $this->name,
-            'email' => $this->email,
+            'email' => $this->publicEmail(),
             'username' => $this->username,
             'is_active' => (bool) $this->is_active,
             'must_change_password' => (bool) $this->must_change_password,

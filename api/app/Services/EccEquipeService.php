@@ -222,7 +222,7 @@ class EccEquipeService
             ]);
         }
 
-        $username = $this->normalizeUsername($username);
+        $username = User::normalizeUsername($username);
         if ($username === '') {
             throw ValidationException::withMessages([
                 'username' => ['Informe um login válido (letras, números e hífens).'],
@@ -253,7 +253,7 @@ class EccEquipeService
 
     private function uniqueUsernameFromNome(string $nome): string
     {
-        $base = $this->normalizeUsername($nome);
+        $base = User::normalizeUsername($nome);
         if ($base === '') {
             $base = 'equipe';
         }
@@ -266,11 +266,6 @@ class EccEquipeService
         }
 
         return $candidate;
-    }
-
-    private function normalizeUsername(string $value): string
-    {
-        return Str::slug(Str::lower(trim($value)), '-');
     }
 
     /**
