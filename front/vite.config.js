@@ -12,10 +12,10 @@ const pwaPlugin = VitePWA({
   includeAssets: ['favicon.ico', 'icons/apple-touch-icon.png'],
   manifest: {
     id: '/',
-    name: 'Eclésias',
-    short_name: 'Eclésias',
+    name: 'Apostolus',
+    short_name: 'Apostolus',
     description:
-      'Plataforma modular de gestão eclesial: pessoas, equipes, eventos, calendário e finanças da sua paróquia.',
+      'Gestão inteligente para Igrejas e Paróquias: pessoas, equipes, eventos, calendário e finanças da sua comunidade.',
     lang: 'pt-BR',
     dir: 'ltr',
     start_url: '/',

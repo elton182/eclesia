@@ -44,7 +44,7 @@ const brandLogo = computed(() => branding.logoUrl || fallbackLogo)
 const brandAlt = computed(() =>
   branding.logoUrl
     ? tenantStore.name || tenantStore.slug || 'Logo'
-    : 'Eclésia',
+    : 'Apostolus',
 )
 
 const can = (permission) =>
@@ -113,7 +113,7 @@ const eccItems = computed(() => {
       />
       <div v-if="isOpen" class="min-w-0">
         <div class="font-semibold text-[17px] leading-tight" style="font-family: Fraunces, serif">
-          {{ branding.logoUrl ? (tenantStore.name || 'Organização') : 'Eclésia' }}
+          {{ branding.logoUrl ? (tenantStore.name || 'Organização') : 'Apostolus' }}
         </div>
         <div class="text-[10px] uppercase tracking-[0.14em] font-semibold opacity-80">
           Gestão eclesial
@@ -180,7 +180,7 @@ const eccItems = computed(() => {
     </nav>
 
     <div v-if="isOpen" class="px-4 py-4 text-[11.5px] text-[#D69E8E] border-t border-white/10 leading-relaxed">
-      Identidade visual baseada na marca Eclésia.
+      Identidade visual baseada na marca Apostolus.
     </div>
   </aside>
 </template>

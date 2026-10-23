@@ -96,10 +96,10 @@ const handleLogin = async () => {
           class="w-[30px] h-[30px] rounded-full border flex items-center justify-center font-serif text-[14px] font-medium"
           style="border-color: #C88A5E; color: #F0D8C2"
         >
-          E
+          A
         </div>
         <div class="font-serif text-[17px] font-medium tracking-wide" style="color: #FFFDFA">
-          Eclesias
+          Apostolus
         </div>
       </div>
 
@@ -130,9 +130,9 @@ const handleLogin = async () => {
             class="w-11 h-11 rounded-full flex items-center justify-center font-serif text-[22px] font-medium"
             style="background: #6B1C2B; color: #F0D8C2"
           >
-            E
+            A
           </div>
-          <div class="font-serif text-[19px] font-medium" style="color: #2A1418">Eclesias</div>
+          <div class="font-serif text-[19px] font-medium" style="color: #2A1418">Apostolus</div>
         </div>
 
         <h2 class="font-serif text-[25px] leading-tight mb-1.5" style="color: #2A1418">Entrar</h2>
@@ -163,7 +163,7 @@ const handleLogin = async () => {
             <span
               class="pl-3 pr-0.5 text-[13px] font-mono shrink-0"
               style="color: rgba(42, 20, 24, 0.62)"
-            >eclesias.com.br/</span>
+            >apostolus.com.br/</span>
             <input
               id="tenant"
               v-model="tenant"

@@ -52,7 +52,7 @@ const orgName = computed(() => tenantStore.name || 'Sua organização')
 const orgSlug = computed(() => tenantStore.slug || '')
 
 const brandLogo = computed(() => branding.logoUrl || null)
-const brandTitle = computed(() => (branding.logoUrl ? orgName.value : 'Eclésia'))
+const brandTitle = computed(() => (branding.logoUrl ? orgName.value : 'Apostolus'))
 
 const roleLabel = computed(() => {
   const roles = authTenant.user?.roles
@@ -228,7 +228,7 @@ function go(path) {
             class="w-6 h-6 rounded-full border flex items-center justify-center font-serif text-[12px] font-medium"
             style="border-color: var(--color-accent); color: var(--color-on-primary)"
           >
-            E
+            A
           </div>
           <span class="font-serif text-[15px] font-medium" style="color: var(--color-on-primary)">
             {{ brandTitle }}

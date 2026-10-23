@@ -40,10 +40,10 @@ const brandLogo = computed(() => branding.logoUrl || fallbackLogo)
 const brandName = computed(() =>
   branding.logoUrl
     ? tenantStore.name || tenantStore.slug || 'Organização'
-    : 'Eclésia',
+    : 'Apostolus',
 )
 const brandAlt = computed(() =>
-  branding.logoUrl ? brandName.value : 'Eclésia',
+  branding.logoUrl ? brandName.value : 'Apostolus',
 )
 
 const isPlatformAdmin = computed(
