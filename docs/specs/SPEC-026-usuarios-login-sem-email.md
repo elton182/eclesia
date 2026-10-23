@@ -24,6 +24,7 @@ Permitir criar e atualizar usuários do tenant com **e-mail e/ou username**, exi
 - [x] Ao alterar username de usuário com e-mail sintético `@login.local`, o e-mail sintético acompanha.
 - [x] `POST /web/login` com `login` = username do usuário criado sem e-mail autentica.
 - [x] Front `/usuarios`: e-mail não obrigatório; campo login/username; lista mostra username ou e-mail.
+- [x] `GET /users` paginado (`page`, `per_page`) com busca `q` (nome, e-mail real ou username); front lista com paginação e busca no servidor.
 
 ## Fora de escopo
 
