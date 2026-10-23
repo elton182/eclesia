@@ -323,6 +323,9 @@ class EccEquipeAcessoTest extends TestCase
             ->assertCreated()
             ->json('data.id');
 
+        $this->tenantJson('POST', '/api/v1/ecc/equipes', ['nome' => 'Sem Login'])
+            ->assertCreated();
+
         $this->tenantJson('POST', "/api/v1/ecc/equipes/{$equipeId}/acesso")
             ->assertCreated();
 
@@ -346,6 +349,16 @@ class EccEquipeAcessoTest extends TestCase
 
         $this->assertNotEmpty($pdf->getContent());
         $this->assertStringStartsWith('%PDF', $pdf->getContent());
+
+        tenancy()->initialize($this->tenant);
+        $linhas = app(\App\Services\EccEquipeService::class)->linhasPdf();
+        tenancy()->end();
+
+        $this->assertCount(1, $linhas);
+        $this->assertSame('EQUIPE PDF', $linhas[0]['equipe']);
+        $this->assertSame('equipe-pdf', $linhas[0]['login']);
+        $this->assertStringContainsString('João Piloto', $linhas[0]['piloto']);
+        $this->assertStringContainsString('Maria Piloto', $linhas[0]['piloto']);
     }
 
     public function test_pdf_equipes_sem_permissao_manage_retorna_403(): void

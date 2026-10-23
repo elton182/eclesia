@@ -2043,7 +2043,7 @@ paths:
       summary: PDF de equipes (piloto e login)
       description: |
         SPEC-025. Requer ecc.equipes.manage. Gera PDF com equipe, nome do(s) piloto(s)
-        e username do acesso compartilhado da igreja atual.
+        e username do acesso compartilhado. Só inclui equipes que já têm login gerado.
       security:
         - bearerAuth: []
           tenantHeader: []
