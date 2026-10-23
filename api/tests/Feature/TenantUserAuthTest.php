@@ -8,8 +8,11 @@ use App\Models\Igreja;
 use App\Models\SuperAdmin;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Services\CookieManager;
+use App\Services\WebAuthService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
+use Laravel\Sanctum\PersonalAccessToken;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -116,6 +119,40 @@ class TenantUserAuthTest extends TestCase
             ->postJson('/api/v1/web/me')
             ->assertOk()
             ->assertJsonPath('success', true);
+    }
+
+    public function test_login_access_30_dias_e_refresh_sem_expiracao(): void
+    {
+        $this->assertSame(43200, CookieManager::ACCESS_TOKEN_EXPIRY);
+        $this->assertNull(CookieManager::REFRESH_TOKEN_EXPIRY);
+
+        $this->postJson('/api/v1/web/login', [
+            'tenant' => 'paroquia-teste',
+            'email' => 'admin@paroquia-teste.local',
+            'password' => 'password',
+        ])->assertOk();
+
+        tenancy()->initialize($this->tenant);
+
+        $access = PersonalAccessToken::query()
+            ->where('name', WebAuthService::ACCESS_TOKEN_NAME)
+            ->latest('id')
+            ->first();
+        $refresh = PersonalAccessToken::query()
+            ->where('name', WebAuthService::REFRESH_TOKEN_NAME)
+            ->latest('id')
+            ->first();
+
+        $this->assertNotNull($access);
+        $this->assertNotNull($refresh);
+        $this->assertNull($refresh->expires_at);
+        $this->assertNotNull($access->expires_at);
+        $this->assertTrue(
+            $access->expires_at->between(
+                now()->addDays(29)->addHours(23),
+                now()->addDays(30)->addHour()
+            )
+        );
     }
 
     public function test_login_unknown_tenant(): void

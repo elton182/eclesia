@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Models\User;
 use Carbon\Carbon;
+use DateTimeInterface;
 
 class WebAuthService
 {
@@ -23,7 +24,7 @@ class WebAuthService
     public function generateAccessTokens(
         User $user,
         int $accessExpiry = CookieManager::ACCESS_TOKEN_EXPIRY,
-        int $refreshExpiry = CookieManager::REFRESH_TOKEN_EXPIRY
+        ?int $refreshExpiry = CookieManager::REFRESH_TOKEN_EXPIRY
     ): array {
         $sessionId = $this->authTokenService->newSessionId();
         $abilities = $this->authTokenService->abilitiesForSession($sessionId);
@@ -34,10 +35,15 @@ class WebAuthService
             Carbon::now()->addMinutes($accessExpiry)
         );
 
+        /** @var DateTimeInterface|null $refreshExpiresAt */
+        $refreshExpiresAt = $refreshExpiry === null
+            ? null
+            : Carbon::now()->addMinutes($refreshExpiry);
+
         $refreshToken = $user->createToken(
             self::REFRESH_TOKEN_NAME,
             $abilities,
-            Carbon::now()->addMinutes($refreshExpiry)
+            $refreshExpiresAt
         );
 
         return [

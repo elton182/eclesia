@@ -1180,6 +1180,8 @@ paths:
         `email` permanece como alias de `login`. Retorna cookies + slug canônico.
         Não revoga sessões web existentes (SPEC-010): múltiplos dispositivos/site+app convivem.
         Cada par access/refresh compartilha ability `session:{ulid}`.
+        Access token: 30 dias. Refresh token: sem `expires_at` (válido até logout/revogação;
+        cookie do refresh usa forever no browser).
       requestBody:
         required: true
         content:

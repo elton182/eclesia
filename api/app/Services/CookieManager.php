@@ -11,9 +11,14 @@ class CookieManager
     public const ACCESS_TOKEN_COOKIE = 'access_token';
     public const REFRESH_TOKEN_COOKIE = 'refresh_token';
 
-    // Tempos de expiração em minutos
-    public const ACCESS_TOKEN_EXPIRY = 480; // 8 horas (SPA guarda Bearer; sem refresh frequente)
-    public const REFRESH_TOKEN_EXPIRY = 10080; // 7 dias
+    /** Access token Sanctum + cookie: 30 dias (minutos). */
+    public const ACCESS_TOKEN_EXPIRY = 43200;
+
+    /**
+     * Refresh token Sanctum: null = sem expires_at (válido até logout/revogação).
+     * Cookie do refresh usa Cookie::forever (limite prático do browser ~400 dias).
+     */
+    public const REFRESH_TOKEN_EXPIRY = null;
 
     /**
      * Cria um cookie de token com as configurações padrão de segurança
@@ -54,17 +59,22 @@ class CookieManager
     }
 
     /**
-     * Cria um cookie de refresh token
+     * Cookie de refresh: forever no browser; o token Sanctum não expira (expires_at null).
      *
      * @param string $token
      * @return SymfonyCookie
      */
     public function createRefreshTokenCookie(string $token): SymfonyCookie
     {
-        return $this->createTokenCookie(
+        return Cookie::forever(
             self::REFRESH_TOKEN_COOKIE,
             $token,
-            self::REFRESH_TOKEN_EXPIRY
+            '/',
+            null,
+            config('app.env') === 'production',
+            config('app.env') === 'production',
+            false,
+            'lax'
         );
     }
 
