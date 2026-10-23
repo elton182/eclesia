@@ -222,6 +222,91 @@ class EccEquipeAcessoTest extends TestCase
             ->assertStatus(422);
     }
 
+    public function test_alterar_login_atualiza_username_e_permite_novo_login(): void
+    {
+        $equipeId = $this->tenantJson('POST', '/api/v1/ecc/equipes', ['nome' => 'Equipe Login'])
+            ->assertCreated()
+            ->json('data.id');
+
+        $acesso = $this->tenantJson('POST', "/api/v1/ecc/equipes/{$equipeId}/acesso")
+            ->assertCreated()
+            ->json('data');
+
+        Auth::forgetGuards();
+
+        $loginAntigo = $this->postJson('/api/v1/web/login', [
+            'tenant' => 'paroquia-acesso',
+            'login' => 'equipe-login',
+            'password' => $acesso['password'],
+        ])->assertOk();
+
+        $tokenAntigo = $loginAntigo->json('access_token');
+
+        Sanctum::actingAs($this->admin);
+
+        $alterado = $this->tenantJson('PUT', "/api/v1/ecc/equipes/{$equipeId}/acesso", [
+            'username' => 'Cana Nova!',
+        ])->assertOk()
+            ->json('data');
+
+        $this->assertSame('cana-nova', $alterado['username']);
+        $this->assertSame('cana-nova', $alterado['acesso_username']);
+        $this->assertTrue($alterado['tem_acesso']);
+        $this->assertArrayNotHasKey('password', $alterado);
+
+        $this->tenantJson('GET', "/api/v1/ecc/equipes/{$equipeId}")
+            ->assertOk()
+            ->assertJsonPath('data.acesso_username', 'cana-nova');
+
+        Auth::forgetGuards();
+
+        $this->withHeader('X-Tenant', 'paroquia-acesso')
+            ->withHeader('Authorization', 'Bearer '.$tokenAntigo)
+            ->postJson('/api/v1/web/me')
+            ->assertUnauthorized();
+
+        $this->postJson('/api/v1/web/login', [
+            'tenant' => 'paroquia-acesso',
+            'login' => 'equipe-login',
+            'password' => $acesso['password'],
+        ])->assertForbidden();
+
+        $this->postJson('/api/v1/web/login', [
+            'tenant' => 'paroquia-acesso',
+            'login' => 'cana-nova',
+            'password' => $acesso['password'],
+        ])->assertOk()
+            ->assertJsonPath('user.username', 'cana-nova');
+    }
+
+    public function test_alterar_login_sem_acesso_retorna_422(): void
+    {
+        $equipeId = $this->tenantJson('POST', '/api/v1/ecc/equipes', ['nome' => 'Sem Login'])
+            ->assertCreated()
+            ->json('data.id');
+
+        $this->tenantJson('PUT', "/api/v1/ecc/equipes/{$equipeId}/acesso", [
+            'username' => 'qualquer',
+        ])->assertStatus(422);
+    }
+
+    public function test_alterar_login_username_duplicado_retorna_422(): void
+    {
+        $equipeA = $this->tenantJson('POST', '/api/v1/ecc/equipes', ['nome' => 'Equipe Alpha'])
+            ->assertCreated()
+            ->json('data.id');
+        $equipeB = $this->tenantJson('POST', '/api/v1/ecc/equipes', ['nome' => 'Equipe Beta'])
+            ->assertCreated()
+            ->json('data.id');
+
+        $this->tenantJson('POST', "/api/v1/ecc/equipes/{$equipeA}/acesso")->assertCreated();
+        $this->tenantJson('POST', "/api/v1/ecc/equipes/{$equipeB}/acesso")->assertCreated();
+
+        $this->tenantJson('PUT', "/api/v1/ecc/equipes/{$equipeB}/acesso", [
+            'username' => 'equipe-alpha',
+        ])->assertStatus(422);
+    }
+
     public function test_login_ainda_aceita_email_como_alias(): void
     {
         $this->postJson('/api/v1/web/login', [
@@ -230,5 +315,53 @@ class EccEquipeAcessoTest extends TestCase
             'password' => 'password',
         ])->assertOk()
             ->assertJsonPath('success', true);
+    }
+
+    public function test_pdf_equipes_inclui_piloto_e_login(): void
+    {
+        $equipeId = $this->tenantJson('POST', '/api/v1/ecc/equipes', ['nome' => 'Equipe PDF'])
+            ->assertCreated()
+            ->json('data.id');
+
+        $this->tenantJson('POST', "/api/v1/ecc/equipes/{$equipeId}/acesso")
+            ->assertCreated();
+
+        $this->tenantJson('POST', '/api/v1/ecc/casais', [
+            'equipe_id' => $equipeId,
+            'nome' => 'João Piloto',
+            'nome_conjuge' => 'Maria Piloto',
+            'piloto' => true,
+        ])->assertCreated();
+
+        $this->tenantJson('POST', '/api/v1/ecc/casais', [
+            'equipe_id' => $equipeId,
+            'nome' => 'Pedro Comum',
+            'nome_conjuge' => 'Ana Comum',
+            'piloto' => false,
+        ])->assertCreated();
+
+        $pdf = $this->tenantJson('GET', '/api/v1/ecc/equipes/pdf')
+            ->assertOk()
+            ->assertHeader('content-type', 'application/pdf');
+
+        $this->assertNotEmpty($pdf->getContent());
+        $this->assertStringStartsWith('%PDF', $pdf->getContent());
+    }
+
+    public function test_pdf_equipes_sem_permissao_manage_retorna_403(): void
+    {
+        tenancy()->initialize($this->tenant);
+        $lider = User::query()->create([
+            'name' => 'Líder PDF',
+            'email' => 'lider-pdf@paroquia-acesso.local',
+            'password' => 'password',
+            'is_active' => true,
+        ]);
+        tenancy()->end();
+
+        Sanctum::actingAs($lider);
+
+        $this->tenantJson('GET', '/api/v1/ecc/equipes/pdf')
+            ->assertForbidden();
     }
 }

@@ -7,10 +7,12 @@ namespace App\Services;
 use App\Models\Casal;
 use App\Models\EccEquipe;
 use App\Models\User;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpFoundation\Response;
 
 class EccEquipeService
 {
@@ -207,9 +209,51 @@ class EccEquipeService
         ];
     }
 
+    /**
+     * SPEC-024: altera o username do acesso compartilhado (sem resetar senha).
+     *
+     * @return array{username: string, equipe: EccEquipe}
+     */
+    public function alterarLoginAcesso(EccEquipe $equipe, string $username): array
+    {
+        if ($equipe->acesso_user_id === null) {
+            throw ValidationException::withMessages([
+                'acesso' => ['Esta equipe ainda não possui acesso. Crie o acesso primeiro.'],
+            ]);
+        }
+
+        $username = $this->normalizeUsername($username);
+        if ($username === '') {
+            throw ValidationException::withMessages([
+                'username' => ['Informe um login válido (letras, números e hífens).'],
+            ]);
+        }
+
+        $user = User::query()->findOrFail($equipe->acesso_user_id);
+
+        if (User::usernameExists($username, $user->id)) {
+            throw ValidationException::withMessages([
+                'username' => ['Este login já está em uso.'],
+            ]);
+        }
+
+        $igreja = $this->igrejaContext->current();
+        $email = sprintf('%s.%s@equipe.local', $username, Str::lower(Str::substr((string) $igreja->id, 0, 8)));
+
+        $user->username = $username;
+        $user->email = $email;
+        $user->save();
+        $user->tokens()->delete();
+
+        return [
+            'username' => $username,
+            'equipe' => $equipe->refresh()->load(['acessoUser:id,username'])->loadCount('casais'),
+        ];
+    }
+
     private function uniqueUsernameFromNome(string $nome): string
     {
-        $base = Str::slug(Str::lower($nome), '-');
+        $base = $this->normalizeUsername($nome);
         if ($base === '') {
             $base = 'equipe';
         }
@@ -224,6 +268,11 @@ class EccEquipeService
         return $candidate;
     }
 
+    private function normalizeUsername(string $value): string
+    {
+        return Str::slug(Str::lower(trim($value)), '-');
+    }
+
     /**
      * Senha inicial fixa para facilitar o repasse ao líder (SPEC-021).
      * Continua exigindo must_change_password no primeiro acesso.
@@ -231,5 +280,58 @@ class EccEquipeService
     private function generateTemporaryPassword(): string
     {
         return '1234';
+    }
+
+    /**
+     * SPEC-025: PDF com equipe, piloto(s) e login do acesso.
+     */
+    public function pdf(): Response
+    {
+        $igreja = $this->igrejaContext->current();
+
+        $equipes = EccEquipe::query()
+            ->where('igreja_id', $igreja->id)
+            ->with([
+                'acessoUser:id,username',
+                'casais' => static fn ($q) => $q->where('piloto', true)->with(['pessoaA:id,nome', 'pessoaB:id,nome']),
+            ])
+            ->orderBy('nome')
+            ->get();
+
+        $linhas = $equipes->map(function (EccEquipe $equipe): array {
+            $pilotos = $equipe->casais
+                ->map(fn (Casal $casal) => $this->formatCasalNome($casal))
+                ->filter(fn (string $nome) => $nome !== '')
+                ->values()
+                ->all();
+
+            return [
+                'equipe' => $equipe->nome,
+                'piloto' => $pilotos === [] ? '—' : implode('; ', $pilotos),
+                'login' => $equipe->acessoUser?->username ?: '—',
+            ];
+        })->all();
+
+        $pdf = Pdf::loadView('ecc.equipes-pdf', [
+            'igreja' => $igreja,
+            'linhas' => $linhas,
+            'geradoEm' => now()->timezone(config('app.timezone', 'UTC'))->format('d/m/Y H:i'),
+        ])->setPaper('a4', 'portrait');
+
+        $slug = Str::slug((string) ($igreja->slug ?? $igreja->nome ?? 'igreja'), '-') ?: 'igreja';
+
+        return $pdf->download('equipes-'.$slug.'.pdf');
+    }
+
+    private function formatCasalNome(Casal $casal): string
+    {
+        $a = trim((string) ($casal->pessoaA?->nome ?? ''));
+        $b = trim((string) ($casal->pessoaB?->nome ?? ''));
+
+        if ($a !== '' && $b !== '') {
+            return $a.' & '.$b;
+        }
+
+        return $a !== '' ? $a : $b;
     }
 }

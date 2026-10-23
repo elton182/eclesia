@@ -34,7 +34,7 @@ A gestão de equipes de perseverança ficou secundária em Casais (`/ecc/equipes
 
 - Equipes de serviço / escala.
 - Esqueci minha senha self-service.
-- Renomear username ao editar nome da equipe.
+- Renomear username ao editar nome da equipe (alteração explícita: SPEC-024).
 - Remover líderes pessoais cadastrados em Usuários (continuam válidos).
 
 ## Contrato de API

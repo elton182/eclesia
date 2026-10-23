@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreEccEquipeRequest;
 use App\Http\Requests\SyncEccEquipeCasaisRequest;
+use App\Http\Requests\UpdateEccEquipeAcessoRequest;
 use App\Http\Requests\UpdateEccEquipeRequest;
 use App\Http\Resources\EccEquipeResource;
 use App\Services\EccEquipeService;
@@ -14,6 +15,7 @@ use App\Services\EccVisibilityScope;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
+use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 class EccEquipeController extends Controller
 {
@@ -102,5 +104,29 @@ class EccEquipeController extends Controller
                 'equipe' => (new EccEquipeResource($result['equipe']))->resolve(),
             ],
         ]);
+    }
+
+    public function alterarLoginAcesso(UpdateEccEquipeAcessoRequest $request, string $id): JsonResponse
+    {
+        $result = $this->equipes->alterarLoginAcesso(
+            $this->equipes->find($id),
+            (string) $request->validated('username'),
+        );
+
+        return response()->json([
+            'data' => [
+                'username' => $result['username'],
+                'tem_acesso' => true,
+                'acesso_username' => $result['username'],
+                'equipe' => (new EccEquipeResource($result['equipe']))->resolve(),
+            ],
+        ]);
+    }
+
+    public function pdf(): SymfonyResponse
+    {
+        abort_unless($this->visibility->userCan('ecc.equipes.manage'), 403);
+
+        return $this->equipes->pdf();
     }
 }

@@ -142,7 +142,9 @@ Route::middleware([
 
     Route::put('ecc/equipes/{id}/casais', [EccEquipeController::class, 'syncCasais']);
     Route::post('ecc/equipes/{id}/acesso', [EccEquipeController::class, 'criarAcesso']);
+    Route::put('ecc/equipes/{id}/acesso', [EccEquipeController::class, 'alterarLoginAcesso']);
     Route::post('ecc/equipes/{id}/acesso/reset-senha', [EccEquipeController::class, 'resetSenhaAcesso']);
+    Route::get('ecc/equipes/pdf', [EccEquipeController::class, 'pdf']);
     Route::apiResource('ecc/equipes', EccEquipeController::class)->names('ecc.equipes');
     Route::get('ecc/equipes-servico', [EccEquipeServicoController::class, 'index']);
     Route::post('ecc/casais/import', [EccCasalController::class, 'import']);

@@ -2038,6 +2038,27 @@ paths:
       responses:
         '201':
           description: Criada
+  /ecc/equipes/pdf:
+    get:
+      summary: PDF de equipes (piloto e login)
+      description: |
+        SPEC-025. Requer ecc.equipes.manage. Gera PDF com equipe, nome do(s) piloto(s)
+        e username do acesso compartilhado da igreja atual.
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      responses:
+        '200':
+          description: PDF
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        '401':
+          description: Não autenticado
+        '403':
+          description: Sem permissão
   /ecc/equipes-servico:
     get:
       summary: Listar equipes de serviço (catálogo)
@@ -2181,6 +2202,55 @@ paths:
           description: Sem permissão
         '422':
           description: Já possui acesso
+    put:
+      summary: Alterar login (username) do acesso da equipe
+      description: |
+        SPEC-024. Requer ecc.equipes.manage. Atualiza username (+ e-mail sintético) do
+        usuário de acesso. Não altera senha nem must_change_password. Revoga tokens.
+        Sem acesso → 422. Username colidindo → 422.
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username]
+              properties:
+                username:
+                  type: string
+                  maxLength: 120
+                  description: Novo login (normalizado para slug)
+                  example: equipe-cana
+      responses:
+        '200':
+          description: Login alterado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      username:
+                        type: string
+                      tem_acesso:
+                        type: boolean
+                      acesso_username:
+                        type: string
+        '403':
+          description: Sem permissão
+        '422':
+          description: Sem acesso, username inválido ou já em uso
   /ecc/equipes/{id}/acesso/reset-senha:
     post:
       summary: Resetar senha do acesso da equipe

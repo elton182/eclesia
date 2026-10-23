@@ -6,8 +6,13 @@ import { useAuthAdminStore } from '@/stores/authAdmin'
 import { useTenantStore } from '@/stores/tenant'
 import api from '@/services/api'
 import { innovToast } from '@/plugins/toast'
-import { innovAlert, innovConfirm } from '@/plugins/dialog'
+import { innovAlert, innovConfirm, innovPrompt } from '@/plugins/dialog'
 import { userHasPermission } from '@/utils/userRoles'
+import {
+  validateEquipeUsername,
+  equipesPdfFilename,
+  downloadBlob,
+} from '@/utils/eccEquipeAcesso'
 import EccEquipeMembrosModal from '@/components/ecc/EccEquipeMembrosModal.vue'
 
 const router = useRouter()
@@ -29,6 +34,7 @@ const search = ref('')
 const mode = ref('list')
 const saving = ref(false)
 const acessoLoadingId = ref(null)
+const pdfLoading = ref(false)
 const equipeForm = ref({ id: null, nome: '', cor: '#6B1C2B' })
 const membrosOpen = ref(false)
 const membrosEquipe = ref(null)
@@ -169,8 +175,70 @@ const handleAcesso = async (equipe) => {
   }
 }
 
+const handleAlterarLogin = async (equipe) => {
+  if (!canManage.value || !equipe.tem_acesso) return
+
+  const digitado = await innovPrompt({
+    title: 'Alterar login',
+    message: `Login atual de ${equipe.nome}: ${equipe.acesso_username}. A senha permanece a mesma; sessões ativas serão encerradas.`,
+    label: 'Novo login',
+    placeholder: 'ex.: equipe-cana',
+    defaultValue: equipe.acesso_username || '',
+    confirmText: 'Salvar',
+    cancelText: 'Cancelar',
+  })
+  if (digitado === null) return
+
+  const valid = validateEquipeUsername(digitado)
+  if (!valid.ok) {
+    innovToast('error', 'Login inválido', valid.message)
+    return
+  }
+
+  if (valid.username === String(equipe.acesso_username || '')) {
+    innovToast('success', 'Sem alteração', 'O login informado é o mesmo do atual.')
+    return
+  }
+
+  acessoLoadingId.value = equipe.id
+  try {
+    const { data } = await api.put(`/ecc/equipes/${equipe.id}/acesso`, {
+      username: valid.username,
+    })
+    const payload = data?.data || data
+    await innovAlert({
+      title: 'Login alterado',
+      message: `Novo usuário: ${payload.username || valid.username}\n\nInforme o novo login ao líder. A senha não foi alterada.`,
+      confirmText: 'Entendi',
+    })
+    await load()
+  } catch (e) {
+    const msg =
+      e.response?.data?.errors?.username?.[0] ||
+      e.response?.data?.message ||
+      'Falha ao alterar login'
+    innovToast('error', 'Erro', msg)
+  } finally {
+    acessoLoadingId.value = null
+  }
+}
+
 const verCasais = (equipe) => {
   router.push({ name: 'ecc-casais', query: { equipe: String(equipe.id) } })
+}
+
+const baixarPdf = async () => {
+  if (!canManage.value || !ensureTenant()) return
+  pdfLoading.value = true
+  try {
+    const res = await api.get('/ecc/equipes/pdf', { responseType: 'blob' })
+    const slug = tenantStore.igreja?.slug || tenantStore.slug || 'igreja'
+    downloadBlob(res.data, equipesPdfFilename(slug))
+  } catch (e) {
+    innovToast('error', 'PDF', e.response?.data?.message || 'Falha ao gerar PDF')
+  } finally {
+    pdfLoading.value = false
+  }
 }
 
 onMounted(load)
@@ -189,15 +257,27 @@ onMounted(load)
             Grupos de perseverança, membros (casais) e acesso compartilhado do líder.
           </p>
         </div>
-        <button
-          v-if="canManage"
-          type="button"
-          class="btn btn-primary w-full sm:w-auto"
-          data-testid="equipes-nova"
-          @click="openCreate"
-        >
-          Nova equipe
-        </button>
+        <div class="flex flex-col gap-2 w-full sm:w-auto sm:flex-row">
+          <button
+            v-if="canManage"
+            type="button"
+            class="btn btn-ghost w-full sm:w-auto"
+            data-testid="equipes-pdf"
+            :disabled="pdfLoading"
+            @click="baixarPdf"
+          >
+            {{ pdfLoading ? 'Gerando PDF…' : 'Gerar PDF' }}
+          </button>
+          <button
+            v-if="canManage"
+            type="button"
+            class="btn btn-primary w-full sm:w-auto"
+            data-testid="equipes-nova"
+            @click="openCreate"
+          >
+            Nova equipe
+          </button>
+        </div>
       </div>
 
       <div class="flex flex-col gap-3 w-full md:flex-row md:flex-wrap md:items-center">
@@ -296,6 +376,16 @@ onMounted(load)
                     ? 'Resetar senha'
                     : 'Acesso da Equipe'
               }}
+            </button>
+            <button
+              v-if="canManage && equipe.tem_acesso"
+              type="button"
+              class="btn btn-ghost"
+              data-testid="equipe-alterar-login"
+              :disabled="acessoLoadingId === equipe.id"
+              @click="handleAlterarLogin(equipe)"
+            >
+              Alterar login
             </button>
             <button
               v-if="canManage"
