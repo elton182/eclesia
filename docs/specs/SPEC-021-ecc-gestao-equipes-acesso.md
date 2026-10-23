@@ -20,8 +20,8 @@ A gestão de equipes de perseverança ficou secundária em Casais (`/ecc/equipes
 
 - [ ] Migration tenant: `users.username` (nullable unique), `users.must_change_password`; `ecc_equipes.acesso_user_id` FK nullable.
 - [ ] `PUT /ecc/equipes/{id}/casais` com `casal_ids[]`: listados ficam na equipe; quem saiu fica `ecc_equipe_id = null`. Requer `ecc.equipes.manage`.
-- [ ] `POST /ecc/equipes/{id}/acesso`: cria user (`name` = nome da equipe, `username` = slug único, e-mail sintético), senha temporária, `must_change_password=true`, papel `lider-equipe` + vínculo N:M, grava `acesso_user_id`. Retorna `username` + `password` uma vez. Se já tem acesso → 422.
-- [ ] `POST /ecc/equipes/{id}/acesso/reset-senha`: nova senha + `must_change_password=true` + revoga tokens. Sem acesso → 422.
+- [x] `POST /ecc/equipes/{id}/acesso`: cria user (`name` = nome da equipe, `username` = slug único, e-mail sintético), senha inicial `1234`, `must_change_password=true`, papel `lider-equipe` + vínculo N:M, grava `acesso_user_id`. Retorna `username` + `password` uma vez. Se já tem acesso → 422.
+- [x] `POST /ecc/equipes/{id}/acesso/reset-senha`: senha volta para `1234` + `must_change_password=true` + revoga tokens. Sem acesso → 422.
 - [ ] List/show equipe inclui `tem_acesso` e `acesso_username` (sem senha).
 - [ ] Renomear equipe **não** altera `username` já criado.
 - [ ] `POST /web/login` aceita `login` (e-mail ou username); `email` permanece como alias.

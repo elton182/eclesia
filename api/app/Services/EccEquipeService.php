@@ -224,8 +224,12 @@ class EccEquipeService
         return $candidate;
     }
 
+    /**
+     * Senha inicial fixa para facilitar o repasse ao líder (SPEC-021).
+     * Continua exigindo must_change_password no primeiro acesso.
+     */
     private function generateTemporaryPassword(): string
     {
-        return Str::password(12, symbols: false);
+        return '1234';
     }
 }

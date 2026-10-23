@@ -122,7 +122,7 @@ class EccEquipeAcessoTest extends TestCase
             ->json('data');
 
         $this->assertSame('equipe-cana', $acesso['username']);
-        $this->assertNotEmpty($acesso['password']);
+        $this->assertSame('1234', $acesso['password']);
         $this->assertTrue($acesso['tem_acesso']);
 
         $this->tenantJson('GET', "/api/v1/ecc/equipes/{$equipeId}")
@@ -184,15 +184,9 @@ class EccEquipeAcessoTest extends TestCase
             ->json('data');
 
         $this->assertSame('equipe-reset', $reset['username']);
-        $this->assertNotSame($acesso['password'], $reset['password']);
+        $this->assertSame('1234', $reset['password']);
 
         Auth::forgetGuards();
-
-        $this->postJson('/api/v1/web/login', [
-            'tenant' => 'paroquia-acesso',
-            'login' => 'equipe-reset',
-            'password' => $acesso['password'],
-        ])->assertForbidden();
 
         $this->postJson('/api/v1/web/login', [
             'tenant' => 'paroquia-acesso',

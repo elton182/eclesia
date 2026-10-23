@@ -115,7 +115,7 @@ const openMembros = (equipe) => {
 const showCredenciais = async (username, password, titulo) => {
   await innovAlert({
     title: titulo,
-    message: `Usuário: ${username}\nSenha temporária: ${password}\n\nAnote a senha — ela não será exibida novamente. No primeiro acesso o líder deverá trocá-la.`,
+    message: `Usuário: ${username}\nSenha inicial: ${password}\n\nNo primeiro acesso o líder deverá trocar a senha.`,
     confirmText: 'Entendi',
   })
 }
@@ -126,7 +126,7 @@ const handleAcesso = async (equipe) => {
   if (equipe.tem_acesso) {
     const ok = await innovConfirm({
       title: 'Resetar senha',
-      message: `Gerar nova senha temporária para o acesso de ${equipe.nome}? O líder deverá trocá-la no próximo login.`,
+      message: `Resetar a senha de ${equipe.nome} para 1234? O líder deverá trocá-la no próximo login.`,
       confirmText: 'Resetar',
       cancelText: 'Cancelar',
       danger: true,
@@ -149,7 +149,7 @@ const handleAcesso = async (equipe) => {
 
   const ok = await innovConfirm({
     title: 'Acesso da Equipe',
-    message: `Criar usuário de acesso para ${equipe.nome}? Será gerada uma senha temporária.`,
+    message: `Criar usuário de acesso para ${equipe.nome}? A senha inicial será 1234 (troca obrigatória no primeiro login).`,
     confirmText: 'Criar acesso',
     cancelText: 'Cancelar',
     danger: false,
