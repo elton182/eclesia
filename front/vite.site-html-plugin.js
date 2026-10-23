@@ -1,15 +1,16 @@
 /**
  * Em dev/preview:
- * - GET /site/:tenantSlug[/:pageSlug] → HTML SEO da API + entry Vue (SPEC-005 / ADR-0003)
- * - GET /site/:tenantSlug/manifest.webmanifest → manifest de acesso (SPEC-023 / ADR-0009)
+ * - GET /site/:tenantSlug/manifest.webmanifest → manifest de acesso (SPEC-023)
+ * - GET /site/:tenantSlug/instalar → SPA com manifest do tenant (SPEC-023)
+ * - GET /site/:tenantSlug[/:pageSlug] → HTML SEO da API + entry Vue (SPEC-005)
  *
- * Produção com dist/ estático: proxy equivalente
- *   /site/:slug/manifest.webmanifest → API /api/v1/public/site/manifest/:slug
- *   /site/:slug[/:page] → API /api/v1/public/site/html/...
+ * Produção com dist/ estático: proxies equivalentes para manifest, instalar e HTML.
  */
 
 import { readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
+
+const RESERVED_SITE_SEGMENTS = new Set(['instalar', 'manifest.webmanifest'])
 
 /**
  * @param {string} indexHtml
@@ -45,6 +46,21 @@ export function injectSpaAssets(html, assets) {
 }
 
 /**
+ * Garante <link rel="manifest"> do tenant (e remove o manifest genérico do index).
+ * @param {string} html
+ * @param {string} tenantSlug
+ */
+export function injectTenantAccessManifest(html, tenantSlug) {
+  const href = `/site/${encodeURIComponent(tenantSlug)}/manifest.webmanifest`
+  const tag = `<link rel="manifest" href="${href}">`
+  let out = html.replace(/<link\b[^>]*rel=["']manifest["'][^>]*>\s*/gi, '')
+  if (out.includes('</head>')) {
+    return out.replace('</head>', `  ${tag}\n</head>`)
+  }
+  return `${tag}\n${out}`
+}
+
+/**
  * @param {{ apiBaseUrl?: string, root?: string }} [options]
  * @returns {import('vite').Plugin}
  */
@@ -54,6 +70,25 @@ export function siteHtmlPrerenderPlugin(options = {}) {
     '/',
   )
   const root = options.root || process.cwd()
+
+  /**
+   * @param {'dev' | 'preview'} mode
+   * @returns {string}
+   */
+  function readSpaShell(mode) {
+    if (mode === 'dev') {
+      const indexPath = join(root, 'index.html')
+      if (existsSync(indexPath)) {
+        return readFileSync(indexPath, 'utf8')
+      }
+      return '<!DOCTYPE html><html><head></head><body><div id="app"></div><script type="module" src="/src/main.js"></script></body></html>'
+    }
+    const distIndex = join(root, 'dist', 'index.html')
+    if (existsSync(distIndex)) {
+      return readFileSync(distIndex, 'utf8')
+    }
+    return '<!DOCTYPE html><html><head></head><body><div id="app"></div></body></html>'
+  }
 
   /**
    * @param {import('vite').Connect.Server} middlewares
@@ -92,6 +127,28 @@ export function siteHtmlPrerenderPlugin(options = {}) {
           return
         }
 
+        const installMatch = pathOnly.match(/^\/site\/([^/]+)\/instalar\/?$/)
+        if (installMatch) {
+          const tenantSlug = decodeURIComponent(installMatch[1])
+          if (!tenantSlug || tenantSlug.includes('.')) {
+            next()
+            return
+          }
+          let shell = readSpaShell(mode)
+          if (mode === 'dev' && !shell.includes('/src/main.js')) {
+            shell = injectSpaAssets(shell, {
+              links: [],
+              scripts: ['<script type="module" src="/src/main.js"></script>'],
+            })
+          }
+          const out = injectTenantAccessManifest(shell, tenantSlug)
+          res.statusCode = 200
+          res.setHeader('Content-Type', 'text/html; charset=UTF-8')
+          res.setHeader('Cache-Control', 'no-store')
+          res.end(out)
+          return
+        }
+
         const match = pathOnly.match(/^\/site\/([^/]+)(?:\/([^/]+))?\/?$/)
         if (!match) {
           next()
@@ -104,7 +161,7 @@ export function siteHtmlPrerenderPlugin(options = {}) {
           next()
           return
         }
-        if (pageSlug && pageSlug.includes('.')) {
+        if (pageSlug && (pageSlug.includes('.') || RESERVED_SITE_SEGMENTS.has(pageSlug))) {
           next()
           return
         }
