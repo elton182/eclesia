@@ -17,18 +17,19 @@ Endpoint e botão na tela de gestão que geram um PDF (DomPDF) listando, para a 
 |--------|--------|
 | Equipe | `ecc_equipes.nome` |
 | Piloto | Casal(is) com `piloto=true` na equipe — nomes `pessoa A & pessoa B` |
-| Login | `acesso_username` (ou “—” se sem acesso) |
+| Login | `acesso_username` (apenas equipes que já têm acesso) |
 
 ## Critérios de aceite (testáveis)
 
-- [ ] `GET /ecc/equipes/pdf` requer autenticação e `ecc.equipes.manage`.
-- [ ] Resposta `application/pdf` com download (filename `equipes-{slug-igreja-ou-data}.pdf`).
-- [ ] Inclui todas as equipes da igreja atual, ordenadas por nome.
-- [ ] Piloto: se vários, junta com `; `; se nenhum, `—`.
-- [ ] Login: username do `acesso_user_id` ou `—`.
-- [ ] Sem equipes: PDF válido com mensagem de lista vazia.
-- [ ] 401 sem auth; 403 sem `ecc.equipes.manage`.
-- [ ] Front: botão “Gerar PDF” na listagem `/ecc/equipes` (quem tem manage).
+- [x] `GET /ecc/equipes/pdf` requer autenticação e `ecc.equipes.manage`.
+- [x] Resposta `application/pdf` com download (filename `equipes-{slug-igreja-ou-data}.pdf`).
+- [x] Inclui só equipes da igreja atual **com** `acesso_user_id` (login gerado), ordenadas por nome.
+- [x] Equipes sem acesso não aparecem no PDF.
+- [x] Piloto: se vários, junta com `; `; se nenhum, `—`.
+- [x] Login: username do `acesso_user_id`.
+- [x] Sem equipes com login: PDF válido com mensagem de lista vazia.
+- [x] 401 sem auth; 403 sem `ecc.equipes.manage`.
+- [x] Front: botão “Gerar PDF” na listagem `/ecc/equipes` (quem tem manage).
 
 ## Fora de escopo
 
