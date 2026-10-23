@@ -37,6 +37,7 @@ import PlanejamentoRecursosView from '../views/PlanejamentoRecursosView.vue'
 import SiteAdminView from '../views/SiteAdminView.vue'
 import ConfiguracoesMarcaView from '../views/ConfiguracoesMarcaView.vue'
 import PublicSiteView from '../views/site/PublicSiteView.vue'
+import SiteAccessInstallView from '../views/site/SiteAccessInstallView.vue'
 import AdminLayout from '../layouts/AdminLayout.vue'
 import AuthLayout from '../layouts/AuthLayout.vue'
 import PublicLayout from '../layouts/PublicLayout.vue'
@@ -94,6 +95,12 @@ const router = createRouter({
           component: LandingView,
         },
       ],
+    },
+    {
+      path: '/site/:tenantSlug/instalar',
+      name: 'public-site-install',
+      component: SiteAccessInstallView,
+      meta: { publicSite: true },
     },
     {
       path: '/site/:tenantSlug',
@@ -427,6 +434,15 @@ router.beforeEach(async (to, from, next) => {
   }
 
   next()
+})
+
+router.afterEach((to, from) => {
+  // Ao sair do site público /instalação, volta o manifest genérico da plataforma.
+  if (from.meta?.publicSite && !to.meta?.publicSite) {
+    import('../utils/tenantAccessManifest').then(({ restoreDefaultManifest }) => {
+      restoreDefaultManifest()
+    })
+  }
 })
 
 export default router

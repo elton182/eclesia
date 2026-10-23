@@ -1,59 +1,37 @@
 <script setup>
+/**
+ * Link compacto do header do site → página /instalar (SPEC-023).
+ * A ação de prompt fica na página dedicada (melhor no mobile).
+ */
 import { computed } from 'vue'
+import { RouterLink } from 'vue-router'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
-import { faDownload } from '@fortawesome/free-solid-svg-icons'
+import { faMobileScreen } from '@fortawesome/free-solid-svg-icons'
 import { library } from '@fortawesome/fontawesome-svg-core'
-import { usePwaInstall } from '@/composables/usePwaInstall'
-import { isRunningStandalone } from '@/utils/pwa'
+import { tenantAccessInstallPath } from '@/utils/tenantAccessManifest'
 
-library.add(faDownload)
+library.add(faMobileScreen)
 
 const props = defineProps({
-  orgName: {
+  tenantSlug: {
     type: String,
-    default: 'paróquia',
+    required: true,
   },
 })
 
-const { canInstall, installing, isInstalled, install } = usePwaInstall()
-
-const standalone = computed(() => isInstalled.value || isRunningStandalone())
-
-const hint = computed(() => {
-  if (standalone.value) {
-    return 'Acesso já instalado neste dispositivo.'
-  }
-  if (canInstall.value) {
-    return `Instale o acesso de ${props.orgName} e entre sem digitar o código.`
-  }
-  return 'No menu do navegador, use “Adicionar à tela inicial” para fixar o acesso.'
-})
-
-async function onInstall() {
-  await install()
-}
+const href = computed(() => tenantAccessInstallPath(props.tenantSlug))
 </script>
 
 <template>
-  <div class="flex flex-col items-end gap-1 min-w-0" data-testid="site-access-install">
-    <button
-      v-if="canInstall && !standalone"
-      type="button"
-      class="inline-flex items-center gap-1.5 no-underline px-3.5 py-2 rounded-md font-medium text-[13px] shrink-0 disabled:opacity-60"
-      style="background: var(--color-primary-soft); color: var(--color-surface)"
-      data-testid="site-access-install-button"
-      :disabled="installing"
-      @click="onInstall"
-    >
-      <FontAwesomeIcon :icon="faDownload" class="text-[12px]" />
-      {{ installing ? 'Abrindo…' : 'Instalar acesso' }}
-    </button>
-    <p
-      class="text-[11px] leading-snug max-w-[220px] text-right md:max-w-[260px]"
-      style="color: color-mix(in srgb, var(--color-ink) 55%, transparent)"
-      data-testid="site-access-install-hint"
-    >
-      {{ hint }}
-    </p>
-  </div>
+  <RouterLink
+    :to="href"
+    class="inline-flex items-center justify-center gap-1.5 shrink-0 rounded-md px-2.5 py-2 text-[13px] font-medium no-underline sm:px-3.5"
+    style="border: 1px solid var(--color-line); color: var(--color-ink)"
+    data-testid="site-install-link"
+    aria-label="Instalar acesso"
+    title="Instalar acesso"
+  >
+    <FontAwesomeIcon :icon="faMobileScreen" class="text-[13px]" />
+    <span class="hidden sm:inline">Instalar</span>
+  </RouterLink>
 </template>
