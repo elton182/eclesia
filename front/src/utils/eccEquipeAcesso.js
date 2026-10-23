@@ -1,5 +1,5 @@
 /**
- * Helpers do acesso compartilhado da equipe (SPEC-021 / SPEC-024).
+ * Helpers do acesso compartilhado da equipe (SPEC-021 / SPEC-024 / SPEC-025).
  */
 
 /**
@@ -31,4 +31,28 @@ export function validateEquipeUsername(value) {
     return { ok: false, message: 'Login deve ter no máximo 120 caracteres.' }
   }
   return { ok: true, username }
+}
+
+/**
+ * Nome sugerido para o PDF de equipes (SPEC-025).
+ * @param {string} [igrejaSlug]
+ * @returns {string}
+ */
+export function equipesPdfFilename(igrejaSlug = 'igreja') {
+  const slug = normalizeEquipeUsername(igrejaSlug) || 'igreja'
+  return `equipes-${slug}.pdf`
+}
+
+/**
+ * Dispara download de um blob no browser.
+ * @param {Blob} blob
+ * @param {string} filename
+ */
+export function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
 }

@@ -15,6 +15,7 @@ use App\Services\EccVisibilityScope;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
+use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 class EccEquipeController extends Controller
 {
@@ -120,5 +121,12 @@ class EccEquipeController extends Controller
                 'equipe' => (new EccEquipeResource($result['equipe']))->resolve(),
             ],
         ]);
+    }
+
+    public function pdf(): SymfonyResponse
+    {
+        abort_unless($this->visibility->userCan('ecc.equipes.manage'), 403);
+
+        return $this->equipes->pdf();
     }
 }

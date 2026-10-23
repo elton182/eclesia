@@ -7,10 +7,12 @@ namespace App\Services;
 use App\Models\Casal;
 use App\Models\EccEquipe;
 use App\Models\User;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpFoundation\Response;
 
 class EccEquipeService
 {
@@ -278,5 +280,58 @@ class EccEquipeService
     private function generateTemporaryPassword(): string
     {
         return '1234';
+    }
+
+    /**
+     * SPEC-025: PDF com equipe, piloto(s) e login do acesso.
+     */
+    public function pdf(): Response
+    {
+        $igreja = $this->igrejaContext->current();
+
+        $equipes = EccEquipe::query()
+            ->where('igreja_id', $igreja->id)
+            ->with([
+                'acessoUser:id,username',
+                'casais' => static fn ($q) => $q->where('piloto', true)->with(['pessoaA:id,nome', 'pessoaB:id,nome']),
+            ])
+            ->orderBy('nome')
+            ->get();
+
+        $linhas = $equipes->map(function (EccEquipe $equipe): array {
+            $pilotos = $equipe->casais
+                ->map(fn (Casal $casal) => $this->formatCasalNome($casal))
+                ->filter(fn (string $nome) => $nome !== '')
+                ->values()
+                ->all();
+
+            return [
+                'equipe' => $equipe->nome,
+                'piloto' => $pilotos === [] ? '—' : implode('; ', $pilotos),
+                'login' => $equipe->acessoUser?->username ?: '—',
+            ];
+        })->all();
+
+        $pdf = Pdf::loadView('ecc.equipes-pdf', [
+            'igreja' => $igreja,
+            'linhas' => $linhas,
+            'geradoEm' => now()->timezone(config('app.timezone', 'UTC'))->format('d/m/Y H:i'),
+        ])->setPaper('a4', 'portrait');
+
+        $slug = Str::slug((string) ($igreja->slug ?? $igreja->nome ?? 'igreja'), '-') ?: 'igreja';
+
+        return $pdf->download('equipes-'.$slug.'.pdf');
+    }
+
+    private function formatCasalNome(Casal $casal): string
+    {
+        $a = trim((string) ($casal->pessoaA?->nome ?? ''));
+        $b = trim((string) ($casal->pessoaB?->nome ?? ''));
+
+        if ($a !== '' && $b !== '') {
+            return $a.' & '.$b;
+        }
+
+        return $a !== '' ? $a : $b;
     }
 }

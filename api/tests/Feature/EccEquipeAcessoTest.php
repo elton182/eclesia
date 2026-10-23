@@ -316,4 +316,52 @@ class EccEquipeAcessoTest extends TestCase
         ])->assertOk()
             ->assertJsonPath('success', true);
     }
+
+    public function test_pdf_equipes_inclui_piloto_e_login(): void
+    {
+        $equipeId = $this->tenantJson('POST', '/api/v1/ecc/equipes', ['nome' => 'Equipe PDF'])
+            ->assertCreated()
+            ->json('data.id');
+
+        $this->tenantJson('POST', "/api/v1/ecc/equipes/{$equipeId}/acesso")
+            ->assertCreated();
+
+        $this->tenantJson('POST', '/api/v1/ecc/casais', [
+            'equipe_id' => $equipeId,
+            'nome' => 'João Piloto',
+            'nome_conjuge' => 'Maria Piloto',
+            'piloto' => true,
+        ])->assertCreated();
+
+        $this->tenantJson('POST', '/api/v1/ecc/casais', [
+            'equipe_id' => $equipeId,
+            'nome' => 'Pedro Comum',
+            'nome_conjuge' => 'Ana Comum',
+            'piloto' => false,
+        ])->assertCreated();
+
+        $pdf = $this->tenantJson('GET', '/api/v1/ecc/equipes/pdf')
+            ->assertOk()
+            ->assertHeader('content-type', 'application/pdf');
+
+        $this->assertNotEmpty($pdf->getContent());
+        $this->assertStringStartsWith('%PDF', $pdf->getContent());
+    }
+
+    public function test_pdf_equipes_sem_permissao_manage_retorna_403(): void
+    {
+        tenancy()->initialize($this->tenant);
+        $lider = User::query()->create([
+            'name' => 'Líder PDF',
+            'email' => 'lider-pdf@paroquia-acesso.local',
+            'password' => 'password',
+            'is_active' => true,
+        ]);
+        tenancy()->end();
+
+        Sanctum::actingAs($lider);
+
+        $this->tenantJson('GET', '/api/v1/ecc/equipes/pdf')
+            ->assertForbidden();
+    }
 }

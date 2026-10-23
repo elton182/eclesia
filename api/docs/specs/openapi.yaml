@@ -2038,6 +2038,27 @@ paths:
       responses:
         '201':
           description: Criada
+  /ecc/equipes/pdf:
+    get:
+      summary: PDF de equipes (piloto e login)
+      description: |
+        SPEC-025. Requer ecc.equipes.manage. Gera PDF com equipe, nome do(s) piloto(s)
+        e username do acesso compartilhado da igreja atual.
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      responses:
+        '200':
+          description: PDF
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        '401':
+          description: Não autenticado
+        '403':
+          description: Sem permissão
   /ecc/equipes-servico:
     get:
       summary: Listar equipes de serviço (catálogo)

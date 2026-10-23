@@ -1,6 +1,10 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { normalizeEquipeUsername, validateEquipeUsername } from './eccEquipeAcesso.js'
+import {
+  normalizeEquipeUsername,
+  validateEquipeUsername,
+  equipesPdfFilename,
+} from './eccEquipeAcesso.js'
 
 describe('eccEquipeAcesso', () => {
   it('normalizeEquipeUsername gera slug', () => {
@@ -18,5 +22,10 @@ describe('eccEquipeAcesso', () => {
   it('validateEquipeUsername aceita slug válido', () => {
     const ok = validateEquipeUsername('Equipe Caná')
     assert.deepEqual(ok, { ok: true, username: 'equipe-cana' })
+  })
+
+  it('equipesPdfFilename usa slug da igreja', () => {
+    assert.equal(equipesPdfFilename('Paróquia São José'), 'equipes-paroquia-sao-jose.pdf')
+    assert.equal(equipesPdfFilename(''), 'equipes-igreja.pdf')
   })
 })
