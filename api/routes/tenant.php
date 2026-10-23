@@ -51,6 +51,7 @@ Route::middleware([
 ])->prefix('api/v1/public/site')->group(function () {
     Route::get('html/{tenantSlug}', [PublicSiteController::class, 'htmlHome']);
     Route::get('html/{tenantSlug}/{pageSlug}', [PublicSiteController::class, 'htmlPage']);
+    Route::get('install-html/{tenantSlug}', [PublicSiteController::class, 'installHtml']);
     Route::get('sitemap/{tenantSlug}', [PublicSiteController::class, 'sitemap']);
     Route::get('manifest/{tenantSlug}', [PublicSiteController::class, 'manifest']);
 });

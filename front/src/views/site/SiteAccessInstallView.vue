@@ -10,7 +10,7 @@ import { useBrandingStore } from '@/stores/branding'
 import { applyBrandCores } from '@/utils/branding'
 import { rememberTenantForLogin } from '@/utils/tenantAuth'
 import { usePwaInstall } from '@/composables/usePwaInstall'
-import { isRunningStandalone } from '@/utils/pwa'
+import { clearDeferredInstallPrompt, isRunningStandalone } from '@/utils/pwa'
 import {
   detectInstallPlatform,
   ensureTenantAccessManifest,
@@ -31,6 +31,8 @@ const loading = ref(true)
 const error = ref('')
 const settings = ref(null)
 const installMessage = ref('')
+const showManual = ref(false)
+const waitingPrompt = ref(true)
 const platform = ref(detectInstallPlatform())
 
 const tenantSlug = computed(() => String(route.params.tenantSlug || ''))
@@ -40,6 +42,15 @@ const brandLogo = computed(() => settings.value?.logo_url || null)
 const siteHome = computed(() => (tenantSlug.value ? `/site/${tenantSlug.value}` : '/'))
 const loginHref = computed(() => tenantAccessStartUrl(tenantSlug.value))
 const standalone = computed(() => isInstalled.value || isRunningStandalone())
+const isIos = computed(() => platform.value === 'ios')
+
+const primaryLabel = computed(() => {
+  if (installing.value) return 'Abrindo…'
+  if (isIos.value) return 'Como adicionar à tela'
+  if (canInstall.value) return 'Instalar agora'
+  if (waitingPrompt.value) return 'Preparando instalação…'
+  return 'Instalar agora'
+})
 
 const guidanceSteps = computed(() => {
   if (platform.value === 'ios') {
@@ -57,9 +68,9 @@ const guidanceSteps = computed(() => {
     ]
   }
   return [
-    'No menu do navegador, use “Instalar app” / “Instalar Eclésias”.',
-    'Ou adicione esta página aos favoritos e abra pelo atalho.',
-    'O login já virá com a organização preenchida.',
+    'No menu do navegador (⋮ ou ⋯), procure “Instalar app”.',
+    'Se não aparecer, o navegador ainda não liberou a instalação automática.',
+    'No iPhone use Safari → Compartilhar → Adicionar à Tela de Início.',
   ]
 })
 
@@ -76,6 +87,11 @@ async function loadSite() {
   rememberTenantForLogin(tenantSlug.value)
 
   const { changed } = ensureTenantAccessManifest(tenantSlug.value)
+  if (changed) {
+    // Prompt capturado com o manifest antigo não serve para este atalho.
+    clearDeferredInstallPrompt()
+  }
+
   const reloadKey = MANIFEST_RELOAD_PREFIX + tenantSlug.value
   if (
     changed &&
@@ -104,27 +120,49 @@ async function loadSite() {
     settings.value = null
   } finally {
     loading.value = false
+    // Dá tempo do Chrome emitir beforeinstallprompt após o HTML com manifest certo.
+    window.setTimeout(() => {
+      waitingPrompt.value = false
+      if (!canInstall.value && !isIos.value) {
+        showManual.value = true
+      }
+    }, 1500)
   }
 }
 
 async function onInstall() {
   installMessage.value = ''
-  if (!canInstall.value) {
-    installMessage.value = 'Use o passo a passo abaixo para adicionar à tela inicial.'
+
+  if (isIos.value) {
+    showManual.value = true
+    installMessage.value =
+      'No iPhone/iPad o Safari não abre popup de instalação — use o passo a passo abaixo.'
     return
   }
+
   const outcome = await install()
   if (outcome === 'accepted') {
+    showManual.value = false
     installMessage.value = 'Pronto! Abra o ícone na tela inicial.'
-  } else if (outcome === 'dismissed') {
-    installMessage.value = 'Instalação cancelada. Você pode tentar de novo quando quiser.'
-  } else {
-    installMessage.value = 'O navegador não liberou o popup. Siga o passo a passo abaixo.'
+    return
   }
+  if (outcome === 'dismissed') {
+    installMessage.value = 'Instalação cancelada. Você pode tentar de novo quando quiser.'
+    return
+  }
+
+  // Sem beforeinstallprompt: o browser não permite popup programático.
+  showManual.value = true
+  installMessage.value =
+    'Este navegador ainda não liberou o popup automático. Use o passo a passo abaixo (ou o menu ⋮ → Instalar app).'
 }
 
 onMounted(() => {
   platform.value = detectInstallPlatform()
+  if (isIos.value) {
+    waitingPrompt.value = false
+    showManual.value = true
+  }
   loadSite()
 })
 
@@ -206,35 +244,35 @@ onUnmounted(() => {
 
           <template v-else>
             <button
-              v-if="canInstall"
               type="button"
               class="btn btn-primary w-full justify-center text-[15px] py-3.5"
               data-testid="site-access-install-prompt"
-              :disabled="installing"
+              :disabled="installing || (waitingPrompt && !isIos && !canInstall)"
               @click="onInstall"
             >
-              <FontAwesomeIcon :icon="faDownload" class="mr-2" />
-              {{ installing ? 'Abrindo…' : 'Instalar agora' }}
+              <FontAwesomeIcon
+                :icon="isIos ? faShareFromSquare : faDownload"
+                class="mr-2"
+              />
+              {{ primaryLabel }}
             </button>
 
             <div
-              v-else
-              class="space-y-4"
+              v-if="showManual || isIos"
+              class="space-y-3"
               data-testid="site-access-install-manual"
             >
-              <button
-                type="button"
-                class="btn btn-primary w-full justify-center text-[15px] py-3.5"
-                data-testid="site-access-install-manual-cta"
-                @click="onInstall"
+              <p class="text-[12.5px] leading-relaxed" style="color: var(--color-muted)">
+                {{
+                  isIos
+                    ? 'No iPhone o Safari não tem popup de instalação. Siga os passos:'
+                    : 'Se o popup não aparecer, instale pelo menu do navegador:'
+                }}
+              </p>
+              <ol
+                class="space-y-2.5 text-[13.5px] leading-relaxed pl-5 list-decimal"
+                style="color: var(--color-ink)"
               >
-                <FontAwesomeIcon
-                  :icon="platform === 'ios' ? faShareFromSquare : faDownload"
-                  class="mr-2"
-                />
-                Como instalar
-              </button>
-              <ol class="space-y-2.5 text-[13.5px] leading-relaxed pl-5 list-decimal" style="color: var(--color-ink)">
                 <li v-for="(step, i) in guidanceSteps" :key="i">{{ step }}</li>
               </ol>
             </div>

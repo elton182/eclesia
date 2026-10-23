@@ -30,7 +30,9 @@ O login do tenant exige o identificador da organização (slug). Membros da par�
 - [x] Front (dev/preview): `GET /site/{slug}/manifest.webmanifest` faz proxy do JSON da API (produção: proxy equivalente).
 - [x] Rota dedicada `/site/{slug}/instalar` com CTA de instalação (prompt nativo ou passo a passo iOS/Android); `instalar` é segmento reservado (não é pageSlug do CMS).
 - [x] No site público: link compacto no header aponta para `/instalar`; banner genérico “Instalar Eclésias” não aparece em `/site/*`.
-- [x] A página `/instalar` (dev/preview) serve SPA com `<link rel="manifest">` do tenant já no HTML (produção: proxy/fallback equivalente).
+- [x] A página `/instalar` serve HTML com `<link rel="manifest">` do tenant no **primeiro paint**
+  (`GET /api/v1/public/site/install-html/{slug}` + proxy front), para o browser poder emitir
+  `beforeinstallprompt` e o botão abrir o popup nativo (quando o SO/navegador permitir; iOS não tem essa API).
 - [x] `GET /entrar?tenant={slug}` pré-preenche e persiste a organização (`rememberTenantForLogin`); campo organização fica somente leitura enquanto o query estiver presente.
 
 ## Fora de escopo

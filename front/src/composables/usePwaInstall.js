@@ -40,11 +40,13 @@ export function usePwaInstall() {
   }
 
   async function install() {
-    if (!canInstall.value || installing.value) {
+    if (installing.value) {
       return 'unavailable'
     }
     installing.value = true
     try {
+      // Sempre tenta o prompt nativo (precisa do gesto do usuário).
+      // canInstall só indica se o evento já chegou — não bloqueia a tentativa.
       const outcome = await promptInstall()
       if (outcome === 'accepted') {
         isInstalled.value = true

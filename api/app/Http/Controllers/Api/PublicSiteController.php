@@ -71,6 +71,14 @@ class PublicSiteController extends Controller
         ]);
     }
 
+    public function installHtml(string $tenantSlug): Response
+    {
+        return response($this->html->renderInstallShell($tenantSlug), 200, [
+            'Content-Type' => 'text/html; charset=UTF-8',
+            'Cache-Control' => 'public, max-age=60',
+        ]);
+    }
+
     public function page(string $slug): SitePageResource
     {
         return new SitePageResource($this->site->publicPage($slug));

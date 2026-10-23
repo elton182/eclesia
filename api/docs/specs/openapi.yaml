@@ -2629,6 +2629,28 @@ paths:
                 type: string
         '404':
           description: Site não publicado
+  /public/site/install-html/{tenantSlug}:
+    get:
+      summary: Shell HTML da página /instalar (manifest no primeiro paint)
+      description: |
+        Sem X-Tenant. Documento mínimo com `<link rel="manifest">` do tenant para o browser
+        poder disparar `beforeinstallprompt`. O front injeta o SPA (como no HTML SEO).
+        SPEC-023 / ADR-0009.
+      parameters:
+        - name: tenantSlug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: HTML do shell /instalar
+          content:
+            text/html:
+              schema:
+                type: string
+        '404':
+          description: Site não publicado
   /public/site/manifest/{tenantSlug}:
     get:
       summary: Web App Manifest do atalho de acesso do tenant

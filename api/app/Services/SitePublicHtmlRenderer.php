@@ -54,6 +54,42 @@ class SitePublicHtmlRenderer
     }
 
     /**
+     * Shell HTML da página /site/{slug}/instalar com manifest no primeiro paint
+     * (necessário para o browser disparar beforeinstallprompt — SPEC-023).
+     */
+    public function renderInstallShell(string $tenantSlug): string
+    {
+        $settings = $this->site->assertPublished();
+        $base = rtrim((string) config('app.frontend_url'), '/');
+        $name = $this->brandTitle($settings);
+        $manifestHref = $base.'/site/'.$tenantSlug.'/manifest.webmanifest';
+        $canonical = $base.'/site/'.$tenantSlug.'/instalar';
+
+        $branding = $this->branding->brandingPayload();
+        $cores = is_array($branding['cores'] ?? null) ? $branding['cores'] : [];
+        $theme = is_string($cores['primary'] ?? null) && preg_match('/^#[0-9A-Fa-f]{6}$/', $cores['primary'])
+            ? $cores['primary']
+            : self::DEFAULT_THEME_COLOR;
+
+        return '<!DOCTYPE html>'."\n"
+            .'<html lang="pt-BR">'."\n"
+            .'<head>'."\n"
+            .'  <meta charset="UTF-8">'."\n"
+            .'  <meta name="viewport" content="width=device-width, initial-scale=1.0">'."\n"
+            .'  <title>'.e('Instalar acesso — '.$name).'</title>'."\n"
+            .'  <meta name="theme-color" content="'.e($theme).'">'."\n"
+            .'  <link rel="canonical" href="'.e($canonical).'">'."\n"
+            .'  <link rel="manifest" href="'.e($manifestHref).'">'."\n"
+            .'  <meta name="apple-mobile-web-app-capable" content="yes">'."\n"
+            .'  <meta name="mobile-web-app-capable" content="yes">'."\n"
+            .'</head>'."\n"
+            .'<body>'."\n"
+            .'  <div id="app"></div>'."\n"
+            .'</body>'."\n"
+            .'</html>'."\n";
+    }
+
+    /**
      * Web App Manifest do atalho de acesso (SPEC-023 / ADR-0009).
      */
     public function renderAccessManifest(string $tenantSlug): string

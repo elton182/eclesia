@@ -106,7 +106,21 @@ export function registerInstallPrompt() {
 }
 
 /**
+ * Descarta um beforeinstallprompt pendente (ex.: manifest trocou de app).
+ */
+export function clearDeferredInstallPrompt() {
+  if (!deferredPrompt) {
+    return
+  }
+  deferredPrompt = null
+  notify()
+}
+
+/**
  * Dispara o prompt nativo de instalação, se disponível.
+ * Só funciona após o browser emitir `beforeinstallprompt` (Chrome/Edge/Android).
+ * iOS Safari não tem essa API.
+ *
  * @returns {Promise<'accepted' | 'dismissed' | 'unavailable'>}
  */
 export async function promptInstall() {
@@ -118,7 +132,11 @@ export async function promptInstall() {
   deferredPrompt = null
   notify()
 
-  await promptEvent.prompt()
-  const choice = await promptEvent.userChoice
-  return choice.outcome === 'accepted' ? 'accepted' : 'dismissed'
+  try {
+    await promptEvent.prompt()
+    const choice = await promptEvent.userChoice
+    return choice.outcome === 'accepted' ? 'accepted' : 'dismissed'
+  } catch {
+    return 'unavailable'
+  }
 }
