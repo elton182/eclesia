@@ -74,13 +74,8 @@ Permissões são namespaced (`users.*`, `igrejas.*`, `ecc.*`, `calendario.*`, `p
 | Funcionalidade | Como funciona |
 |----------------|---------------|
 | Login | `/entrar` — slug do tenant + e-mail + senha. E-mail é PII criptografada (LGPD). |
-<<<<<<< HEAD
 | Sessão | Access **30 dias** + refresh **sem expiração** (`CookieManager`; cookie refresh forever); Bearer no front |
-| Me / logout / refresh | Mantém ou encerra a sessão; front chama `/web/refresh` no 401 |
-=======
-| Sessão | Access **8 h** + refresh **7 dias** (`CookieManager`); cookie Sanctum + Bearer no front |
 | Me / logout / refresh | Mantém ou encerra a sessão; front chama `/web/refresh` automaticamente no 401 |
->>>>>>> origin/main
 | Multi-dispositivo | **Só API:** login novo **não** derruba outras sessões; logout vale só no dispositivo atual |
 
 **Não tem (ainda):** tela para listar/revogar sessões ativas.
