@@ -208,6 +208,24 @@ class SitePublicHtmlTest extends TestCase
             ->assertStatus(400);
     }
 
+    public function test_install_html_includes_tenant_manifest_link(): void
+    {
+        $this->publishHomeWithBlocks();
+
+        $response = $this->get('/api/v1/public/site/install-html/org-html');
+        $response->assertOk();
+        $html = $response->getContent();
+        $this->assertIsString($html);
+        $this->assertStringContainsString(
+            'rel="manifest" href="http://front.test/site/org-html/manifest.webmanifest"',
+            $html,
+        );
+        $this->assertStringContainsString('Instalar acesso — Org Html', $html);
+        $this->assertStringContainsString('id="app"', $html);
+        $this->assertStringNotContainsString('href="/manifest.webmanifest"', $html);
+        $this->assertStringNotContainsString('href="http://front.test/manifest.webmanifest"', $html);
+    }
+
     public function test_access_manifest_returns_404_when_unpublished(): void
     {
         $this->get('/api/v1/public/site/manifest/org-html')

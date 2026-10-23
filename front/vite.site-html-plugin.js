@@ -134,14 +134,45 @@ export function siteHtmlPrerenderPlugin(options = {}) {
             next()
             return
           }
-          let shell = readSpaShell(mode)
-          if (mode === 'dev' && !shell.includes('/src/main.js')) {
-            shell = injectSpaAssets(shell, {
+          const upstream = new URL(
+            `api/v1/public/site/install-html/${encodeURIComponent(tenantSlug)}`,
+            apiBase,
+          )
+          const upstreamRes = await fetch(upstream)
+          let html = await upstreamRes.text()
+
+          if (!upstreamRes.ok) {
+            // Fallback: SPA local com manifest injetado (dev sem API / site off).
+            let shell = readSpaShell(mode)
+            if (mode === 'dev' && !shell.includes('/src/main.js')) {
+              shell = injectSpaAssets(shell, {
+                links: [],
+                scripts: ['<script type="module" src="/src/main.js"></script>'],
+              })
+            }
+            html = injectTenantAccessManifest(shell, tenantSlug)
+            res.statusCode = 200
+            res.setHeader('Content-Type', 'text/html; charset=UTF-8')
+            res.setHeader('Cache-Control', 'no-store')
+            res.end(html)
+            return
+          }
+
+          /** @type {{ links: string[], scripts: string[] }} */
+          let assets = { links: [], scripts: [] }
+          if (mode === 'dev') {
+            assets = {
               links: [],
               scripts: ['<script type="module" src="/src/main.js"></script>'],
-            })
+            }
+          } else {
+            const indexPath = join(root, 'dist', 'index.html')
+            if (existsSync(indexPath)) {
+              assets = extractIndexAssets(readFileSync(indexPath, 'utf8'))
+            }
           }
-          const out = injectTenantAccessManifest(shell, tenantSlug)
+
+          const out = injectSpaAssets(html, assets)
           res.statusCode = 200
           res.setHeader('Content-Type', 'text/html; charset=UTF-8')
           res.setHeader('Cache-Control', 'no-store')

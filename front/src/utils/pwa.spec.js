@@ -5,6 +5,7 @@ import {
   canPromptInstall,
   registerInstallPrompt,
   promptInstall,
+  clearDeferredInstallPrompt,
   onInstallAvailabilityChange,
   isInstallBannerDismissed,
   dismissInstallBanner,
@@ -101,6 +102,23 @@ describe('pwa', () => {
 
   it('promptInstall retorna unavailable sem prompt pendente', async () => {
     assert.equal(await promptInstall(), 'unavailable')
+  })
+
+  it('clearDeferredInstallPrompt descarta evento capturado', async () => {
+    const cleanup = registerInstallPrompt()
+    const event = {
+      preventDefault: mock.fn(),
+      prompt: mock.fn(async () => {}),
+      userChoice: Promise.resolve({ outcome: 'accepted' }),
+    }
+    for (const listener of handlers.get('beforeinstallprompt') ?? []) {
+      listener(event)
+    }
+    assert.equal(canPromptInstall(), true)
+    clearDeferredInstallPrompt()
+    assert.equal(canPromptInstall(), false)
+    assert.equal(await promptInstall(), 'unavailable')
+    cleanup()
   })
 
   it('dismissInstallBanner persiste fechamento do banner', () => {
