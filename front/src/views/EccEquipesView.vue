@@ -6,8 +6,9 @@ import { useAuthAdminStore } from '@/stores/authAdmin'
 import { useTenantStore } from '@/stores/tenant'
 import api from '@/services/api'
 import { innovToast } from '@/plugins/toast'
-import { innovAlert, innovConfirm } from '@/plugins/dialog'
+import { innovAlert, innovConfirm, innovPrompt } from '@/plugins/dialog'
 import { userHasPermission } from '@/utils/userRoles'
+import { validateEquipeUsername } from '@/utils/eccEquipeAcesso'
 import EccEquipeMembrosModal from '@/components/ecc/EccEquipeMembrosModal.vue'
 
 const router = useRouter()
@@ -169,6 +170,54 @@ const handleAcesso = async (equipe) => {
   }
 }
 
+const handleAlterarLogin = async (equipe) => {
+  if (!canManage.value || !equipe.tem_acesso) return
+
+  const digitado = await innovPrompt({
+    title: 'Alterar login',
+    message: `Login atual de ${equipe.nome}: ${equipe.acesso_username}. A senha permanece a mesma; sessões ativas serão encerradas.`,
+    label: 'Novo login',
+    placeholder: 'ex.: equipe-cana',
+    defaultValue: equipe.acesso_username || '',
+    confirmText: 'Salvar',
+    cancelText: 'Cancelar',
+  })
+  if (digitado === null) return
+
+  const valid = validateEquipeUsername(digitado)
+  if (!valid.ok) {
+    innovToast('error', 'Login inválido', valid.message)
+    return
+  }
+
+  if (valid.username === String(equipe.acesso_username || '')) {
+    innovToast('success', 'Sem alteração', 'O login informado é o mesmo do atual.')
+    return
+  }
+
+  acessoLoadingId.value = equipe.id
+  try {
+    const { data } = await api.put(`/ecc/equipes/${equipe.id}/acesso`, {
+      username: valid.username,
+    })
+    const payload = data?.data || data
+    await innovAlert({
+      title: 'Login alterado',
+      message: `Novo usuário: ${payload.username || valid.username}\n\nInforme o novo login ao líder. A senha não foi alterada.`,
+      confirmText: 'Entendi',
+    })
+    await load()
+  } catch (e) {
+    const msg =
+      e.response?.data?.errors?.username?.[0] ||
+      e.response?.data?.message ||
+      'Falha ao alterar login'
+    innovToast('error', 'Erro', msg)
+  } finally {
+    acessoLoadingId.value = null
+  }
+}
+
 const verCasais = (equipe) => {
   router.push({ name: 'ecc-casais', query: { equipe: String(equipe.id) } })
 }
@@ -296,6 +345,16 @@ onMounted(load)
                     ? 'Resetar senha'
                     : 'Acesso da Equipe'
               }}
+            </button>
+            <button
+              v-if="canManage && equipe.tem_acesso"
+              type="button"
+              class="btn btn-ghost"
+              data-testid="equipe-alterar-login"
+              :disabled="acessoLoadingId === equipe.id"
+              @click="handleAlterarLogin(equipe)"
+            >
+              Alterar login
             </button>
             <button
               v-if="canManage"

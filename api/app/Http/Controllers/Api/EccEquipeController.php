@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreEccEquipeRequest;
 use App\Http\Requests\SyncEccEquipeCasaisRequest;
+use App\Http\Requests\UpdateEccEquipeAcessoRequest;
 use App\Http\Requests\UpdateEccEquipeRequest;
 use App\Http\Resources\EccEquipeResource;
 use App\Services\EccEquipeService;
@@ -97,6 +98,23 @@ class EccEquipeController extends Controller
             'data' => [
                 'username' => $result['username'],
                 'password' => $result['password'],
+                'tem_acesso' => true,
+                'acesso_username' => $result['username'],
+                'equipe' => (new EccEquipeResource($result['equipe']))->resolve(),
+            ],
+        ]);
+    }
+
+    public function alterarLoginAcesso(UpdateEccEquipeAcessoRequest $request, string $id): JsonResponse
+    {
+        $result = $this->equipes->alterarLoginAcesso(
+            $this->equipes->find($id),
+            (string) $request->validated('username'),
+        );
+
+        return response()->json([
+            'data' => [
+                'username' => $result['username'],
                 'tem_acesso' => true,
                 'acesso_username' => $result['username'],
                 'equipe' => (new EccEquipeResource($result['equipe']))->resolve(),

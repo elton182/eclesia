@@ -207,9 +207,51 @@ class EccEquipeService
         ];
     }
 
+    /**
+     * SPEC-024: altera o username do acesso compartilhado (sem resetar senha).
+     *
+     * @return array{username: string, equipe: EccEquipe}
+     */
+    public function alterarLoginAcesso(EccEquipe $equipe, string $username): array
+    {
+        if ($equipe->acesso_user_id === null) {
+            throw ValidationException::withMessages([
+                'acesso' => ['Esta equipe ainda não possui acesso. Crie o acesso primeiro.'],
+            ]);
+        }
+
+        $username = $this->normalizeUsername($username);
+        if ($username === '') {
+            throw ValidationException::withMessages([
+                'username' => ['Informe um login válido (letras, números e hífens).'],
+            ]);
+        }
+
+        $user = User::query()->findOrFail($equipe->acesso_user_id);
+
+        if (User::usernameExists($username, $user->id)) {
+            throw ValidationException::withMessages([
+                'username' => ['Este login já está em uso.'],
+            ]);
+        }
+
+        $igreja = $this->igrejaContext->current();
+        $email = sprintf('%s.%s@equipe.local', $username, Str::lower(Str::substr((string) $igreja->id, 0, 8)));
+
+        $user->username = $username;
+        $user->email = $email;
+        $user->save();
+        $user->tokens()->delete();
+
+        return [
+            'username' => $username,
+            'equipe' => $equipe->refresh()->load(['acessoUser:id,username'])->loadCount('casais'),
+        ];
+    }
+
     private function uniqueUsernameFromNome(string $nome): string
     {
-        $base = Str::slug(Str::lower($nome), '-');
+        $base = $this->normalizeUsername($nome);
         if ($base === '') {
             $base = 'equipe';
         }
@@ -222,6 +264,11 @@ class EccEquipeService
         }
 
         return $candidate;
+    }
+
+    private function normalizeUsername(string $value): string
+    {
+        return Str::slug(Str::lower(trim($value)), '-');
     }
 
     /**
