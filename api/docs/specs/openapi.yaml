@@ -2146,7 +2146,7 @@ paths:
       summary: Criar acesso da equipe
       description: |
         SPEC-021. Requer ecc.equipes.manage. Cria usuário compartilhado (username + senha
-        temporária + must_change_password). Se já existe acesso → 422.
+        inicial 1234 + must_change_password). Se já existe acesso → 422.
       security:
         - bearerAuth: []
           tenantHeader: []
@@ -2183,7 +2183,7 @@ paths:
     post:
       summary: Resetar senha do acesso da equipe
       description: |
-        SPEC-021. Requer ecc.equipes.manage. Nova senha temporária + must_change_password
+        SPEC-021. Requer ecc.equipes.manage. Senha inicial 1234 + must_change_password
         + revoga tokens Sanctum do usuário. Sem acesso → 422.
       security:
         - bearerAuth: []
