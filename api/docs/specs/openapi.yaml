@@ -581,7 +581,17 @@ components:
         email:
           type: string
           format: email
+          nullable: true
+          description: >
+            E-mail real. Null quando o login é só por username
+            (e-mail sintético @login.local / @equipe.local não é exposto).
+        username:
+          type: string
+          nullable: true
+          description: Login alternativo ao e-mail (SPEC-021 / SPEC-026)
         is_active:
+          type: boolean
+        must_change_password:
           type: boolean
         pessoa_id:
           type: string
@@ -1728,6 +1738,9 @@ paths:
           description: Sem permissão
     post:
       summary: Criar usuário
+      description: >
+        SPEC-026. Exige `name`, `password` e ao menos um de `email` | `username`.
+        Sem e-mail real, a API gera e-mail sintético interno e expõe `email: null`.
       security:
         - tenantHeader: []
       requestBody:
@@ -1736,13 +1749,18 @@ paths:
           application/json:
             schema:
               type: object
-              required: [name, email, password]
+              required: [name, password]
               properties:
                 name:
                   type: string
                 email:
                   type: string
                   format: email
+                  description: Obrigatório se username omitido
+                username:
+                  type: string
+                  maxLength: 120
+                  description: Login sem e-mail (slug); obrigatório se email omitido
                 password:
                   type: string
                   format: password
@@ -1755,7 +1773,7 @@ paths:
         '201':
           description: Criado
         '422':
-          description: Validação
+          description: Validação (faltam email e username, duplicado ou inválido)
   /users/{id}:
     get:
       summary: Detalhe do usuário
@@ -1775,6 +1793,9 @@ paths:
           description: Não encontrado
     patch:
       summary: Atualizar usuário
+      description: >
+        SPEC-026. `email` e `username` opcionais; não permite remover ambos os
+        identificadores de login.
       security:
         - tenantHeader: []
       parameters:
@@ -1793,6 +1814,12 @@ paths:
                   type: string
                 email:
                   type: string
+                  nullable: true
+                  description: Null ou vazio remove e-mail real (exige username)
+                username:
+                  type: string
+                  nullable: true
+                  maxLength: 120
                 password:
                   type: string
                 is_active:
@@ -2115,6 +2142,9 @@ paths:
           description: Atualizada
     delete:
       summary: Remover equipe
+      description: >
+        Requer ecc.equipes.manage. Bloqueado (409) se houver casais vinculados.
+        Remove também o usuário de acesso compartilhado, se existir.
       security:
         - bearerAuth: []
           tenantHeader: []
@@ -2127,6 +2157,12 @@ paths:
       responses:
         '204':
           description: Removida
+        '403':
+          description: Sem permissão
+        '404':
+          description: Não encontrada
+        '409':
+          description: Possui casais vinculados
   /ecc/equipes/{id}/casais:
     put:
       summary: Sincronizar casais da equipe

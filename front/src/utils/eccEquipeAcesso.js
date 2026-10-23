@@ -44,6 +44,15 @@ export function equipesPdfFilename(igrejaSlug = 'igreja') {
 }
 
 /**
+ * Exclusão só quando não há casais vinculados.
+ * @param {{ casais_count?: number|string|null }|null|undefined} equipe
+ * @returns {boolean}
+ */
+export function equipePodeSerExcluida(equipe) {
+  return Number(equipe?.casais_count ?? 0) === 0
+}
+
+/**
  * Dispara download de um blob no browser.
  * @param {Blob} blob
  * @param {string} filename

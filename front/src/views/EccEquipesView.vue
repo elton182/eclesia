@@ -12,6 +12,7 @@ import {
   validateEquipeUsername,
   equipesPdfFilename,
   downloadBlob,
+  equipePodeSerExcluida,
 } from '@/utils/eccEquipeAcesso'
 import EccEquipeMembrosModal from '@/components/ecc/EccEquipeMembrosModal.vue'
 
@@ -116,6 +117,34 @@ const saveEquipe = async () => {
 const openMembros = (equipe) => {
   membrosEquipe.value = equipe
   membrosOpen.value = true
+}
+
+const canDeleteEquipe = (equipe) =>
+  canManage.value && equipePodeSerExcluida(equipe)
+
+const removeEquipe = async (equipe) => {
+  if (!canDeleteEquipe(equipe)) {
+    innovToast('error', 'Erro', 'Remova os casais da equipe antes de excluí-la.')
+    return
+  }
+  const ok = await innovConfirm({
+    title: 'Excluir equipe',
+    message: `Excluir a equipe "${equipe.nome}"? Esta ação não pode ser desfeita.`,
+    confirmText: 'Excluir',
+    danger: true,
+  })
+  if (!ok) return
+  try {
+    await api.delete(`/ecc/equipes/${equipe.id}`)
+    innovToast('success', 'OK', 'Equipe excluída')
+    await load()
+  } catch (e) {
+    innovToast(
+      'error',
+      'Erro',
+      e.response?.data?.message || 'Falha ao excluir equipe',
+    )
+  }
 }
 
 const showCredenciais = async (username, password, titulo) => {
@@ -394,6 +423,15 @@ onMounted(load)
               @click="openEdit(equipe)"
             >
               Editar
+            </button>
+            <button
+              v-if="canDeleteEquipe(equipe)"
+              type="button"
+              class="btn btn-ghost text-red-700"
+              data-testid="equipe-excluir"
+              @click="removeEquipe(equipe)"
+            >
+              Excluir
             </button>
           </div>
         </div>

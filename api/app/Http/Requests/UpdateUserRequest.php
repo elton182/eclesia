@@ -21,7 +21,8 @@ class UpdateUserRequest extends FormRequest
     {
         return [
             'name' => ['sometimes', 'required', 'string', 'max:255'],
-            'email' => ['sometimes', 'required', 'email', 'max:255'],
+            'email' => ['sometimes', 'nullable', 'email', 'max:255'],
+            'username' => ['sometimes', 'nullable', 'string', 'max:120'],
             'password' => ['sometimes', 'nullable', 'string', Password::defaults()],
             'is_active' => ['sometimes', 'boolean'],
             'pessoa_id' => ['sometimes', 'nullable', 'string', 'max:26'],

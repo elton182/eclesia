@@ -25,19 +25,51 @@ class UserService
     }
 
     /**
-     * @param  array{name: string, email: string, password: string, is_active?: bool, pessoa_id?: string|null}  $data
+     * @param  array{name: string, email?: string|null, username?: string|null, password: string, is_active?: bool, pessoa_id?: string|null}  $data
      */
     public function create(array $data): User
     {
-        if (User::emailExists($data['email'])) {
+        $rawUsername = $data['username'] ?? null;
+        $username = $this->resolveUsernameInput($rawUsername);
+        if ($rawUsername !== null && $rawUsername !== '' && $username === null) {
+            throw ValidationException::withMessages([
+                'username' => ['Informe um login válido (letras, números e hífens).'],
+            ]);
+        }
+
+        $email = $this->resolveEmailInput($data['email'] ?? null);
+
+        if ($email === null && $username === null) {
+            throw ValidationException::withMessages([
+                'email' => ['Informe e-mail ou login (username).'],
+            ]);
+        }
+
+        if ($username !== null && User::usernameExists($username)) {
+            throw ValidationException::withMessages([
+                'username' => ['Este login já está em uso.'],
+            ]);
+        }
+
+        if ($email !== null && User::emailExists($email)) {
             throw ValidationException::withMessages([
                 'email' => ['Este e-mail já está em uso.'],
             ]);
         }
 
+        if ($email === null) {
+            $email = User::syntheticLoginEmail((string) $username);
+            if (User::emailExists($email)) {
+                throw ValidationException::withMessages([
+                    'username' => ['Este login já está em uso.'],
+                ]);
+            }
+        }
+
         return User::query()->create([
             'name' => $data['name'],
-            'email' => $data['email'],
+            'email' => $email,
+            'username' => $username,
             'password' => $data['password'],
             'is_active' => $data['is_active'] ?? true,
             'pessoa_id' => $data['pessoa_id'] ?? null,
@@ -45,24 +77,86 @@ class UserService
     }
 
     /**
-     * @param  array{name?: string, email?: string, password?: string, is_active?: bool, pessoa_id?: string|null}  $data
+     * @param  array{name?: string, email?: string|null, username?: string|null, password?: string, is_active?: bool, pessoa_id?: string|null}  $data
      */
     public function update(User $user, array $data): User
     {
-        if (isset($data['email']) && User::emailExists($data['email'], $user->id)) {
+        $payload = collect($data)->only(['name', 'is_active', 'pessoa_id', 'password'])->filter(
+            fn ($value, $key) => $key !== 'password' || ($value !== null && $value !== '')
+        )->all();
+
+        $hasEmailKey = array_key_exists('email', $data);
+        $hasUsernameKey = array_key_exists('username', $data);
+
+        $nextUsername = $user->username;
+        if ($hasUsernameKey) {
+            $rawUsername = $data['username'];
+            $nextUsername = $this->resolveUsernameInput($rawUsername);
+            if ($rawUsername !== null && $rawUsername !== '' && $nextUsername === null) {
+                throw ValidationException::withMessages([
+                    'username' => ['Informe um login válido (letras, números e hífens).'],
+                ]);
+            }
+            if ($nextUsername !== null && User::usernameExists($nextUsername, $user->id)) {
+                throw ValidationException::withMessages([
+                    'username' => ['Este login já está em uso.'],
+                ]);
+            }
+            $payload['username'] = $nextUsername;
+        }
+
+        $nextPublicEmail = $user->publicEmail();
+        if ($hasEmailKey) {
+            $nextPublicEmail = $this->resolveEmailInput($data['email']);
+            if ($nextPublicEmail !== null && User::emailExists($nextPublicEmail, $user->id)) {
+                throw ValidationException::withMessages([
+                    'email' => ['Este e-mail já está em uso.'],
+                ]);
+            }
+        }
+
+        if ($nextPublicEmail === null && $nextUsername === null) {
             throw ValidationException::withMessages([
-                'email' => ['Este e-mail já está em uso.'],
+                'email' => ['Informe e-mail ou login (username).'],
             ]);
         }
 
-        $payload = collect($data)->only(['name', 'email', 'is_active', 'pessoa_id', 'password'])->filter(
-            fn ($value, $key) => $key !== 'password' || ($value !== null && $value !== '')
-        )->all();
+        if ($hasEmailKey) {
+            $payload['email'] = $nextPublicEmail ?? User::syntheticLoginEmail((string) $nextUsername);
+        } elseif (
+            $hasUsernameKey
+            && $nextUsername !== null
+            && ($user->publicEmail() === null || User::isSyntheticEmail($user->email))
+        ) {
+            $payload['email'] = User::syntheticLoginEmail($nextUsername);
+        }
 
         $user->fill($payload);
         $user->save();
 
         return $user->refresh();
+    }
+
+    private function resolveUsernameInput(mixed $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        $normalized = User::normalizeUsername((string) $value);
+
+        return $normalized === '' ? null : $normalized;
+    }
+
+    private function resolveEmailInput(mixed $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $email = trim((string) $value);
+
+        return $email === '' ? null : $email;
     }
 
     public function delete(User $user): void

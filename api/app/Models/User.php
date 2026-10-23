@@ -122,6 +122,46 @@ class User extends Authenticatable
     }
 
     /**
+     * Normaliza login digitado para username (slug), SPEC-021 / SPEC-026.
+     * Alinhado ao front (`normalizeEquipeUsername`): sem transliterar `@` → `at`.
+     */
+    public static function normalizeUsername(string $value): string
+    {
+        $ascii = Str::lower(Str::ascii(trim($value)));
+        $slug = preg_replace('/[^a-z0-9]+/', '-', $ascii) ?? '';
+
+        return trim($slug, '-');
+    }
+
+    public static function isSyntheticEmail(?string $email): bool
+    {
+        if ($email === null || $email === '') {
+            return false;
+        }
+
+        $lower = Str::lower($email);
+
+        return str_ends_with($lower, '@login.local')
+            || str_ends_with($lower, '@equipe.local');
+    }
+
+    /**
+     * E-mail interno quando o usuário não tem e-mail real (SPEC-026).
+     */
+    public static function syntheticLoginEmail(string $username): string
+    {
+        return $username.'@login.local';
+    }
+
+    /**
+     * E-mail exposto na API: null para sintéticos.
+     */
+    public function publicEmail(): ?string
+    {
+        return static::isSyntheticEmail($this->email) ? null : $this->email;
+    }
+
+    /**
      * @return array<string, string>
      */
     protected function casts(): array

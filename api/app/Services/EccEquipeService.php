@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 class EccEquipeService
 {
@@ -83,7 +84,24 @@ class EccEquipeService
 
     public function delete(EccEquipe $equipe): void
     {
+        $equipe->loadCount('casais');
+        if ((int) ($equipe->casais_count ?? 0) > 0) {
+            throw new ConflictHttpException(
+                'Não é possível excluir equipe com casais vinculados. Remova os membros antes.'
+            );
+        }
+
+        $acessoUserId = $equipe->acesso_user_id;
+        if ($acessoUserId !== null) {
+            $equipe->acesso_user_id = null;
+            $equipe->save();
+        }
+
         $equipe->delete();
+
+        if ($acessoUserId !== null) {
+            User::query()->whereKey($acessoUserId)->delete();
+        }
     }
 
     public function findOrCreateByNome(string $nome): EccEquipe
@@ -222,7 +240,7 @@ class EccEquipeService
             ]);
         }
 
-        $username = $this->normalizeUsername($username);
+        $username = User::normalizeUsername($username);
         if ($username === '') {
             throw ValidationException::withMessages([
                 'username' => ['Informe um login válido (letras, números e hífens).'],
@@ -253,7 +271,7 @@ class EccEquipeService
 
     private function uniqueUsernameFromNome(string $nome): string
     {
-        $base = $this->normalizeUsername($nome);
+        $base = User::normalizeUsername($nome);
         if ($base === '') {
             $base = 'equipe';
         }
@@ -266,11 +284,6 @@ class EccEquipeService
         }
 
         return $candidate;
-    }
-
-    private function normalizeUsername(string $value): string
-    {
-        return Str::slug(Str::lower(trim($value)), '-');
     }
 
     /**
