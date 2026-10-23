@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useAuthAdminStore } from '@/stores/authAdmin'
@@ -229,7 +229,30 @@ function onNav(item) {
   router.push({ path: item.path, query: item.query || {} })
 }
 
+const userMenuOpen = ref(false)
+
+async function logout() {
+  userMenuOpen.value = false
+  if (isPlatformAdmin.value) {
+    tenantStore.clear()
+    igrejaStore.reset()
+    branding.reset()
+    await authAdmin.logout()
+    router.push('/admin/login')
+    return
+  }
+  await authTenant.logout()
+  router.push('/entrar')
+}
+
+function onDocumentClick(e) {
+  if (!e.target.closest('[data-testid="module-user-menu"]')) {
+    userMenuOpen.value = false
+  }
+}
+
 onMounted(async () => {
+  document.addEventListener('click', onDocumentClick)
   if (tenantStore.slug) {
     await branding.ensureLoaded()
   }
@@ -240,6 +263,10 @@ onMounted(async () => {
       /* ignore */
     }
   }
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', onDocumentClick)
 })
 </script>
 
@@ -370,16 +397,36 @@ onMounted(async () => {
             <span class="text-[9px]" style="color: var(--color-muted)">▾</span>
           </span>
         </div>
-        <div class="flex items-center gap-2.5 shrink-0">
+        <div class="flex items-center gap-2.5 shrink-0 relative" data-testid="module-user-menu">
           <PwaInstallNavButton labeled />
           <span class="text-[12.5px] hidden sm:inline" style="color: var(--color-muted)">
             {{ displayName }}
           </span>
-          <div
+          <button
+            type="button"
             class="w-7 h-7 rounded-full flex items-center justify-center text-[11.5px] font-medium"
             style="background: var(--color-primary-soft); color: #F0D8C2"
+            aria-label="Menu do usuário"
+            data-testid="module-user-menu-toggle"
+            @click.stop="userMenuOpen = !userMenuOpen"
           >
             {{ initials }}
+          </button>
+          <div
+            v-if="userMenuOpen"
+            class="absolute right-0 top-9 rounded-lg py-2 min-w-[160px] z-20 shadow-lg"
+            style="background: var(--color-surface); border: 1px solid var(--color-line)"
+            data-testid="module-user-menu-dropdown"
+          >
+            <button
+              type="button"
+              class="w-full text-left px-4 py-2 text-[13px]"
+              style="color: var(--color-ink)"
+              data-testid="module-logout"
+              @click="logout"
+            >
+              Sair
+            </button>
           </div>
         </div>
       </header>
