@@ -65,6 +65,12 @@ const membros = computed(() => {
     })
 })
 
+/**
+ * Refs são auto-unwrapped no template — não passar `selectedLeft` direto
+ * para helpers que esperam Ref (senão `setRef.value` fica undefined).
+ * @param {import('vue').Ref<Set<string>>} setRef
+ * @param {string|number} id
+ */
 const toggle = (setRef, id) => {
   const next = new Set(setRef.value)
   const key = String(id)
@@ -72,6 +78,9 @@ const toggle = (setRef, id) => {
   else next.add(key)
   setRef.value = next
 }
+
+const toggleLeft = (id) => toggle(selectedLeft, id)
+const toggleRight = (id) => toggle(selectedRight, id)
 
 const moveToEquipe = () => {
   if (!selectedLeft.value.size) return
@@ -157,7 +166,7 @@ const save = async () => {
                   class="shrink-0"
                   :checked="selectedLeft.has(String(c.id))"
                   :data-testid="`membros-disp-${c.id}`"
-                  @change="toggle(selectedLeft, c.id)"
+                  @change="toggleLeft(c.id)"
                 >
                 <span class="truncate">{{ labelCasal(c) }}</span>
               </label>
@@ -231,7 +240,7 @@ const save = async () => {
                   class="shrink-0"
                   :checked="selectedRight.has(String(c.id))"
                   :data-testid="`membros-eq-${c.id}`"
-                  @change="toggle(selectedRight, c.id)"
+                  @change="toggleRight(c.id)"
                 >
                 <span class="truncate">{{ labelCasal(c) }}</span>
               </label>

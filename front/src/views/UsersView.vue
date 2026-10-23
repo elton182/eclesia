@@ -4,7 +4,7 @@ import api from '@/services/api'
 import { innovToast } from '@/plugins/toast'
 import { innovConfirm } from '@/plugins/dialog'
 import { buildSyncRolesPayload, roleLabel } from '@/utils/userRoles'
-import { displayUserLogin, validateUserLoginFields } from '@/utils/userLogin'
+import { displayUserLogin, filterUsersByLoginSearch, validateUserLoginFields } from '@/utils/userLogin'
 import { filterEquipesBySearch } from '@/utils/eccFilters'
 import { useIgrejaStore } from '@/stores/igreja'
 
@@ -13,6 +13,7 @@ const users = ref([])
 const roles = ref([])
 const equipes = ref([])
 const equipeSearch = ref('')
+const userSearch = ref('')
 const loading = ref(false)
 const mode = ref('list')
 const saving = ref(false)
@@ -37,6 +38,9 @@ const igrejas = computed(() => igrejaStore.igrejas)
 const liderAtivo = computed(() => !!roleForm.value.toggles['lider-equipe'])
 const equipesFiltradas = computed(() =>
   filterEquipesBySearch(equipes.value, equipeSearch.value),
+)
+const filteredUsers = computed(() =>
+  filterUsersByLoginSearch(users.value, userSearch.value),
 )
 
 const load = async () => {
@@ -220,18 +224,35 @@ onMounted(load)
     </div>
 
     <div v-if="mode === 'list'" class="space-y-4">
-      <button class="btn btn-primary" data-testid="user-new" @click="openCreate">
-        Novo usuário
-      </button>
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <button class="btn btn-primary w-full sm:w-auto" data-testid="user-new" @click="openCreate">
+          Novo usuário
+        </button>
+        <input
+          v-model="userSearch"
+          type="search"
+          class="input w-full sm:max-w-sm"
+          placeholder="Buscar por nome, e-mail ou login…"
+          data-testid="users-search"
+          aria-label="Buscar usuários"
+        >
+      </div>
 
       <div class="card overflow-hidden">
         <div v-if="loading" class="p-8 text-center" style="color: var(--color-muted)">Carregando…</div>
         <div v-else-if="!users.length" class="p-8 text-center" style="color: var(--color-muted)">
           Nenhum usuário encontrado.
         </div>
+        <div
+          v-else-if="!filteredUsers.length"
+          class="p-8 text-center"
+          style="color: var(--color-muted)"
+        >
+          Nenhum usuário corresponde à busca.
+        </div>
         <div v-else class="divide-y" style="border-color: var(--color-line)">
           <div
-            v-for="user in users"
+            v-for="user in filteredUsers"
             :key="user.id"
             class="px-5 py-4 space-y-2"
             data-testid="user-row"

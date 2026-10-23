@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 class EccEquipeService
 {
@@ -83,7 +84,24 @@ class EccEquipeService
 
     public function delete(EccEquipe $equipe): void
     {
+        $equipe->loadCount('casais');
+        if ((int) ($equipe->casais_count ?? 0) > 0) {
+            throw new ConflictHttpException(
+                'Não é possível excluir equipe com casais vinculados. Remova os membros antes.'
+            );
+        }
+
+        $acessoUserId = $equipe->acesso_user_id;
+        if ($acessoUserId !== null) {
+            $equipe->acesso_user_id = null;
+            $equipe->save();
+        }
+
         $equipe->delete();
+
+        if ($acessoUserId !== null) {
+            User::query()->whereKey($acessoUserId)->delete();
+        }
     }
 
     public function findOrCreateByNome(string $nome): EccEquipe

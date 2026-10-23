@@ -111,6 +111,43 @@ class EccEquipeAcessoTest extends TestCase
         tenancy()->end();
     }
 
+    public function test_excluir_equipe_sem_casais(): void
+    {
+        $equipeId = $this->tenantJson('POST', '/api/v1/ecc/equipes', ['nome' => 'Equipe Vazia'])
+            ->assertCreated()
+            ->json('data.id');
+
+        $this->tenantJson('POST', "/api/v1/ecc/equipes/{$equipeId}/acesso")
+            ->assertCreated();
+
+        $this->tenantJson('DELETE', "/api/v1/ecc/equipes/{$equipeId}")
+            ->assertNoContent();
+
+        $this->tenantJson('GET', "/api/v1/ecc/equipes/{$equipeId}")
+            ->assertNotFound();
+    }
+
+    public function test_excluir_equipe_com_casais_retorna_409(): void
+    {
+        $equipeId = $this->tenantJson('POST', '/api/v1/ecc/equipes', ['nome' => 'Com Casais'])
+            ->assertCreated()
+            ->json('data.id');
+
+        $casalId = $this->tenantJson('POST', '/api/v1/ecc/casais', [
+            'nome' => 'João',
+            'nome_conjuge' => 'Maria',
+            'equipe_id' => $equipeId,
+        ])->assertCreated()->json('data.id');
+
+        $this->assertNotEmpty($casalId);
+
+        $this->tenantJson('DELETE', "/api/v1/ecc/equipes/{$equipeId}")
+            ->assertStatus(409);
+
+        $this->tenantJson('GET', "/api/v1/ecc/equipes/{$equipeId}")
+            ->assertOk();
+    }
+
     public function test_criar_acesso_gera_username_e_senha_temporaria(): void
     {
         $equipeId = $this->tenantJson('POST', '/api/v1/ecc/equipes', ['nome' => 'Equipe Caná'])

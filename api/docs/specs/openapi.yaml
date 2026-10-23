@@ -2142,6 +2142,9 @@ paths:
           description: Atualizada
     delete:
       summary: Remover equipe
+      description: >
+        Requer ecc.equipes.manage. Bloqueado (409) se houver casais vinculados.
+        Remove também o usuário de acesso compartilhado, se existir.
       security:
         - bearerAuth: []
           tenantHeader: []
@@ -2154,6 +2157,12 @@ paths:
       responses:
         '204':
           description: Removida
+        '403':
+          description: Sem permissão
+        '404':
+          description: Não encontrada
+        '409':
+          description: Possui casais vinculados
   /ecc/equipes/{id}/casais:
     put:
       summary: Sincronizar casais da equipe

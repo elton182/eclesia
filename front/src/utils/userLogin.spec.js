@@ -4,6 +4,7 @@ import {
   normalizeUsername,
   isSyntheticEmail,
   displayUserLogin,
+  filterUsersByLoginSearch,
   validateUserLoginFields,
 } from './userLogin.js'
 
@@ -51,5 +52,17 @@ describe('userLogin', () => {
       email: 'a@b.com',
       username: null,
     })
+  })
+
+  it('filterUsersByLoginSearch busca nome, email e username', () => {
+    const users = [
+      { name: 'Ana Silva', email: 'ana@igreja.org', username: null },
+      { name: 'Monitor', email: null, username: 'monitor-sala' },
+      { name: 'Outro', email: 'x@login.local', username: 'outro' },
+    ]
+    assert.equal(filterUsersByLoginSearch(users, 'ana').length, 1)
+    assert.equal(filterUsersByLoginSearch(users, 'monitor').length, 1)
+    assert.equal(filterUsersByLoginSearch(users, 'igreja').length, 1)
+    assert.equal(filterUsersByLoginSearch(users, '').length, 3)
   })
 })

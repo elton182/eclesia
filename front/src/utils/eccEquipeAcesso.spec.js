@@ -4,6 +4,7 @@ import {
   normalizeEquipeUsername,
   validateEquipeUsername,
   equipesPdfFilename,
+  equipePodeSerExcluida,
 } from './eccEquipeAcesso.js'
 
 describe('eccEquipeAcesso', () => {
@@ -27,5 +28,12 @@ describe('eccEquipeAcesso', () => {
   it('equipesPdfFilename usa slug da igreja', () => {
     assert.equal(equipesPdfFilename('Paróquia São José'), 'equipes-paroquia-sao-jose.pdf')
     assert.equal(equipesPdfFilename(''), 'equipes-igreja.pdf')
+  })
+
+  it('equipePodeSerExcluida só sem casais', () => {
+    assert.equal(equipePodeSerExcluida({ casais_count: 0 }), true)
+    assert.equal(equipePodeSerExcluida({ casais_count: '0' }), true)
+    assert.equal(equipePodeSerExcluida({ casais_count: 2 }), false)
+    assert.equal(equipePodeSerExcluida({}), true)
   })
 })

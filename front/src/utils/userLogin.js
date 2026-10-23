@@ -35,6 +35,26 @@ export function displayUserLogin(user) {
 }
 
 /**
+ * Filtra usuários por nome, e-mail ou username (tela Usuários).
+ * @param {Array<{ name?: string, email?: string|null, username?: string|null }>|null|undefined} users
+ * @param {string} query
+ * @returns {Array}
+ */
+export function filterUsersByLoginSearch(users, query) {
+  const q = String(query || '').trim().toLocaleLowerCase('pt-BR')
+  const list = users || []
+  if (!q) return [...list]
+  return list.filter((u) => {
+    const name = String(u.name || '').toLocaleLowerCase('pt-BR')
+    const email = u.email && !isSyntheticEmail(u.email)
+      ? String(u.email).toLocaleLowerCase('pt-BR')
+      : ''
+    const username = String(u.username || '').toLocaleLowerCase('pt-BR')
+    return name.includes(q) || email.includes(q) || username.includes(q)
+  })
+}
+
+/**
  * Valida create/update: precisa de e-mail real ou username.
  * @param {{ email?: string, username?: string }} input
  * @returns {{ ok: true, email: string|null, username: string|null } | { ok: false, message: string }}
