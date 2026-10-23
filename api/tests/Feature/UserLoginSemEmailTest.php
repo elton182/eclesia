@@ -242,4 +242,53 @@ class UserLoginSemEmailTest extends TestCase
             'password' => 'password123',
         ])->assertOk();
     }
+
+    public function test_listar_usuarios_paginado_e_busca_por_q(): void
+    {
+        Sanctum::actingAs($this->admin);
+
+        for ($i = 1; $i <= 16; $i++) {
+            $this->withHeader('X-Tenant', 'paroquia-login')
+                ->postJson('/api/v1/users', [
+                    'name' => "Usuário {$i}",
+                    'username' => "user-{$i}",
+                    'password' => 'password123',
+                ])
+                ->assertCreated();
+        }
+
+        $this->withHeader('X-Tenant', 'paroquia-login')
+            ->postJson('/api/v1/users', [
+                'name' => 'Zelador Especial',
+                'username' => 'zelador',
+                'password' => 'password123',
+            ])
+            ->assertCreated();
+
+        $page1 = $this->withHeader('X-Tenant', 'paroquia-login')
+            ->getJson('/api/v1/users?per_page=15&page=1')
+            ->assertOk();
+
+        $this->assertCount(15, $page1->json('data'));
+        $this->assertSame(1, $page1->json('meta.current_page'));
+        $this->assertGreaterThanOrEqual(2, (int) $page1->json('meta.last_page'));
+        $this->assertGreaterThanOrEqual(17, (int) $page1->json('meta.total'));
+
+        $page2 = $this->withHeader('X-Tenant', 'paroquia-login')
+            ->getJson('/api/v1/users?per_page=15&page=2')
+            ->assertOk();
+
+        $this->assertNotEmpty($page2->json('data'));
+        $this->assertSame(2, $page2->json('meta.current_page'));
+
+        $busca = $this->withHeader('X-Tenant', 'paroquia-login')
+            ->getJson('/api/v1/users?q=zelador')
+            ->assertOk();
+
+        $names = collect($busca->json('data'))->pluck('name')->all();
+        $this->assertContains('Zelador Especial', $names);
+        $this->assertTrue(
+            collect($busca->json('data'))->contains(fn ($u) => ($u['username'] ?? null) === 'zelador')
+        );
+    }
 }

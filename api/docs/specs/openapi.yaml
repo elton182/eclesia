@@ -1727,11 +1727,33 @@ paths:
   /users:
     get:
       summary: Listar usuários do tenant
+      description: >
+        Lista paginada. `q` filtra por nome, e-mail real ou username (parcial).
       security:
         - tenantHeader: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 15
+        - name: q
+          in: query
+          description: Busca por nome, e-mail ou username
+          schema:
+            type: string
+            maxLength: 120
       responses:
         '200':
-          description: Lista paginada
+          description: Lista paginada (data + meta Laravel)
         '401':
           description: Não autenticado
         '403':
