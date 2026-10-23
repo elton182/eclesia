@@ -232,8 +232,7 @@ const baixarPdf = async () => {
   pdfLoading.value = true
   try {
     const res = await api.get('/ecc/equipes/pdf', { responseType: 'blob' })
-    const slug = tenantStore.igreja?.slug || tenantStore.slug || 'igreja'
-    downloadBlob(res.data, equipesPdfFilename(slug))
+    downloadBlob(res.data, equipesPdfFilename(tenantStore.slug || 'igreja'))
   } catch (e) {
     innovToast('error', 'PDF', e.response?.data?.message || 'Falha ao gerar PDF')
   } finally {

@@ -283,14 +283,17 @@ class EccEquipeService
     }
 
     /**
-     * SPEC-025: PDF com equipe, piloto(s) e login do acesso.
+     * SPEC-025: linhas do PDF — só equipes com login de acesso gerado.
+     *
+     * @return list<array{equipe: string, piloto: string, login: string}>
      */
-    public function pdf(): Response
+    public function linhasPdf(): array
     {
         $igreja = $this->igrejaContext->current();
 
         $equipes = EccEquipe::query()
             ->where('igreja_id', $igreja->id)
+            ->whereNotNull('acesso_user_id')
             ->with([
                 'acessoUser:id,username',
                 'casais' => static fn ($q) => $q->where('piloto', true)->with(['pessoaA:id,nome', 'pessoaB:id,nome']),
@@ -298,7 +301,7 @@ class EccEquipeService
             ->orderBy('nome')
             ->get();
 
-        $linhas = $equipes->map(function (EccEquipe $equipe): array {
+        return $equipes->map(function (EccEquipe $equipe): array {
             $pilotos = $equipe->casais
                 ->map(fn (Casal $casal) => $this->formatCasalNome($casal))
                 ->filter(fn (string $nome) => $nome !== '')
@@ -308,9 +311,18 @@ class EccEquipeService
             return [
                 'equipe' => $equipe->nome,
                 'piloto' => $pilotos === [] ? '—' : implode('; ', $pilotos),
-                'login' => $equipe->acessoUser?->username ?: '—',
+                'login' => (string) ($equipe->acessoUser?->username ?: '—'),
             ];
         })->all();
+    }
+
+    /**
+     * SPEC-025: PDF com equipe, piloto(s) e login do acesso.
+     */
+    public function pdf(): Response
+    {
+        $igreja = $this->igrejaContext->current();
+        $linhas = $this->linhasPdf();
 
         $pdf = Pdf::loadView('ecc.equipes-pdf', [
             'igreja' => $igreja,

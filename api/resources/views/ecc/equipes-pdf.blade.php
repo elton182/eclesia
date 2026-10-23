@@ -22,7 +22,7 @@
     </div>
 
     @if(count($linhas) === 0)
-        <p class="empty">Nenhuma equipe cadastrada.</p>
+        <p class="empty">Nenhuma equipe com login de acesso.</p>
     @else
         <table>
             <thead>
