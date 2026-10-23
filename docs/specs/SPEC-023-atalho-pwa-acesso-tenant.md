@@ -28,7 +28,9 @@ O login do tenant exige o identificador da organização (slug). Membros da par�
 - [x] 404 se site não publicado; tenant inexistente → erro de identificação (mesmo padrão HTML/sitemap).
 - [x] HTML SEO da home/página inclui `<link rel="manifest" href="…/site/{slug}/manifest.webmanifest">` (URL no host do front).
 - [x] Front (dev/preview): `GET /site/{slug}/manifest.webmanifest` faz proxy do JSON da API (produção: proxy equivalente).
-- [x] No site público: CTA **Instalar acesso** usa o prompt PWA quando disponível; banner genérico “Instalar Eclésias” não aparece em `/site/*`.
+- [x] Rota dedicada `/site/{slug}/instalar` com CTA de instalação (prompt nativo ou passo a passo iOS/Android); `instalar` é segmento reservado (não é pageSlug do CMS).
+- [x] No site público: link compacto no header aponta para `/instalar`; banner genérico “Instalar Eclésias” não aparece em `/site/*`.
+- [x] A página `/instalar` (dev/preview) serve SPA com `<link rel="manifest">` do tenant já no HTML (produção: proxy/fallback equivalente).
 - [x] `GET /entrar?tenant={slug}` pré-preenche e persiste a organização (`rememberTenantForLogin`); campo organização fica somente leitura enquanto o query estiver presente.
 
 ## Fora de escopo

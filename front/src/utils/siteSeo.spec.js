@@ -4,7 +4,11 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { applyDocumentSeo, resolveSeo } from './siteBlocks.js'
-import { extractIndexAssets, injectSpaAssets } from '../../vite.site-html-plugin.js'
+import {
+  extractIndexAssets,
+  injectSpaAssets,
+  injectTenantAccessManifest,
+} from '../../vite.site-html-plugin.js'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -63,6 +67,14 @@ describe('site SEO document (SPEC-005)', () => {
     assert.match(out, /rel="stylesheet"/)
     assert.match(out, /type="module"/)
     assert.match(out, /<main>Oi<\/main>/)
+  })
+
+  it('vite plugin troca manifest genérico pelo do tenant na página /instalar', () => {
+    const shell =
+      '<!DOCTYPE html><html><head><link rel="manifest" href="/manifest.webmanifest"><title>E</title></head><body><div id="app"></div></body></html>'
+    const out = injectTenantAccessManifest(shell, 'sao-jose')
+    assert.match(out, /rel="manifest" href="\/site\/sao-jose\/manifest\.webmanifest"/)
+    assert.doesNotMatch(out, /href="\/manifest\.webmanifest"/)
   })
 
   it('vite.config registra plugin e denylist /site/', () => {
