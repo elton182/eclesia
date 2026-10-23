@@ -195,7 +195,7 @@ Entrada típica: card **ECC** no launcher → rotas sob `/ecc/*`.
 |----------------|---------------|
 | Site público | Visitante em `/site/{slug}` (+ páginas) |
 | SEO / HTML | Rotas HTML e sitemap por path (sem precisar de `X-Tenant` no browser) |
-| Atalho PWA de acesso | `/site/{slug}/instalar` — prompt nativo ou passo a passo; atalho abre `/entrar?tenant={slug}` (SPEC-023) |
+| Atalho PWA de acesso | `/site/{slug}/instalar` — login primeiro, depois instalar; atalho abre `/entrar?tenant={slug}` (SPEC-023) |
 | CMS admin | `/site` — publicação, menu, cores/marca do **site**, SEO, contato |
 | Páginas, comunicados, pastorais na vitrine | CRUD no admin |
 | Formulários | Definição + recebimento de submissions |
