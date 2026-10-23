@@ -4,7 +4,8 @@ import api from '@/services/api'
 import { innovToast } from '@/plugins/toast'
 import { innovConfirm } from '@/plugins/dialog'
 import { buildSyncRolesPayload, roleLabel } from '@/utils/userRoles'
-import { displayUserLogin, filterUsersByLoginSearch, validateUserLoginFields } from '@/utils/userLogin'
+import { displayUserLogin, validateUserLoginFields } from '@/utils/userLogin'
+import { buildUsersListParams, parseUsersListMeta } from '@/utils/usersList'
 import { filterEquipesBySearch } from '@/utils/eccFilters'
 import { useIgrejaStore } from '@/stores/igreja'
 
@@ -14,9 +15,12 @@ const roles = ref([])
 const equipes = ref([])
 const equipeSearch = ref('')
 const userSearch = ref('')
+const userPage = ref(1)
+const userMeta = ref({ current_page: 1, last_page: 1, per_page: 15, total: 0 })
 const loading = ref(false)
 const mode = ref('list')
 const saving = ref(false)
+let searchDebounce = null
 const form = ref({
   id: null,
   name: '',
@@ -39,26 +43,67 @@ const liderAtivo = computed(() => !!roleForm.value.toggles['lider-equipe'])
 const equipesFiltradas = computed(() =>
   filterEquipesBySearch(equipes.value, equipeSearch.value),
 )
-const filteredUsers = computed(() =>
-  filterUsersByLoginSearch(users.value, userSearch.value),
-)
 
-const load = async () => {
+const fetchUsersPage = async () => {
+  const params = buildUsersListParams({
+    page: userPage.value,
+    perPage: 15,
+    q: userSearch.value,
+  })
+  const usersRes = await api.get('/users', { params })
+  const list = usersRes.data.data || usersRes.data || []
+  users.value = Array.isArray(list) ? list : []
+  userMeta.value = parseUsersListMeta(usersRes.data, users.value.length)
+  userPage.value = userMeta.value.current_page
+}
+
+const loadUsers = async () => {
   loading.value = true
   try {
-    const [usersRes, rolesRes] = await Promise.all([
-      api.get('/users'),
-      api.get('/roles'),
-      igrejaStore.load(),
-    ])
-    users.value = usersRes.data.data || usersRes.data || []
-    roles.value = rolesRes.data.data || rolesRes.data || []
+    await fetchUsersPage()
   } catch (e) {
     innovToast('error', 'Erro', e.response?.data?.message || 'Falha ao listar usuários')
+    users.value = []
   } finally {
     loading.value = false
   }
 }
+
+const load = async () => {
+  loading.value = true
+  try {
+    const [, rolesRes] = await Promise.all([
+      fetchUsersPage(),
+      api.get('/roles'),
+      igrejaStore.load(),
+    ])
+    roles.value = rolesRes.data.data || rolesRes.data || []
+  } catch (e) {
+    innovToast('error', 'Erro', e.response?.data?.message || 'Falha ao listar usuários')
+    users.value = []
+  } finally {
+    loading.value = false
+  }
+}
+
+const applyUserSearch = () => {
+  userPage.value = 1
+  loadUsers()
+}
+
+const goUserPage = (page) => {
+  if (page < 1 || page > (userMeta.value.last_page || 1)) return
+  userPage.value = page
+  loadUsers()
+}
+
+watch(userSearch, () => {
+  if (mode.value !== 'list') return
+  clearTimeout(searchDebounce)
+  searchDebounce = setTimeout(() => {
+    applyUserSearch()
+  }, 300)
+})
 
 const loadEquipes = async () => {
   try {
@@ -153,7 +198,7 @@ const save = async () => {
       innovToast('success', 'OK', 'Usuário criado')
     }
     mode.value = 'list'
-    await load()
+    await loadUsers()
   } catch (e) {
     const msg =
       e.response?.data?.message ||
@@ -176,7 +221,7 @@ const remove = async (user) => {
   try {
     await api.delete(`/users/${user.id}`)
     innovToast('success', 'OK', 'Usuário removido')
-    await load()
+    await loadUsers()
   } catch (e) {
     innovToast('error', 'Erro', e.response?.data?.message || 'Falha ao remover')
   }
@@ -198,7 +243,7 @@ const saveRoles = async () => {
     await api.put(`/users/${roleForm.value.userId}/roles`, payload)
     innovToast('success', 'OK', 'Papéis atualizados')
     mode.value = 'list'
-    await load()
+    await loadUsers()
   } catch (e) {
     const msg =
       e.response?.data?.message ||
@@ -235,24 +280,18 @@ onMounted(load)
           placeholder="Buscar por nome, e-mail ou login…"
           data-testid="users-search"
           aria-label="Buscar usuários"
+          @keyup.enter="applyUserSearch"
         >
       </div>
 
       <div class="card overflow-hidden">
         <div v-if="loading" class="p-8 text-center" style="color: var(--color-muted)">Carregando…</div>
         <div v-else-if="!users.length" class="p-8 text-center" style="color: var(--color-muted)">
-          Nenhum usuário encontrado.
-        </div>
-        <div
-          v-else-if="!filteredUsers.length"
-          class="p-8 text-center"
-          style="color: var(--color-muted)"
-        >
-          Nenhum usuário corresponde à busca.
+          {{ userSearch.trim() ? 'Nenhum usuário corresponde à busca.' : 'Nenhum usuário encontrado.' }}
         </div>
         <div v-else class="divide-y" style="border-color: var(--color-line)">
           <div
-            v-for="user in filteredUsers"
+            v-for="user in users"
             :key="user.id"
             class="px-5 py-4 space-y-2"
             data-testid="user-row"
@@ -295,6 +334,38 @@ onMounted(load)
               {{ user.equipes_lideradas.map((e) => e.nome).join(', ') }}
             </div>
           </div>
+        </div>
+      </div>
+
+      <div
+        v-if="userMeta.last_page > 1"
+        class="flex items-center justify-between text-sm"
+        style="color: var(--color-muted)"
+        data-testid="users-pagination"
+      >
+        <span>
+          Página {{ userMeta.current_page }} de {{ userMeta.last_page }}
+          ({{ userMeta.total }})
+        </span>
+        <div class="flex gap-2">
+          <button
+            type="button"
+            class="btn btn-ghost"
+            data-testid="users-page-prev"
+            :disabled="userMeta.current_page <= 1 || loading"
+            @click="goUserPage(userMeta.current_page - 1)"
+          >
+            Anterior
+          </button>
+          <button
+            type="button"
+            class="btn btn-ghost"
+            data-testid="users-page-next"
+            :disabled="userMeta.current_page >= userMeta.last_page || loading"
+            @click="goUserPage(userMeta.current_page + 1)"
+          >
+            Próxima
+          </button>
         </div>
       </div>
     </div>

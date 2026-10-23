@@ -10,18 +10,76 @@ use App\Models\Pastoral;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Pagination\LengthAwarePaginator as Paginator;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Spatie\Permission\Models\Role;
 
 class UserService
 {
-    public function paginate(int $perPage = 15): LengthAwarePaginator
+    /**
+     * Lista paginada. Com `q`, filtra por nome/e-mail (LGPD decrypt em memória)
+     * e username (parcial) — escopo tenant, volume tipicamente baixo.
+     */
+    public function paginate(int $perPage = 15, ?string $q = null, ?int $page = null): LengthAwarePaginator
     {
-        return User::query()
+        $perPage = max(1, min($perPage, 100));
+        $page = max(1, $page ?? Paginator::resolveCurrentPage());
+        $term = trim((string) $q);
+
+        $base = User::query()
             ->with('equipesLideradas:id,nome')
-            ->orderBy('id')
-            ->paginate($perPage);
+            ->orderBy('id');
+
+        if ($term === '') {
+            return $base->paginate($perPage, ['*'], 'page', $page);
+        }
+
+        $matched = $base->get()->filter(fn (User $user) => $this->userMatchesSearch($user, $term))->values();
+
+        return $this->paginateCollection($matched, $perPage, $page);
+    }
+
+    private function userMatchesSearch(User $user, string $term): bool
+    {
+        $needle = Str::lower($term);
+        $usernameNeedle = User::normalizeUsername($term);
+
+        if ($usernameNeedle !== '' && $user->username !== null) {
+            if (str_contains(Str::lower((string) $user->username), $usernameNeedle)) {
+                return true;
+            }
+        }
+
+        if ($user->name !== null && str_contains(Str::lower((string) $user->name), $needle)) {
+            return true;
+        }
+
+        $email = $user->publicEmail();
+        if ($email !== null && str_contains(Str::lower($email), $needle)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * @param  Collection<int, User>  $items
+     */
+    private function paginateCollection(Collection $items, int $perPage, int $page): LengthAwarePaginator
+    {
+        return new Paginator(
+            $items->forPage($page, $perPage)->values(),
+            $items->count(),
+            $perPage,
+            $page,
+            [
+                'path' => Paginator::resolveCurrentPath(),
+                'query' => request()->query(),
+            ]
+        );
     }
 
     /**
