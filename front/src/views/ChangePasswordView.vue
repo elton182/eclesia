@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { homePathForUser } from '@/utils/userRoles'
 import { extractApiError } from '@/utils/tenantAuth'
+import { appInstallRoute, shouldOfferAppInstall } from '@/utils/siteAccessInstall'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -39,7 +40,12 @@ const handleSubmit = async () => {
     return
   }
 
-  router.push(homePathForUser(authStore.user))
+  const home = homePathForUser(authStore.user)
+  if (shouldOfferAppInstall({})) {
+    router.replace(appInstallRoute(home))
+    return
+  }
+  router.push(home)
 }
 </script>
 

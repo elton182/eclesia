@@ -16,7 +16,7 @@ Identificação continua por header/path (ADR-0002); domínio custom permanece f
 2. **Servir no host do front** em `/site/{tenantSlug}/manifest.webmanifest` (proxy em dev/preview e produção), porque o Web App Manifest exige same-origin com a página instalável.
 3. **Identidade do app instalado:** `id: /acesso/{slug}`, `name` = nome do tenant, `start_url: /entrar?tenant={slug}`, `scope: /` (após o login o usuário precisa navegar o app inteiro).
 4. **PWA global** permanece para a landing/plataforma; no site público o front aponta o `<link rel="manifest">` para o manifest do tenant.
-5. **Página dedicada** `/site/{slug}/instalar` (segmento reservado): primeiro autentica (login/senha com org já amarrada ao slug); só então mostra o CTA de instalação (prompt nativo ou passo a passo). O header do site só leva a essa rota.
+5. **Página dedicada** `/site/{slug}/instalar` (segmento reservado): autentica (login/senha com org já amarrada ao slug); após sessão válida, restaura o manifest da plataforma e redireciona ao app com `?instalar=1` + painel de instalação (o BIP nativo não é confiável em `/site/*` com manifest do tenant). O header do site só leva a essa rota.
 6. **Primeiro paint com manifest do tenant** via `GET /public/site/install-html/{slug}` (proxy no front). Trocar o manifest só via JS depois do load **não** costuma rearmar `beforeinstallprompt`.
 7. **Ícones MVP:** assets padrão do front (`/icons/...`); nome/tema diferenciam a paróquia.
 8. **Limite de plataforma:** o popup só existe onde há `BeforeInstallPromptEvent` (Chrome/Edge/Android). iOS Safari exige “Adicionar à Tela de Início” manual — não há API para forçar dialog.
