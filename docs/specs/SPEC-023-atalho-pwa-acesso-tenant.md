@@ -29,7 +29,7 @@ O login do tenant exige o identificador da organização (slug). Membros da par�
 - [x] HTML SEO da home/página inclui `<link rel="manifest" href="…/site/{slug}/manifest.webmanifest">` (URL no host do front).
 - [x] Front (dev/preview): `GET /site/{slug}/manifest.webmanifest` faz proxy do JSON da API (produção: proxy equivalente).
 - [x] Rota dedicada `/site/{slug}/instalar` (`instalar` é segmento reservado, não é pageSlug do CMS).
-- [x] Fluxo em dois passos: **1)** login (org = slug da URL + e-mail/usuário + senha); **2)** só após sessão válida, CTA de instalação (prompt nativo ou passo a passo iOS/Android). Se `must_change_password`, redireciona para troca de senha.
+- [x] Fluxo em dois passos: **1)** login em `/site/{slug}/instalar` (org = slug + e-mail/usuário + senha); **2)** após sessão válida, redireciona ao app (`/inicio` ou home do papel) com `?instalar=1` e painel `AppInstallPanel` (prompt nativo da plataforma ou passo a passo iOS/Android). Motivo: o `beforeinstallprompt` da plataforma não dispara de forma confiável enquanto a URL/manifest ainda são do tenant em `/site/*`. Se `must_change_password`, marca pendência de instalação e redireciona para troca de senha; ao concluir, segue para o app com o painel.
 - [x] No site público: link compacto no header aponta para `/instalar`; banner genérico “Instalar Eclésias” não aparece em `/site/*`.
 - [x] A página `/instalar` serve HTML com `<link rel="manifest">` do tenant no **primeiro paint**
   (`GET /api/v1/public/site/install-html/{slug}` + proxy front).

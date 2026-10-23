@@ -3,6 +3,7 @@ import { RouterView } from 'vue-router'
 import InnovToast from '@/components/base/InnovToast.vue'
 import InnovDialog from '@/components/base/InnovDialog.vue'
 import PwaInstallBanner from '@/components/base/PwaInstallBanner.vue'
+import AppInstallPanel from '@/components/base/AppInstallPanel.vue'
 </script>
 
 <template>
@@ -13,6 +14,7 @@ import PwaInstallBanner from '@/components/base/PwaInstallBanner.vue'
   </RouterView>
   <InnovToast />
   <InnovDialog />
+  <AppInstallPanel />
   <PwaInstallBanner />
 </template>
 

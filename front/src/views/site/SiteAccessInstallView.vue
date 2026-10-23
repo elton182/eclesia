@@ -2,7 +2,7 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
-import { faArrowLeft, faDownload, faShareFromSquare } from '@fortawesome/free-solid-svg-icons'
+import { faArrowLeft } from '@fortawesome/free-solid-svg-icons'
 import { library } from '@fortawesome/fontawesome-svg-core'
 import api from '@/services/api'
 import { useAuthStore } from '@/stores/auth'
@@ -15,18 +15,21 @@ import {
   rememberTenantForLogin,
   validateTenantLoginForm,
 } from '@/utils/tenantAuth'
-import { usePwaInstall } from '@/composables/usePwaInstall'
 import { clearDeferredInstallPrompt, isRunningStandalone } from '@/utils/pwa'
 import {
-  detectInstallPlatform,
   ensureTenantAccessManifest,
+  restoreDefaultManifest,
   tenantAccessInstallPath,
   tenantAccessStartUrl,
 } from '@/utils/tenantAccessManifest'
 import { homePathForUser } from '@/utils/userRoles'
-import { resolveInstallPageStep } from '@/utils/siteAccessInstall'
+import {
+  appInstallRoute,
+  markPendingPwaInstall,
+  resolveInstallPageStep,
+} from '@/utils/siteAccessInstall'
 
-library.add(faArrowLeft, faDownload, faShareFromSquare)
+library.add(faArrowLeft)
 
 const MANIFEST_RELOAD_PREFIX = 'eclesia_pwa_tenant_manifest:'
 
@@ -35,13 +38,11 @@ const router = useRouter()
 const authStore = useAuthStore()
 const tenantStore = useTenantStore()
 const brandingStore = useBrandingStore()
-const { canInstall, installing, isInstalled, install } = usePwaInstall()
 
 const loading = ref(true)
 const error = ref('')
 const settings = ref(null)
-/** @type {import('vue').Ref<'login' | 'install'>} */
-const step = ref('login')
+const redirecting = ref(false)
 
 const remembered = loadLoginCredentials()
 const loginId = ref(remembered.login || remembered.email || '')
@@ -50,64 +51,30 @@ const showPassword = ref(false)
 const loginLoading = ref(false)
 const loginError = ref('')
 
-const installMessage = ref('')
-const showManual = ref(false)
-const waitingPrompt = ref(false)
-const platform = ref(detectInstallPlatform())
-
 const tenantSlug = computed(() => String(route.params.tenantSlug || ''))
 const brandTitle = computed(() => settings.value?.titulo || tenantStore.name || 'Paróquia')
 const brandInitial = computed(() => (brandTitle.value || 'P')[0].toUpperCase())
 const brandLogo = computed(() => settings.value?.logo_url || null)
 const siteHome = computed(() => (tenantSlug.value ? `/site/${tenantSlug.value}` : '/'))
-const appHome = computed(() => homePathForUser(authStore.user))
 const loginHref = computed(() => tenantAccessStartUrl(tenantSlug.value))
-const standalone = computed(() => isInstalled.value || isRunningStandalone())
-const isIos = computed(() => platform.value === 'ios')
-const authenticated = computed(() => authStore.isAuthenticated && !!authStore.user)
 
-const primaryLabel = computed(() => {
-  if (installing.value) return 'Abrindo…'
-  if (isIos.value) return 'Como adicionar à tela'
-  if (canInstall.value) return 'Instalar agora'
-  if (waitingPrompt.value) return 'Preparando instalação…'
-  return 'Instalar agora'
-})
+/**
+ * Após login válido: sai de /site/* (manifest da plataforma) e abre o app com CTA de instalar.
+ * O beforeinstallprompt da plataforma não dispara de forma confiável em /site/{slug}/instalar.
+ */
+function goToAppInstall() {
+  redirecting.value = true
+  markPendingPwaInstall()
+  restoreDefaultManifest()
+  clearDeferredInstallPrompt()
+  const dest = appInstallRoute(homePathForUser(authStore.user))
+  return router.replace(dest)
+}
 
-const guidanceSteps = computed(() => {
-  if (platform.value === 'ios') {
-    return [
-      'Toque em Compartilhar (□↑) na barra do Safari.',
-      'Role e escolha “Adicionar à Tela de Início”.',
-      'Confirme — o ícone abre o acesso desta paróquia.',
-    ]
-  }
-  if (platform.value === 'android') {
-    return [
-      'Toque no menu ⋮ do Chrome.',
-      'Escolha “Instalar app” ou “Adicionar à tela inicial”.',
-      'Abra o ícone para entrar sem digitar o código.',
-    ]
-  }
-  return [
-    'No menu do navegador (⋮ ou ⋯), procure “Instalar app”.',
-    'Se não aparecer, o navegador ainda não liberou a instalação automática.',
-    'No iPhone use Safari → Compartilhar → Adicionar à Tela de Início.',
-  ]
-})
-
-function beginInstallStep() {
-  step.value = 'install'
-  ensureTenantAccessManifest(tenantSlug.value)
-  waitingPrompt.value = !isIos.value
-  showManual.value = isIos.value
-  installMessage.value = ''
-  window.setTimeout(() => {
-    waitingPrompt.value = false
-    if (!canInstall.value && !isIos.value) {
-      showManual.value = true
-    }
-  }, 1200)
+function goToChangePassword() {
+  markPendingPwaInstall()
+  restoreDefaultManifest()
+  return router.push({ name: 'change-password' })
 }
 
 async function loadSite() {
@@ -149,20 +116,18 @@ async function loadSite() {
     document.title = `Instalar acesso — ${brandTitle.value}`
     ensureTenantAccessManifest(tenantSlug.value)
 
-    // Já logado nesta organização → pula para instalar.
     const ok = await authStore.checkAuth()
     const nextStep = resolveInstallPageStep({
       authenticated: ok,
       mustChangePassword: !!authStore.user?.must_change_password,
     })
     if (nextStep === 'change-password') {
-      router.push({ name: 'change-password' })
+      await goToChangePassword()
       return
     }
-    if (nextStep === 'install') {
-      beginInstallStep()
-    } else {
-      step.value = 'login'
+    if (nextStep === 'go-app-install') {
+      await goToAppInstall()
+      return
     }
   } catch (e) {
     error.value = e.response?.status === 404
@@ -203,41 +168,14 @@ async function onLoginSubmit() {
     mustChangePassword: !!authStore.user?.must_change_password,
   })
   if (nextStep === 'change-password') {
-    router.push({ name: 'change-password' })
+    await goToChangePassword()
     return
   }
 
-  beginInstallStep()
-}
-
-async function onInstall() {
-  installMessage.value = ''
-
-  if (isIos.value) {
-    showManual.value = true
-    installMessage.value =
-      'No iPhone/iPad o Safari não abre popup de instalação — use o passo a passo abaixo.'
-    return
-  }
-
-  const outcome = await install()
-  if (outcome === 'accepted') {
-    showManual.value = false
-    installMessage.value = 'Pronto! Abra o ícone na tela inicial.'
-    return
-  }
-  if (outcome === 'dismissed') {
-    installMessage.value = 'Instalação cancelada. Você pode tentar de novo quando quiser.'
-    return
-  }
-
-  showManual.value = true
-  installMessage.value =
-    'Este navegador ainda não liberou o popup automático. Use o passo a passo abaixo (ou o menu ⋮ → Instalar app).'
+  await goToAppInstall()
 }
 
 onMounted(() => {
-  platform.value = detectInstallPlatform()
   loadSite()
 })
 
@@ -266,15 +204,6 @@ onUnmounted(() => {
         Voltar ao site
       </RouterLink>
       <RouterLink
-        v-if="step === 'install' && authenticated"
-        :to="appHome"
-        class="btn btn-ghost text-[13px]"
-        data-testid="site-access-install-go-app"
-      >
-        Ir ao app
-      </RouterLink>
-      <RouterLink
-        v-else
         :to="loginHref"
         class="btn btn-ghost text-[13px]"
         data-testid="site-access-install-login-link"
@@ -286,8 +215,8 @@ onUnmounted(() => {
 
     <main class="flex-1 flex items-start justify-center px-5 py-10 md:py-16">
       <div class="w-full max-w-md">
-        <div v-if="loading" class="text-center text-[14px]" style="color: var(--color-muted)">
-          Carregando…
+        <div v-if="loading || redirecting" class="text-center text-[14px]" style="color: var(--color-muted)">
+          {{ redirecting ? 'Abrindo o app para instalar…' : 'Carregando…' }}
         </div>
         <div v-else-if="error" class="text-center" data-testid="site-access-install-error">
           <p class="text-[15px] mb-4">{{ error }}</p>
@@ -313,18 +242,11 @@ onUnmounted(() => {
               Instalar {{ brandTitle }}
             </h1>
             <p class="text-[14px] leading-relaxed" style="color: var(--color-muted)">
-              <template v-if="step === 'login'">
-                Entre com seu usuário para liberar a instalação do atalho desta organização.
-              </template>
-              <template v-else>
-                Pronto. Agora instale o ícone na tela inicial — ele abre já nesta paróquia.
-              </template>
+              Entre com seu usuário. Em seguida abrimos o app para instalar o atalho na tela inicial.
             </p>
           </div>
 
-          <!-- Passo 1: login -->
           <form
-            v-if="step === 'login'"
             class="space-y-0"
             data-testid="site-access-install-login-form"
             @submit.prevent="onLoginSubmit"
@@ -397,77 +319,9 @@ onUnmounted(() => {
               :disabled="loginLoading"
               data-testid="site-access-install-login-submit"
             >
-              {{ loginLoading ? 'Entrando…' : 'Entrar e continuar' }}
+              {{ loginLoading ? 'Entrando…' : 'Entrar e instalar' }}
             </button>
           </form>
-
-          <!-- Passo 2: instalar (só após login) -->
-          <template v-else>
-            <div
-              v-if="standalone"
-              class="rounded-[var(--radius)] px-4 py-3 text-[13.5px] text-center"
-              style="background: var(--color-accent-soft); color: var(--color-ink)"
-              data-testid="site-access-install-standalone"
-            >
-              Este acesso já está instalado neste dispositivo.
-            </div>
-
-            <template v-else>
-              <button
-                type="button"
-                class="btn btn-primary w-full justify-center text-[15px] py-3.5"
-                data-testid="site-access-install-prompt"
-                :disabled="installing || (waitingPrompt && !isIos && !canInstall)"
-                @click="onInstall"
-              >
-                <FontAwesomeIcon
-                  :icon="isIos ? faShareFromSquare : faDownload"
-                  class="mr-2"
-                />
-                {{ primaryLabel }}
-              </button>
-
-              <div
-                v-if="showManual || isIos"
-                class="space-y-3"
-                data-testid="site-access-install-manual"
-              >
-                <p class="text-[12.5px] leading-relaxed" style="color: var(--color-muted)">
-                  {{
-                    isIos
-                      ? 'No iPhone o Safari não tem popup de instalação. Siga os passos:'
-                      : 'Se o popup não aparecer, instale pelo menu do navegador:'
-                  }}
-                </p>
-                <ol
-                  class="space-y-2.5 text-[13.5px] leading-relaxed pl-5 list-decimal"
-                  style="color: var(--color-ink)"
-                >
-                  <li v-for="(stepItem, i) in guidanceSteps" :key="i">{{ stepItem }}</li>
-                </ol>
-              </div>
-            </template>
-
-            <p
-              v-if="installMessage"
-              class="text-[13px] text-center"
-              style="color: var(--color-muted)"
-              data-testid="site-access-install-message"
-            >
-              {{ installMessage }}
-            </p>
-
-            <p class="text-center text-[13px]">
-              <RouterLink
-                :to="appHome"
-                class="no-underline font-medium"
-                style="color: var(--color-primary-soft)"
-                data-testid="site-access-install-open-app"
-              >
-                Abrir o app agora
-              </RouterLink>
-            </p>
-          </template>
         </div>
       </div>
     </main>

@@ -5,6 +5,7 @@ import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import { faTimes } from '@fortawesome/free-solid-svg-icons'
 import { library } from '@fortawesome/fontawesome-svg-core'
 import { usePwaInstall } from '@/composables/usePwaInstall'
+import { shouldOfferAppInstall } from '@/utils/siteAccessInstall'
 
 library.add(faTimes)
 
@@ -13,7 +14,11 @@ const { showBanner, installing, install, dismissBanner } = usePwaInstall()
 
 /** No site público o CTA é o atalho da paróquia (SPEC-023), não o PWA genérico. */
 const onPublicSite = computed(() => String(route.path || '').startsWith('/site/'))
-const visible = computed(() => showBanner.value && !onPublicSite.value)
+/** Evita dois CTAs quando o painel pós-login de /instalar está aberto. */
+const offeringAppInstall = computed(() => shouldOfferAppInstall(route.query))
+const visible = computed(
+  () => showBanner.value && !onPublicSite.value && !offeringAppInstall.value,
+)
 
 async function onInstall() {
   await install()
