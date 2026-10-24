@@ -1,6 +1,6 @@
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, inject, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import api from '@/services/api'
 import { useTenantStore } from '@/stores/tenant'
 import { useAuthStore } from '@/stores/auth'
@@ -23,6 +23,7 @@ import {
 } from '@/utils/liderEquipeTour'
 
 const router = useRouter()
+const route = useRoute()
 const tenantStore = useTenantStore()
 const authStore = useAuthStore()
 
@@ -40,6 +41,8 @@ const formDeposito = ref({
   valor: '',
   comprovante: null,
 })
+
+const tourHelpRequest = inject('liderTourHelpRequest', ref(0))
 
 const multipleEquipes = computed(() => equipes.value.length > 1)
 const tourSteps = computed(() => liderEquipeTourSteps({ multipleEquipes: multipleEquipes.value }))
@@ -155,6 +158,23 @@ watch(equipeId, () => {
   if (!loading.value) loadDepositos()
 })
 
+watch(
+  () => tourHelpRequest.value,
+  (n, prev) => {
+    if (n && n !== prev) abrirTour(true)
+  },
+)
+
+watch(
+  () => route.query.tour,
+  (v) => {
+    if (v === '1') {
+      abrirTour(true)
+      router.replace({ query: { ...route.query, tour: undefined } })
+    }
+  },
+)
+
 async function baixarComprovante(dep) {
   try {
     const { data } = await api.get(`/ecc/financeiro/depositos/${dep.id}/comprovante`, {
@@ -190,36 +210,30 @@ function fecharTour() {
 
 onMounted(async () => {
   await load()
-  abrirTour(false)
+  if (route.query.tour === '1') {
+    abrirTour(true)
+    router.replace({ query: { ...route.query, tour: undefined } })
+  } else {
+    abrirTour(false)
+  }
 })
 </script>
 
 <template>
-  <div class="p-6 md:p-[30px] w-full" data-testid="minha-equipe-page">
-    <div class="mb-6 md:mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-      <div>
-        <p class="page-eyebrow">ECC</p>
-        <h2
-          class="font-serif text-[27px] leading-tight mt-1"
-          style="color: var(--color-ink)"
-          data-tour="titulo"
-        >
-          {{ equipeAtual?.nome || 'Minha equipe' }}
-        </h2>
-        <p class="mt-2 text-[13.5px] leading-relaxed" style="color: var(--color-muted)">
-          Atualize o cadastro dos casais que já estão na sua equipe.
-        </p>
-      </div>
-      <button
-        type="button"
-        class="btn btn-ghost w-full sm:w-auto"
-        data-testid="minha-equipe-ver-tour"
-        data-tour="rever"
-        @click="abrirTour(true)"
+  <div class="px-4 md:px-6 lg:px-8 py-5 md:py-8 w-full max-w-2xl mx-auto" data-testid="minha-equipe-page">
+    <header class="mb-6">
+      <p class="page-eyebrow">ECC · Equipe</p>
+      <h1
+        class="font-serif text-[28px] leading-tight mt-1 font-normal"
+        style="color: var(--color-ink)"
+        data-tour="titulo"
       >
-        Ver tour
-      </button>
-    </div>
+        {{ equipeAtual?.nome || 'Minha equipe' }}
+      </h1>
+      <p class="mt-2 text-[14px] leading-relaxed" style="color: var(--color-muted)">
+        Revise e atualize os dados dos casais da sua equipe.
+      </p>
+    </header>
 
     <div v-if="multipleEquipes" class="mb-5 max-w-sm">
       <label class="fld" for="minha-equipe-seletor" data-tour="seletor">Equipe</label>
@@ -235,10 +249,6 @@ onMounted(async () => {
       </select>
     </div>
 
-    <p class="text-[13px] mb-4" style="color: var(--color-muted)" data-tour="limite">
-      Incluir, excluir ou trocar de equipe fica com a secretaria.
-    </p>
-
     <div
       v-if="loading"
       class="text-[13.5px]"
@@ -247,57 +257,77 @@ onMounted(async () => {
       Carregando…
     </div>
 
-    <div
-      v-else
-      class="w-full overflow-hidden rounded-[11px]"
-      style="background: var(--color-surface); border: 1px solid var(--color-line)"
-      data-tour="lista"
-      data-testid="minha-equipe-lista"
-    >
-      <div
-        v-if="!casaisDaEquipe.length"
-        class="p-10 text-center text-[13.5px]"
-        style="color: var(--color-muted)"
-        data-tour="atualizar"
-      >
-        Nenhum casal nesta equipe.
+    <template v-else>
+      <div class="flex items-baseline justify-between gap-3 mb-3">
+        <h2 class="text-[15px] font-medium" style="color: var(--color-ink)">
+          Casais da equipe
+        </h2>
+        <span
+          class="text-[12px] px-2.5 py-0.5 rounded-full"
+          style="background: var(--color-accent-soft); color: var(--color-accent-dark)"
+          data-testid="minha-equipe-contador"
+        >
+          {{ casaisDaEquipe.length }}
+          {{ casaisDaEquipe.length === 1 ? 'casal' : 'casais' }}
+        </span>
       </div>
-      <div
-        v-for="(casal, index) in casaisDaEquipe"
-        :key="casal.id"
-        class="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"
-        style="border-top: 1px solid var(--color-line)"
-        data-testid="minha-equipe-casal"
+
+      <ul
+        class="flex flex-col gap-3"
+        data-tour="lista"
+        data-testid="minha-equipe-lista"
       >
-        <div class="min-w-0">
-          <div class="font-medium text-[15px]" style="color: var(--color-ink)">
+        <li
+          v-if="!casaisDaEquipe.length"
+          class="rounded-[12px] border border-dashed p-10 text-center text-[13.5px]"
+          style="border-color: var(--color-line); color: var(--color-muted)"
+          data-tour="atualizar"
+        >
+          Nenhum casal nesta equipe.
+        </li>
+        <li
+          v-for="(casal, index) in casaisDaEquipe"
+          :key="casal.id"
+          class="card p-4"
+          data-testid="minha-equipe-casal"
+        >
+          <div class="font-medium text-[16px]" style="color: var(--color-ink)">
             {{ casalEle(casal) }} & {{ casalEla(casal) }}
           </div>
-          <div class="text-[13px] mt-1" style="color: var(--color-muted)">
+          <div class="text-[13px] mt-1.5" style="color: var(--color-muted)">
             <span v-if="contato(casal).telefones">{{ contato(casal).telefones }}</span>
             <span v-if="contato(casal).telefones && contato(casal).emails"> · </span>
             <span v-if="contato(casal).emails">{{ contato(casal).emails }}</span>
             <span v-if="!contato(casal).telefones && !contato(casal).emails">Sem telefone ou e-mail</span>
           </div>
-        </div>
-        <button
-          type="button"
-          class="btn btn-primary w-full sm:w-auto"
-          data-testid="minha-equipe-atualizar"
-          :data-tour="index === 0 ? 'atualizar' : undefined"
-          @click="atualizar(casal)"
-        >
-          Atualizar cadastro
-        </button>
-      </div>
-    </div>
+          <button
+            type="button"
+            class="btn btn-primary w-full mt-4"
+            data-testid="minha-equipe-atualizar"
+            :data-tour="index === 0 ? 'atualizar' : undefined"
+            @click="atualizar(casal)"
+          >
+            Atualizar cadastro
+          </button>
+        </li>
+      </ul>
+
+      <p
+        class="text-[12.5px] mt-5 leading-relaxed"
+        style="color: var(--color-muted)"
+        data-tour="limite"
+        data-testid="minha-equipe-limite"
+      >
+        Incluir ou excluir casais da equipe fica com a secretaria.
+      </p>
+    </template>
 
     <section
       class="mt-10"
       data-testid="minha-equipe-depositos"
       data-tour="depositos"
     >
-      <h3 class="font-serif text-[22px] leading-tight" style="color: var(--color-ink)">
+      <h3 class="font-serif text-[22px] leading-tight font-normal" style="color: var(--color-ink)">
         Depósito mensal
       </h3>
       <p class="mt-1 text-[13.5px] leading-relaxed mb-4" style="color: var(--color-muted)">
@@ -306,8 +336,7 @@ onMounted(async () => {
       </p>
 
       <form
-        class="rounded-[11px] p-5 mb-5"
-        style="background: var(--color-surface); border: 1px solid var(--color-line)"
+        class="card p-5 mb-5"
         data-testid="minha-equipe-deposito-form"
         @submit.prevent="enviarDeposito"
       >
@@ -374,15 +403,15 @@ onMounted(async () => {
       </div>
       <ul
         v-else
-        class="rounded-[11px] overflow-hidden"
-        style="background: var(--color-surface); border: 1px solid var(--color-line)"
+        class="card overflow-hidden divide-y"
+        style="border-color: var(--color-line)"
         data-testid="minha-equipe-depositos-lista"
       >
         <li
           v-for="dep in depositosDaEquipe"
           :key="dep.id"
           class="flex flex-col gap-1 px-5 py-3 sm:flex-row sm:items-center sm:justify-between"
-          style="border-top: 1px solid var(--color-line)"
+          style="border-color: var(--color-line)"
           data-testid="minha-equipe-deposito-item"
         >
           <div>

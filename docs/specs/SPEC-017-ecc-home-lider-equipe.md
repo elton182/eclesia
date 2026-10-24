@@ -27,7 +27,7 @@ Quem tem só o papel `lider-equipe` entra no mesmo launcher de quem administra o
 - [ ] Front: papel exclusivo `lider-equipe` redireciona `/inicio` para `/ecc/minha-equipe`. Outro papel junto mantém o launcher.
 - [ ] A home lista os casais da equipe (nome, telefone, e-mail) e abre a ficha em “Atualizar cadastro”. Várias equipes: seletor no topo.
 - [ ] Formulário do líder: equipe só leitura; sem novo, importar, excluir ou trocar Ele/Ela. Shell sem “Todos os módulos”, eventos e relatórios.
-- [ ] Tour abre na primeira visita, cada passo tem Fechar, e “Ver tour” reinicia do passo 1. Flag `eclesia.tour.lider-equipe.v1` no `localStorage`.
+- [ ] Tour abre na primeira visita, cada passo tem Fechar, e o ícone de ajuda no cabeçalho reinicia do passo 1. Flag `eclesia.tour.lider-equipe.v1` no `localStorage`. (UI do shell: SPEC-027.)
 - [ ] Ficha em 5 etapas (Contato, Endereço, Pessoas, ECC, Serviço) com indicador “N de 5”; só a etapa ativa é exibida.
 - [ ] **Continuar** grava a ficha via `POST` (casal novo, 1ª etapa) ou `PUT` e avança; falha de gravação mantém a etapa.
 - [ ] **Voltar** não grava; **Concluir** (última etapa) grava e, para o líder exclusivo, volta a `/ecc/minha-equipe`.

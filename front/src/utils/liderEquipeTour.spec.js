@@ -32,13 +32,14 @@ describe('liderEquipeTour', () => {
     assert.equal(beginLiderTour({ storage }).open, false)
   })
 
-  it('Ver tour reabre do passo 1 mesmo com a flag gravada', () => {
+  it('ícone de ajuda reabre o tour do passo 1 mesmo com a flag gravada', () => {
     const storage = memoryStorage({ [LIDER_EQUIPE_TOUR_KEY]: '1' })
     const session = beginLiderTour({ storage, force: true })
     assert.equal(session.open, true)
     assert.equal(session.index, 0)
     assert.equal(session.steps[0].id, 'titulo')
     assert.equal(session.steps.at(-1).target, 'rever')
+    assert.match(session.steps.at(-1).body, /ícone de ajuda/i)
   })
 
   it('inclui o seletor só quando há mais de uma equipe', () => {

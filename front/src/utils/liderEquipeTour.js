@@ -46,7 +46,7 @@ export function liderEquipeTourSteps({ multipleEquipes = false } = {}) {
       id: 'rever',
       target: 'rever',
       title: 'Rever o tour',
-      body: 'Use Ver tour quando quiser passar por estes passos de novo.',
+      body: 'Toque no ícone de ajuda no cabeçalho quando quiser passar por estes passos de novo.',
     },
   )
 

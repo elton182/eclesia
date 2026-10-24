@@ -1043,6 +1043,85 @@ components:
         updated_at:
           type: string
           format: date-time
+    EccRecado:
+      type: object
+      properties:
+        id:
+          type: string
+          description: ULID
+        titulo:
+          type: string
+        corpo:
+          type: string
+        urgente:
+          type: boolean
+        fixado:
+          type: boolean
+        escopo:
+          type: string
+          enum: [paroquia, etapa, equipe]
+        equipe_id:
+          type: string
+          nullable: true
+        etapa:
+          type: integer
+          nullable: true
+          minimum: 1
+          maximum: 3
+        publicado_em:
+          type: string
+          format: date-time
+          nullable: true
+        valido_ate:
+          type: string
+          format: date-time
+          nullable: true
+        status:
+          type: string
+          enum: [rascunho, publicado]
+        criado_por_user_id:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    EccReflexao:
+      type: object
+      properties:
+        id:
+          type: string
+          description: ULID
+        titulo:
+          type: string
+        passagem_biblica:
+          type: string
+          nullable: true
+        texto:
+          type: string
+        imagem_url:
+          type: string
+          nullable: true
+          description: URL autenticada relativa da imagem (quando houver)
+        tem_imagem:
+          type: boolean
+        publicado_em:
+          type: string
+          format: date
+        status:
+          type: string
+          enum: [rascunho, publicado]
+        criado_por_user_id:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
 paths:
   /health:
     get:
@@ -4045,6 +4124,311 @@ paths:
           description: Sem permissão
         '422':
           description: Validação / não provisionado
+
+  /ecc/recados:
+    get:
+      summary: Listar recados ECC
+      description: >
+        Com ecc.recados.view (líder): só publicados válidos no escopo do usuário.
+        Com ecc.recados.manage: todos (filtro status opcional).
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [rascunho, publicado]
+      responses:
+        '200':
+          description: Lista de recados
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/EccRecado'
+        '403':
+          description: Sem permissão
+    post:
+      summary: Criar recado (secretaria)
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [titulo, corpo, escopo, status]
+              properties:
+                titulo: {type: string, maxLength: 180}
+                corpo: {type: string, maxLength: 10000}
+                urgente: {type: boolean}
+                fixado: {type: boolean}
+                escopo: {type: string, enum: [paroquia, etapa, equipe]}
+                equipe_id: {type: string, nullable: true}
+                etapa: {type: integer, nullable: true, minimum: 1, maximum: 3}
+                publicado_em: {type: string, format: date-time, nullable: true}
+                valido_ate: {type: string, format: date-time, nullable: true}
+                status: {type: string, enum: [rascunho, publicado]}
+      responses:
+        '201':
+          description: Criado
+        '403':
+          description: Sem permissão
+        '422':
+          description: Validação
+  /ecc/recados/novidades:
+    get:
+      summary: Contagem de recados novos desde um instante
+      description: >
+        Recados publicados, ainda válidos, no escopo do usuário, com publicado_em > desde.
+        Usado pelo badge discreto no ícone Recados (SPEC-027).
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: desde
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Contagem
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      count: {type: integer, minimum: 0}
+        '403':
+          description: Sem permissão
+        '422':
+          description: desde inválido
+  /ecc/recados/{id}:
+    get:
+      summary: Detalhe do recado
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        '200':
+          description: Recado
+        '403':
+          description: Sem permissão
+        '404':
+          description: Não encontrado
+    put:
+      summary: Atualizar recado
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                titulo: {type: string, maxLength: 180}
+                corpo: {type: string, maxLength: 10000}
+                urgente: {type: boolean}
+                fixado: {type: boolean}
+                escopo: {type: string, enum: [paroquia, etapa, equipe]}
+                equipe_id: {type: string, nullable: true}
+                etapa: {type: integer, nullable: true, minimum: 1, maximum: 3}
+                publicado_em: {type: string, format: date-time, nullable: true}
+                valido_ate: {type: string, format: date-time, nullable: true}
+                status: {type: string, enum: [rascunho, publicado]}
+      responses:
+        '200':
+          description: Atualizado
+        '403':
+          description: Sem permissão
+        '404':
+          description: Não encontrado
+        '422':
+          description: Validação
+    delete:
+      summary: Remover recado
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        '204':
+          description: Removido
+        '403':
+          description: Sem permissão
+        '404':
+          description: Não encontrado
+
+  /ecc/reflexoes:
+    get:
+      summary: Listar reflexões do diácono
+      description: >
+        Com ecc.reflexoes.view: só publicadas (histórico).
+        Com manage: todas (filtro status opcional).
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [rascunho, publicado]
+      responses:
+        '200':
+          description: Lista de reflexões
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/EccReflexao'
+        '403':
+          description: Sem permissão
+    post:
+      summary: Criar reflexão
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [titulo, texto, status]
+              properties:
+                titulo: {type: string, maxLength: 180}
+                passagem_biblica: {type: string, maxLength: 255}
+                texto: {type: string, maxLength: 50000}
+                publicado_em: {type: string, format: date}
+                status: {type: string, enum: [rascunho, publicado]}
+                imagem: {type: string, format: binary}
+      responses:
+        '201':
+          description: Criada
+        '403':
+          description: Sem permissão
+        '422':
+          description: Validação
+  /ecc/reflexoes/{id}:
+    get:
+      summary: Detalhe da reflexão
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        '200':
+          description: Reflexão
+        '403':
+          description: Sem permissão
+        '404':
+          description: Não encontrada
+    put:
+      summary: Atualizar reflexão
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                titulo: {type: string, maxLength: 180}
+                passagem_biblica: {type: string, maxLength: 255, nullable: true}
+                texto: {type: string, maxLength: 50000}
+                publicado_em: {type: string, format: date}
+                status: {type: string, enum: [rascunho, publicado]}
+                imagem: {type: string, format: binary}
+                remover_imagem: {type: boolean}
+      responses:
+        '200':
+          description: Atualizada
+        '403':
+          description: Sem permissão
+        '404':
+          description: Não encontrada
+        '422':
+          description: Validação
+    delete:
+      summary: Remover reflexão
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        '204':
+          description: Removida
+        '403':
+          description: Sem permissão
+        '404':
+          description: Não encontrada
+  /ecc/reflexoes/{id}/imagem:
+    get:
+      summary: Download da imagem da reflexão
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        '200':
+          description: Arquivo de imagem
+        '403':
+          description: Sem permissão
+        '404':
+          description: Sem imagem / não encontrada
 
   /calendario/locais:
     get:

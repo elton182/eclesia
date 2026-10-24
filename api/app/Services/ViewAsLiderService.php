@@ -25,6 +25,8 @@ class ViewAsLiderService
         'ecc.casais.view',
         'ecc.casais.atualizar',
         'ecc.financeiro.depositos.submeter',
+        'ecc.recados.view',
+        'ecc.reflexoes.view',
     ];
 
     private const CACHE_TTL_SECONDS = 43200; // 12h

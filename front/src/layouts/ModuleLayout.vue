@@ -1,6 +1,7 @@
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, provide, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import api from '@/services/api'
 import { useAuthStore } from '@/stores/auth'
 import { useAuthAdminStore } from '@/stores/authAdmin'
 import { useTenantStore } from '@/stores/tenant'
@@ -16,8 +17,14 @@ import {
   isSomenteLiderEquipe,
   isViewAsLider,
 } from '@/utils/userRoles'
+import {
+  defaultRecadosDesde,
+  formatRecadosBadge,
+  getRecadosLastSeen,
+} from '@/utils/liderRecados'
 import PwaInstallNavButton from '@/components/base/PwaInstallNavButton.vue'
 import ViewAsLiderBanner from '@/components/ViewAsLiderBanner.vue'
+import LiderBottomNav from '@/components/ecc/LiderBottomNav.vue'
 import fallbackLogo from '@/assets/logo-icon.png'
 
 const props = defineProps({
@@ -127,9 +134,63 @@ const somenteLider = computed(() =>
 
 const viewAsLider = computed(() => isViewAsLider(authTenant.user))
 
+const liderShell = computed(
+  () => props.moduleKey === 'ecc' && (somenteLider.value || viewAsLider.value),
+)
+
+const recadosBadge = ref(null)
+const tourHelpRequest = ref(0)
+provide('liderTourHelpRequest', tourHelpRequest)
+
+async function refreshRecadosBadge() {
+  if (!liderShell.value) {
+    recadosBadge.value = null
+    return
+  }
+  try {
+    const desde = getRecadosLastSeen(localStorage) || defaultRecadosDesde()
+    const { data } = await api.get('/ecc/recados/novidades', { params: { desde } })
+    recadosBadge.value = formatRecadosBadge(data?.data?.count ?? 0)
+  } catch {
+    recadosBadge.value = null
+  }
+}
+
+const liderNavActive = computed(() => {
+  if (route.path.startsWith('/ecc/recados')) return 'recados'
+  if (route.path.startsWith('/ecc/reflexoes')) return 'reflexoes'
+  return 'equipe'
+})
+
+function onLiderNav(tab) {
+  if (tab === 'equipe') router.push({ name: 'ecc-minha-equipe' })
+  else if (tab === 'recados') router.push({ name: 'ecc-recados' })
+  else if (tab === 'reflexoes') router.push({ name: 'ecc-reflexoes' })
+}
+
+function requestLiderTourHelp() {
+  if (route.name !== 'ecc-minha-equipe') {
+    router.push({ name: 'ecc-minha-equipe', query: { tour: '1' } })
+    return
+  }
+  tourHelpRequest.value += 1
+}
+
+watch(
+  () => [liderShell.value, route.path],
+  () => {
+    if (liderShell.value) refreshRecadosBadge()
+  },
+  { immediate: true },
+)
+
 const navItems = computed(() => {
   if (props.moduleKey === 'ecc' && somenteLider.value) {
-    return [{ label: 'Minha equipe', path: '/ecc/minha-equipe', exact: true }]
+    return [
+      { label: 'Minha equipe', path: '/ecc/minha-equipe', exact: true },
+      { label: 'Recados', path: '/ecc/recados' },
+      { label: 'Reflexões', path: '/ecc/reflexoes' },
+    ]
   }
   if (props.moduleKey === 'site') {
     return [
@@ -192,6 +253,15 @@ const navItems = computed(() => {
   }
   if (canSeeEccFinanceiroNav(authTenant.user, { isSuperAdmin: isPlatformAdmin.value })) {
     items.push({ label: 'Financeiro', path: '/ecc/financeiro' })
+  }
+  if (
+    can('ecc.recados.view') ||
+    can('ecc.recados.manage') ||
+    can('ecc.reflexoes.view') ||
+    can('ecc.reflexoes.manage')
+  ) {
+    items.push({ label: 'Recados', path: '/ecc/recados' })
+    items.push({ label: 'Reflexões', path: '/ecc/reflexoes' })
   }
   items.push({ label: 'Relatórios', path: '/ecc/relatorios', stub: true })
   return items
@@ -378,33 +448,51 @@ onUnmounted(() => {
           style="color: var(--color-muted)"
         >
           <router-link
-            v-if="!somenteLider || route.path !== '/ecc/minha-equipe'"
+            v-if="!liderShell && (!somenteLider || route.path !== '/ecc/minha-equipe')"
             :to="somenteLider ? '/ecc/minha-equipe' : '/inicio'"
             class="md:hidden no-underline"
             style="color: var(--color-primary-hover)"
           >
             ←
           </router-link>
-          <template v-if="showOrgInHeader && igrejaLabel">
+          <template v-if="showOrgInHeader && igrejaLabel && !liderShell">
             <span class="truncate hidden sm:inline">{{ orgName }}</span>
             <span class="hidden sm:inline" style="color: var(--color-line)">/</span>
           </template>
           <span
             class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[13px] font-medium truncate max-w-[16rem]"
-            style="border: 1px solid var(--color-line); color: var(--color-ink)"
+            :style="liderShell
+              ? { color: 'var(--color-ink)', border: 'none', paddingLeft: 0 }
+              : { border: '1px solid var(--color-line)', color: 'var(--color-ink)' }"
           >
             {{ headerContextLabel }}
-            <span class="text-[9px]" style="color: var(--color-muted)">▾</span>
+            <span v-if="!liderShell" class="text-[9px]" style="color: var(--color-muted)">▾</span>
           </span>
         </div>
         <div class="flex items-center gap-2.5 shrink-0 relative" data-testid="module-user-menu">
-          <PwaInstallNavButton labeled />
-          <span class="text-[12.5px] hidden sm:inline" style="color: var(--color-muted)">
+          <button
+            v-if="liderShell"
+            type="button"
+            class="w-8 h-8 rounded-full flex items-center justify-center border-0 cursor-pointer"
+            style="background: var(--color-accent-soft); color: var(--color-accent-dark)"
+            aria-label="Ajuda — ver tour"
+            data-testid="lider-ajuda-tour"
+            data-tour="rever"
+            @click="requestLiderTourHelp"
+          >
+            <span class="text-[14px] font-semibold leading-none">?</span>
+          </button>
+          <PwaInstallNavButton v-if="!liderShell" labeled />
+          <span
+            v-if="!liderShell"
+            class="text-[12.5px] hidden sm:inline"
+            style="color: var(--color-muted)"
+          >
             {{ displayName }}
           </span>
           <button
             type="button"
-            class="w-7 h-7 rounded-full flex items-center justify-center text-[11.5px] font-medium"
+            class="w-8 h-8 rounded-full flex items-center justify-center text-[11.5px] font-medium"
             style="background: var(--color-primary-soft); color: #F0D8C2"
             aria-label="Menu do usuário"
             data-testid="module-user-menu-toggle"
@@ -431,10 +519,21 @@ onUnmounted(() => {
         </div>
       </header>
 
-      <main class="flex-1 min-w-0 w-full">
-        <router-view />
+      <main
+        class="flex-1 min-w-0 w-full"
+        :class="liderShell ? 'pb-[72px] md:pb-0' : ''"
+      >
+        <router-view @recados-seen="refreshRecadosBadge" />
       </main>
+
     </div>
     </div>
+
+    <LiderBottomNav
+      v-if="liderShell"
+      :active="liderNavActive"
+      :recados-badge="recadosBadge"
+      @navigate="onLiderNav"
+    />
   </div>
 </template>

@@ -42,3 +42,4 @@ front/.env.*
 
 # Prototipo lixo Windows
 *:Zone.Identifier
+api/composer.phar
