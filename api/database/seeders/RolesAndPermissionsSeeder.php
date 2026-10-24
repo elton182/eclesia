@@ -115,6 +115,10 @@ class RolesAndPermissionsSeeder extends Seeder
         'ecc.financeiro.view',
         'ecc.financeiro.manage',
         'ecc.financeiro.depositos.submeter',
+        'ecc.recados.view',
+        'ecc.recados.manage',
+        'ecc.reflexoes.view',
+        'ecc.reflexoes.manage',
         'ecc.escala.editar',
         'pessoas.manage',
     ];
@@ -235,6 +239,8 @@ class RolesAndPermissionsSeeder extends Seeder
             'ecc.casais.view',
             'ecc.casais.atualizar',
             'ecc.financeiro.depositos.submeter',
+            'ecc.recados.view',
+            'ecc.reflexoes.view',
         ]);
 
         app()[PermissionRegistrar::class]->forgetCachedPermissions();

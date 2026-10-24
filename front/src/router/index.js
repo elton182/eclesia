@@ -10,6 +10,8 @@ import ChangePasswordView from '../views/ChangePasswordView.vue'
 import LoginView from '../views/LoginView.vue'
 import WelcomeView from '../views/WelcomeView.vue'
 import MinhaEquipeView from '../views/MinhaEquipeView.vue'
+import EccRecadosView from '../views/EccRecadosView.vue'
+import EccReflexoesView from '../views/EccReflexoesView.vue'
 import { homePathForUser, isSomenteLiderEquipe } from '../utils/userRoles'
 import TenantsView from '../views/TenantsView.vue'
 import UsersView from '../views/UsersView.vue'
@@ -224,6 +226,16 @@ const router = createRouter({
           path: 'ecc/minha-equipe',
           name: 'ecc-minha-equipe',
           component: MinhaEquipeView,
+        },
+        {
+          path: 'ecc/recados',
+          name: 'ecc-recados',
+          component: EccRecadosView,
+        },
+        {
+          path: 'ecc/reflexoes',
+          name: 'ecc-reflexoes',
+          component: EccReflexoesView,
         },
         {
           path: 'ecc/equipes',

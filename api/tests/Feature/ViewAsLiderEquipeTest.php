@@ -317,6 +317,8 @@ class ViewAsLiderEquipeTest extends TestCase
             'ecc.casais.view',
             'ecc.casais.atualizar',
             'ecc.financeiro.depositos.submeter',
+            'ecc.recados.view',
+            'ecc.reflexoes.view',
         ], ViewAsLiderService::LIDER_PERMISSIONS);
     }
 }

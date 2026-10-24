@@ -12,6 +12,8 @@ use App\Http\Controllers\Api\EccEquipeServicoController;
 use App\Http\Controllers\Api\EccEventoController;
 use App\Http\Controllers\Api\EccFinanceiroController;
 use App\Http\Controllers\Api\EccFinanceiroDepositoController;
+use App\Http\Controllers\Api\EccRecadoController;
+use App\Http\Controllers\Api\EccReflexaoController;
 use App\Http\Controllers\Api\EventoTipoController;
 use App\Http\Controllers\Api\IgrejaController;
 use App\Http\Controllers\Api\PastoralController;
@@ -103,6 +105,11 @@ Route::middleware([
         ->middleware('signed')
         ->name('pessoas.foto.show');
 
+    // Imagem de reflexão: URL assinada (SPEC-027).
+    Route::get('ecc/reflexoes/{id}/imagem-publica', [EccReflexaoController::class, 'imagemAssinada'])
+        ->middleware('signed')
+        ->name('ecc.reflexoes.imagem.show');
+
     // Logo do app: URL assinada + ?tenant= (SPEC-014).
     Route::get('app/branding/logo', [AppBrandingController::class, 'showLogo'])
         ->middleware('signed')
@@ -184,6 +191,20 @@ Route::middleware([
     Route::get('ecc/financeiro/depositos/{id}/comprovante', [EccFinanceiroDepositoController::class, 'comprovante']);
     Route::post('ecc/financeiro/depositos/{id}/aprovar', [EccFinanceiroDepositoController::class, 'aprovar']);
     Route::post('ecc/financeiro/depositos/{id}/rejeitar', [EccFinanceiroDepositoController::class, 'rejeitar']);
+
+    Route::get('ecc/recados/novidades', [EccRecadoController::class, 'novidades']);
+    Route::get('ecc/recados', [EccRecadoController::class, 'index']);
+    Route::post('ecc/recados', [EccRecadoController::class, 'store']);
+    Route::get('ecc/recados/{id}', [EccRecadoController::class, 'show']);
+    Route::put('ecc/recados/{id}', [EccRecadoController::class, 'update']);
+    Route::delete('ecc/recados/{id}', [EccRecadoController::class, 'destroy']);
+
+    Route::get('ecc/reflexoes', [EccReflexaoController::class, 'index']);
+    Route::post('ecc/reflexoes', [EccReflexaoController::class, 'store']);
+    Route::get('ecc/reflexoes/{id}/imagem', [EccReflexaoController::class, 'imagem']);
+    Route::get('ecc/reflexoes/{id}', [EccReflexaoController::class, 'show']);
+    Route::match(['put', 'post'], 'ecc/reflexoes/{id}', [EccReflexaoController::class, 'update']);
+    Route::delete('ecc/reflexoes/{id}', [EccReflexaoController::class, 'destroy']);
 
     Route::get('eventos/tipos', [EventoTipoController::class, 'index']);
     Route::post('eventos/tipos', [EventoTipoController::class, 'store']);
