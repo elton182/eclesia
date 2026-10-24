@@ -449,12 +449,22 @@ router.beforeEach(async (to, from, next) => {
 })
 
 router.afterEach((to, from) => {
-  // Ao sair do site público /instalação, volta o manifest genérico da plataforma.
-  if (from.meta?.publicSite && !to.meta?.publicSite) {
-    import('../utils/tenantAccessManifest').then(({ restoreDefaultManifest }) => {
-      restoreDefaultManifest()
-    })
+  // Ao sair do site público /instalação, volta o manifest genérico da plataforma —
+  // exceto no login com ?tenant= (fluxo /instalar → entrar), para não trocar o PWA
+  // da paróquia pelo da plataforma no meio do caminho.
+  if (!from.meta?.publicSite || to.meta?.publicSite) {
+    return
   }
+  const tenantQuery = to.query?.tenant
+  const keepsTenantManifest =
+    to.name === 'tenant-login' &&
+    (typeof tenantQuery === 'string' ? tenantQuery : Array.isArray(tenantQuery) ? tenantQuery[0] : '')
+  if (keepsTenantManifest) {
+    return
+  }
+  import('../utils/tenantAccessManifest').then(({ restoreDefaultManifest }) => {
+    restoreDefaultManifest()
+  })
 })
 
 export default router
