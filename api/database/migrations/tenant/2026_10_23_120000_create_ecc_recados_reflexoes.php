@@ -10,6 +10,11 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // Tentativa anterior pode ter criado só ecc_recados (FK users.id é bigint, não ULID).
+        if (Schema::hasTable('ecc_recados') && ! Schema::hasTable('ecc_reflexoes')) {
+            Schema::drop('ecc_recados');
+        }
+
         if (! Schema::hasTable('ecc_recados')) {
             Schema::create('ecc_recados', function (Blueprint $table) {
                 $table->ulid('id')->primary();
@@ -24,7 +29,8 @@ return new class extends Migration
                 $table->timestamp('publicado_em')->nullable();
                 $table->timestamp('valido_ate')->nullable();
                 $table->string('status', 20)->default('rascunho');
-                $table->foreignUlid('criado_por_user_id')->nullable()->constrained('users')->nullOnDelete();
+                // users.id é bigint (não ULID) — ver create_users_table / site_tables
+                $table->foreignId('criado_por_user_id')->nullable()->constrained('users')->nullOnDelete();
                 $table->timestamps();
 
                 $table->index(['igreja_id', 'status', 'publicado_em']);
@@ -42,7 +48,7 @@ return new class extends Migration
                 $table->string('imagem_path')->nullable();
                 $table->date('publicado_em')->nullable();
                 $table->string('status', 20)->default('rascunho');
-                $table->foreignUlid('criado_por_user_id')->nullable()->constrained('users')->nullOnDelete();
+                $table->foreignId('criado_por_user_id')->nullable()->constrained('users')->nullOnDelete();
                 $table->timestamps();
 
                 $table->index(['igreja_id', 'status', 'publicado_em']);

@@ -86,7 +86,7 @@ class EccRecadoService
         return EccRecado::query()->create([
             ...$payload,
             'igreja_id' => $this->igrejaId(),
-            'criado_por_user_id' => $user->getKey(),
+            'criado_por_user_id' => $user->id,
         ]);
     }
 
