@@ -30,6 +30,7 @@ class StoreEccReflexaoRequest extends FormRequest
                 EccReflexao::STATUS_PUBLICADO,
             ])],
             'imagem' => ['nullable', 'file', 'image', 'max:5120'],
+            'anexo' => ['nullable', 'file', 'max:10240'],
         ];
     }
 }

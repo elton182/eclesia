@@ -6,9 +6,12 @@ import { useAuthAdminStore } from '@/stores/authAdmin'
 import { innovToast } from '@/plugins/toast'
 import { innovConfirm } from '@/plugins/dialog'
 import { userHasPermission } from '@/utils/userRoles'
-import { markRecadosSeen } from '@/utils/liderRecados'
+import { formatAnexoTamanho } from '@/utils/eccMural'
+import EccInteracoesBlock from '@/components/ecc/EccInteracoesBlock.vue'
+import EccComentariosModeracao from '@/components/ecc/EccComentariosModeracao.vue'
+import EccEngajamentoPanel from '@/components/ecc/EccEngajamentoPanel.vue'
 
-const emit = defineEmits(['recados-seen'])
+const emit = defineEmits(['mural-seen', 'recados-seen'])
 
 const auth = useAuthStore()
 const authAdmin = useAuthAdminStore()
@@ -18,6 +21,11 @@ const equipes = ref([])
 const showForm = ref(false)
 const saving = ref(false)
 const editingId = ref(null)
+const selected = ref(null)
+const detailLoading = ref(false)
+const anexoFile = ref(null)
+const removerAnexo = ref(false)
+const showEngajamento = ref(false)
 
 const form = ref(blankForm())
 
@@ -35,10 +43,15 @@ function blankForm() {
   }
 }
 
-const canManage = computed(() =>
-  userHasPermission(auth.user, 'ecc.recados.manage', {
-    isSuperAdmin: authAdmin.isAuthenticated && !auth.isAuthenticated,
-  }),
+const authOpts = () => ({
+  isSuperAdmin: authAdmin.isAuthenticated && !auth.isAuthenticated,
+})
+
+const canManage = computed(() => userHasPermission(auth.user, 'ecc.recados.manage', authOpts()))
+
+const canModerar = computed(() =>
+  userHasPermission(auth.user, 'ecc.interacoes.moderar', authOpts())
+  || canManage.value,
 )
 
 function formatDate(iso) {
@@ -62,10 +75,6 @@ async function load() {
     const params = canManage.value ? {} : undefined
     const { data } = await api.get('/ecc/recados', { params })
     items.value = data?.data || []
-    if (!canManage.value) {
-      markRecadosSeen(localStorage)
-      emit('recados-seen')
-    }
   } catch (e) {
     innovToast('error', 'Recados', e.response?.data?.message || 'Falha ao carregar')
     items.value = []
@@ -84,50 +93,111 @@ async function loadEquipes() {
   }
 }
 
+async function openDetail(item) {
+  detailLoading.value = true
+  showEngajamento.value = false
+  try {
+    const { data } = await api.get(`/ecc/recados/${item.id}`)
+    selected.value = data?.data || null
+    if (selected.value && !selected.value.lido_por_mim && selected.value.status === 'publicado') {
+      const ler = await api.post(`/ecc/recados/${item.id}/ler`)
+      selected.value = {
+        ...selected.value,
+        lido_por_mim: true,
+        lido_em: ler.data?.data?.lido_em || selected.value.lido_em,
+      }
+      items.value = items.value.map((it) =>
+        String(it.id) === String(item.id)
+          ? { ...it, lido_por_mim: true, lido_em: selected.value.lido_em }
+          : it,
+      )
+      emit('mural-seen')
+      emit('recados-seen')
+    }
+  } catch (e) {
+    innovToast('error', 'Recados', e.response?.data?.message || 'Não foi possível abrir')
+    selected.value = null
+  } finally {
+    detailLoading.value = false
+  }
+}
+
+function closeDetail() {
+  selected.value = null
+  showEngajamento.value = false
+}
+
+async function downloadAnexo(item) {
+  try {
+    const res = await api.get(`/ecc/recados/${item.id}/anexo`, { responseType: 'blob' })
+    const url = URL.createObjectURL(res.data)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = item.anexo_nome || 'anexo'
+    a.click()
+    URL.revokeObjectURL(url)
+  } catch (e) {
+    innovToast('error', 'Anexo', e.response?.data?.message || 'Falha no download')
+  }
+}
+
 function openNew() {
   editingId.value = null
   form.value = blankForm()
+  anexoFile.value = null
+  removerAnexo.value = false
   showForm.value = true
+  selected.value = null
 }
 
-function openEdit(item) {
-  editingId.value = item.id
-  form.value = {
-    titulo: item.titulo,
-    corpo: item.corpo,
-    urgente: !!item.urgente,
-    fixado: !!item.fixado,
-    escopo: item.escopo || 'paroquia',
-    equipe_id: item.equipe_id || '',
-    etapa: item.etapa || 1,
-    valido_ate: item.valido_ate ? item.valido_ate.slice(0, 16) : '',
-    status: item.status,
+async function openEdit(item) {
+  try {
+    const { data } = await api.get(`/ecc/recados/${item.id}`)
+    const full = data?.data || item
+    editingId.value = full.id
+    form.value = {
+      titulo: full.titulo,
+      corpo: full.corpo || '',
+      urgente: !!full.urgente,
+      fixado: !!full.fixado,
+      escopo: full.escopo || 'paroquia',
+      equipe_id: full.equipe_id || '',
+      etapa: full.etapa || 1,
+      valido_ate: full.valido_ate ? full.valido_ate.slice(0, 16) : '',
+      status: full.status,
+    }
+    anexoFile.value = null
+    removerAnexo.value = false
+    showForm.value = true
+    selected.value = null
+  } catch (e) {
+    innovToast('error', 'Recados', e.response?.data?.message || 'Falha ao abrir edição')
   }
-  showForm.value = true
 }
 
 async function save() {
   saving.value = true
   try {
-    const body = {
-      titulo: form.value.titulo,
-      corpo: form.value.corpo,
-      urgente: form.value.urgente,
-      fixado: form.value.fixado,
-      escopo: form.value.escopo,
-      status: form.value.status,
-      valido_ate: form.value.valido_ate
-        ? new Date(form.value.valido_ate).toISOString()
-        : null,
+    const fd = new FormData()
+    fd.append('titulo', form.value.titulo)
+    fd.append('corpo', form.value.corpo)
+    fd.append('urgente', form.value.urgente ? '1' : '0')
+    fd.append('fixado', form.value.fixado ? '1' : '0')
+    fd.append('escopo', form.value.escopo)
+    fd.append('status', form.value.status)
+    if (form.value.valido_ate) {
+      fd.append('valido_ate', new Date(form.value.valido_ate).toISOString())
     }
-    if (form.value.escopo === 'equipe') body.equipe_id = form.value.equipe_id || null
-    if (form.value.escopo === 'etapa') body.etapa = Number(form.value.etapa)
+    if (form.value.escopo === 'equipe') fd.append('equipe_id', form.value.equipe_id || '')
+    if (form.value.escopo === 'etapa') fd.append('etapa', String(form.value.etapa))
+    if (anexoFile.value) fd.append('anexo', anexoFile.value)
+    if (editingId.value && removerAnexo.value) fd.append('remover_anexo', '1')
 
     if (editingId.value) {
-      await api.put(`/ecc/recados/${editingId.value}`, body)
+      await api.post(`/ecc/recados/${editingId.value}`, fd)
       innovToast('success', 'Recados', 'Recado atualizado')
     } else {
-      await api.post('/ecc/recados', body)
+      await api.post('/ecc/recados', fd)
       innovToast('success', 'Recados', 'Recado publicado')
     }
     showForm.value = false
@@ -148,10 +218,29 @@ async function remove(item) {
   try {
     await api.delete(`/ecc/recados/${item.id}`)
     innovToast('success', 'Recados', 'Removido')
+    if (selected.value?.id === item.id) closeDetail()
     await load()
   } catch (e) {
     innovToast('error', 'Recados', e.response?.data?.message || 'Falha ao remover')
   }
+}
+
+async function onInteracaoUpdated(itemId, patch) {
+  if (selected.value && String(selected.value.id) === String(itemId)) {
+    selected.value = {
+      ...selected.value,
+      ...(patch.likes_count !== undefined ? { likes_count: patch.likes_count } : {}),
+      ...(patch.liked_by_me !== undefined ? { liked_by_me: patch.liked_by_me } : {}),
+    }
+  }
+  items.value = items.value.map((it) => {
+    if (String(it.id) !== String(itemId)) return it
+    return {
+      ...it,
+      ...(patch.likes_count !== undefined ? { likes_count: patch.likes_count } : {}),
+      ...(patch.liked_by_me !== undefined ? { liked_by_me: patch.liked_by_me } : {}),
+    }
+  })
 }
 
 onMounted(async () => {
@@ -182,6 +271,8 @@ onMounted(async () => {
       </button>
     </header>
 
+    <EccComentariosModeracao v-if="canModerar" class="mb-6" />
+
     <div v-if="showForm && canManage" class="card p-5 mb-6" data-testid="recados-form">
       <h2 class="font-serif text-[20px] mb-4" style="color: var(--color-ink)">
         {{ editingId ? 'Editar recado' : 'Novo recado' }}
@@ -194,6 +285,20 @@ onMounted(async () => {
         <div>
           <label class="fld" for="recado-corpo">Mensagem</label>
           <textarea id="recado-corpo" v-model="form.corpo" class="input min-h-[120px]" required />
+        </div>
+        <div>
+          <label class="fld" for="recado-anexo">Anexo (opcional)</label>
+          <input
+            id="recado-anexo"
+            type="file"
+            class="input"
+            accept=".pdf,.doc,.docx,.xls,.xlsx,image/jpeg,image/png,image/webp"
+            data-testid="recados-anexo"
+            @change="anexoFile = $event.target.files?.[0] || null"
+          />
+          <label v-if="editingId" class="inline-flex items-center gap-2 mt-2 text-[13px]">
+            <input v-model="removerAnexo" type="checkbox" /> Remover anexo atual
+          </label>
         </div>
         <div class="grid gap-4 sm:grid-cols-2">
           <div>
@@ -248,9 +353,84 @@ onMounted(async () => {
       </form>
     </div>
 
-    <div v-if="loading" class="text-[13.5px]" style="color: var(--color-muted)">Carregando…</div>
+    <article
+      v-if="selected"
+      class="card p-5 mb-6"
+      data-testid="recado-detalhe"
+    >
+      <button
+        type="button"
+        class="text-[13px] mb-3 border-0 bg-transparent cursor-pointer p-0"
+        style="color: var(--color-primary-hover)"
+        @click="closeDetail"
+      >
+        ← Voltar à lista
+      </button>
+      <div class="flex flex-wrap items-center gap-2 mb-2">
+        <span
+          v-if="selected.fixado"
+          class="text-[11px] px-2 py-0.5 rounded-full font-medium"
+          style="background: var(--color-accent-soft); color: var(--color-accent-dark)"
+        >Fixado</span>
+        <span
+          v-if="selected.urgente"
+          class="text-[11px] px-2 py-0.5 rounded-full font-medium"
+          style="background: color-mix(in srgb, var(--color-danger) 14%, transparent); color: var(--color-danger)"
+        >Urgente</span>
+      </div>
+      <h2 class="text-[22px] font-medium" style="color: var(--color-ink)">{{ selected.titulo }}</h2>
+      <p class="text-[12px] mt-2" style="color: var(--color-muted)">
+        {{ formatDate(selected.publicado_em) }}
+        <template v-if="selected.valido_ate"> · até {{ formatDate(selected.valido_ate) }}</template>
+      </p>
+      <p class="text-[15px] mt-4 whitespace-pre-wrap leading-relaxed" style="color: var(--color-ink)">
+        {{ selected.corpo }}
+      </p>
+      <button
+        v-if="selected.tem_anexo"
+        type="button"
+        class="btn btn-ghost text-sm mt-4"
+        data-testid="recado-baixar-anexo"
+        @click="downloadAnexo(selected)"
+      >
+        Baixar {{ selected.anexo_nome || 'anexo' }}
+        <span v-if="selected.anexo_tamanho" style="color: var(--color-muted)">
+          ({{ formatAnexoTamanho(selected.anexo_tamanho) }})
+        </span>
+      </button>
+      <div v-if="canManage" class="flex flex-wrap gap-2 mt-4">
+        <button type="button" class="btn btn-ghost text-sm" @click="openEdit(selected)">Editar</button>
+        <button type="button" class="btn btn-ghost text-sm" style="color: var(--color-danger)" @click="remove(selected)">
+          Remover
+        </button>
+        <button
+          type="button"
+          class="btn btn-ghost text-sm"
+          data-testid="recado-engajamento-btn"
+          @click="showEngajamento = !showEngajamento"
+        >
+          {{ showEngajamento ? 'Ocultar engajamento' : 'Ver engajamento' }}
+        </button>
+      </div>
+      <EccEngajamentoPanel
+        v-if="canManage && showEngajamento"
+        alvo-tipo="recado"
+        :alvo-id="selected.id"
+      />
+      <EccInteracoesBlock
+        v-if="selected.status === 'publicado'"
+        alvo-tipo="recado"
+        :alvo-id="selected.id"
+        :likes-count="selected.likes_count || 0"
+        :liked-by-me="!!selected.liked_by_me"
+        :comentarios-count="selected.comentarios_count || 0"
+        @updated="(p) => onInteracaoUpdated(selected.id, p)"
+      />
+    </article>
+
+    <div v-if="loading || detailLoading" class="text-[13.5px]" style="color: var(--color-muted)">Carregando…</div>
     <div
-      v-else-if="!items.length"
+      v-else-if="!selected && !items.length"
       class="rounded-[12px] border border-dashed p-10 text-center"
       style="border-color: var(--color-line)"
       data-testid="recados-vazio"
@@ -260,44 +440,55 @@ onMounted(async () => {
         Quando a secretaria publicar, aparece aqui.
       </p>
     </div>
-    <ul v-else class="flex flex-col gap-3" data-testid="recados-lista">
+    <ul v-else-if="!selected" class="flex flex-col gap-3" data-testid="recados-lista">
       <li
         v-for="item in items"
         :key="item.id"
-        class="card p-4"
+        class="card p-0 overflow-hidden"
         data-testid="recado-item"
       >
-        <div class="flex flex-wrap items-center gap-2 mb-2">
-          <span
-            v-if="item.fixado"
-            class="text-[11px] px-2 py-0.5 rounded-full font-medium"
-            style="background: var(--color-accent-soft); color: var(--color-accent-dark)"
-          >Fixado</span>
-          <span
-            v-if="item.urgente"
-            class="text-[11px] px-2 py-0.5 rounded-full font-medium"
-            style="background: color-mix(in srgb, var(--color-danger) 14%, transparent); color: var(--color-danger)"
-          >Urgente</span>
-          <span
-            v-if="canManage && item.status === 'rascunho'"
-            class="text-[11px] px-2 py-0.5 rounded-full"
-            style="background: var(--color-line); color: var(--color-muted)"
-          >Rascunho</span>
-        </div>
-        <h3 class="text-[17px] font-medium" style="color: var(--color-ink)">{{ item.titulo }}</h3>
-        <p class="text-[14px] mt-2 whitespace-pre-wrap leading-relaxed" style="color: var(--color-ink)">
-          {{ item.corpo }}
-        </p>
-        <p class="text-[12px] mt-3" style="color: var(--color-muted)">
-          {{ formatDate(item.publicado_em) }}
-          <template v-if="item.valido_ate"> · até {{ formatDate(item.valido_ate) }}</template>
-        </p>
-        <div v-if="canManage" class="flex gap-2 mt-3">
-          <button type="button" class="btn btn-ghost text-sm" @click="openEdit(item)">Editar</button>
-          <button type="button" class="btn btn-ghost text-sm" style="color: var(--color-danger)" @click="remove(item)">
-            Remover
-          </button>
-        </div>
+        <button
+          type="button"
+          class="w-full text-left border-0 bg-transparent cursor-pointer p-4"
+          @click="openDetail(item)"
+        >
+          <div class="flex flex-wrap items-center gap-2 mb-2">
+            <span
+              v-if="!item.lido_por_mim && item.status === 'publicado'"
+              class="w-2 h-2 rounded-full shrink-0"
+              style="background: var(--color-accent-dark)"
+              title="Não lido"
+              data-testid="recado-nao-lido"
+            />
+            <span
+              v-if="item.fixado"
+              class="text-[11px] px-2 py-0.5 rounded-full font-medium"
+              style="background: var(--color-accent-soft); color: var(--color-accent-dark)"
+            >Fixado</span>
+            <span
+              v-if="item.urgente"
+              class="text-[11px] px-2 py-0.5 rounded-full font-medium"
+              style="background: color-mix(in srgb, var(--color-danger) 14%, transparent); color: var(--color-danger)"
+            >Urgente</span>
+            <span
+              v-if="canManage && item.status === 'rascunho'"
+              class="text-[11px] px-2 py-0.5 rounded-full"
+              style="background: var(--color-line); color: var(--color-muted)"
+            >Rascunho</span>
+            <span
+              v-if="item.tem_anexo"
+              class="text-[11px] px-2 py-0.5 rounded-full"
+              style="background: var(--color-line); color: var(--color-muted)"
+            >Anexo</span>
+          </div>
+          <h3 class="text-[17px] font-medium" style="color: var(--color-ink)">{{ item.titulo }}</h3>
+          <p class="text-[14px] mt-2 line-clamp-2 leading-relaxed" style="color: var(--color-muted)">
+            {{ item.resumo }}
+          </p>
+          <p class="text-[12px] mt-3" style="color: var(--color-muted)">
+            {{ formatDate(item.publicado_em) }}
+          </p>
+        </button>
       </li>
     </ul>
   </div>

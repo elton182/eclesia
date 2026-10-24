@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Models\EccLeitura;
 use App\Models\EccReflexao;
 use App\Models\User;
 use Carbon\Carbon;
@@ -11,6 +12,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class EccReflexaoService
 {
@@ -42,8 +44,28 @@ class EccReflexaoService
             $query->where('status', EccReflexao::STATUS_PUBLICADO);
         }
 
+        $user = auth()->user() instanceof User ? auth()->user() : null;
+
         return $query->get()
-            ->map(fn (EccReflexao $r): array => $this->serialize($r))
+            ->map(fn (EccReflexao $r): array => $this->serialize($r, listMode: true, user: $user))
+            ->values()
+            ->all();
+    }
+
+    /**
+     * IDs publicados no feed (para contagem de não lidos).
+     *
+     * @return list<string>
+     */
+    public function listFeedIdsForUnread(): array
+    {
+        $this->assertCanView();
+
+        return EccReflexao::query()
+            ->where('igreja_id', $this->igrejaId())
+            ->where('status', EccReflexao::STATUS_PUBLICADO)
+            ->pluck('id')
+            ->map(static fn (mixed $id): string => (string) $id)
             ->values()
             ->all();
     }
@@ -70,13 +92,17 @@ class EccReflexaoService
     /**
      * @param  array<string, mixed>  $data
      */
-    public function create(array $data, ?UploadedFile $imagem, User $user): EccReflexao
+    public function create(array $data, ?UploadedFile $imagem, User $user, ?UploadedFile $anexo = null): EccReflexao
     {
         $this->assertCanManage();
         $payload = $this->normalizePayload($data);
 
         if ($imagem !== null) {
             $payload['imagem_path'] = $this->storeImagem($imagem);
+        }
+
+        if ($anexo !== null) {
+            $payload = [...$payload, ...EccMuralAnexo::store($anexo, $this->igrejaId(), 'reflexoes')];
         }
 
         return EccReflexao::query()->create([
@@ -89,8 +115,14 @@ class EccReflexaoService
     /**
      * @param  array<string, mixed>  $data
      */
-    public function update(EccReflexao $reflexao, array $data, ?UploadedFile $imagem, bool $removerImagem): EccReflexao
-    {
+    public function update(
+        EccReflexao $reflexao,
+        array $data,
+        ?UploadedFile $imagem,
+        bool $removerImagem,
+        ?UploadedFile $anexo = null,
+        bool $removerAnexo = false,
+    ): EccReflexao {
         $this->assertCanManage();
         abort_unless((string) $reflexao->igreja_id === $this->igrejaId(), 404);
 
@@ -108,6 +140,21 @@ class EccReflexaoService
             $payload['imagem_path'] = $this->storeImagem($imagem);
         }
 
+        if ($removerAnexo && $reflexao->anexo_path) {
+            EccMuralAnexo::delete($reflexao->anexo_path);
+            $payload['anexo_path'] = null;
+            $payload['anexo_nome'] = null;
+            $payload['anexo_mime'] = null;
+            $payload['anexo_tamanho'] = null;
+        }
+
+        if ($anexo !== null) {
+            if ($reflexao->anexo_path) {
+                EccMuralAnexo::delete($reflexao->anexo_path);
+            }
+            $payload = [...$payload, ...EccMuralAnexo::store($anexo, $this->igrejaId(), 'reflexoes')];
+        }
+
         $reflexao->fill($payload);
         $reflexao->save();
 
@@ -122,30 +169,62 @@ class EccReflexaoService
         if ($reflexao->imagem_path) {
             $this->deleteImagem($reflexao->imagem_path);
         }
+        EccMuralAnexo::delete($reflexao->anexo_path);
 
         $reflexao->delete();
+    }
+
+    public function streamAnexo(EccReflexao $reflexao): StreamedResponse
+    {
+        abort_unless((string) $reflexao->igreja_id === $this->igrejaId(), 404);
+        $path = $reflexao->anexo_path;
+        abort_unless(is_string($path) && $path !== '' && Storage::disk('public')->exists($path), 404);
+
+        return Storage::disk('public')->response(
+            $path,
+            $reflexao->anexo_nome ?: 'anexo',
+            ['Content-Type' => $reflexao->anexo_mime ?: 'application/octet-stream'],
+        );
     }
 
     /**
      * @return array<string, mixed>
      */
-    public function serialize(EccReflexao $reflexao): array
+    public function serialize(EccReflexao $reflexao, bool $listMode = false, ?User $user = null): array
     {
+        $user ??= auth()->user() instanceof User ? auth()->user() : null;
         $temImagem = $reflexao->imagem_path !== null && $reflexao->imagem_path !== '';
+        $stats = app(EccInteracaoService::class)->statsFor('reflexao', (string) $reflexao->id, $user);
+        $leitura = app(EccLeituraService::class)->leituraDoUsuario(EccLeitura::ALVO_REFLEXAO, (string) $reflexao->id, $user);
+        $anexo = EccMuralAnexo::meta($reflexao);
 
-        return [
+        $base = [
             'id' => (string) $reflexao->id,
             'titulo' => (string) $reflexao->titulo,
+            'resumo' => EccLeituraService::resumoTexto((string) $reflexao->texto),
             'passagem_biblica' => $reflexao->passagem_biblica,
-            'texto' => (string) $reflexao->texto,
             'tem_imagem' => $temImagem,
             'imagem_url' => $temImagem ? $this->imagemUrl($reflexao) : null,
             'publicado_em' => $reflexao->publicado_em?->format('Y-m-d'),
             'status' => (string) $reflexao->status,
             'criado_por_user_id' => $reflexao->criado_por_user_id ? (string) $reflexao->criado_por_user_id : null,
+            'likes_count' => $stats['likes_count'],
+            'liked_by_me' => $stats['liked_by_me'],
+            'comentarios_count' => $stats['comentarios_count'],
+            'lido_por_mim' => $leitura['lido_por_mim'],
+            'lido_em' => $leitura['lido_em'],
+            ...$anexo,
             'created_at' => $reflexao->created_at?->toIso8601String(),
             'updated_at' => $reflexao->updated_at?->toIso8601String(),
         ];
+
+        if ($listMode) {
+            return $base;
+        }
+
+        $base['texto'] = (string) $reflexao->texto;
+
+        return $base;
     }
 
     private function imagemUrl(EccReflexao $reflexao): ?string

@@ -119,6 +119,7 @@ class RolesAndPermissionsSeeder extends Seeder
         'ecc.recados.manage',
         'ecc.reflexoes.view',
         'ecc.reflexoes.manage',
+        'ecc.interacoes.moderar',
         'ecc.escala.editar',
         'pessoas.manage',
     ];

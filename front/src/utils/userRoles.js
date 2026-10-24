@@ -75,7 +75,9 @@ export function userHasPermission(user, permission, opts = {}) {
     return true
   }
   if (
-    (permission === 'ecc.recados.manage' || permission === 'ecc.reflexoes.manage') &&
+    (permission === 'ecc.recados.manage'
+      || permission === 'ecc.reflexoes.manage'
+      || permission === 'ecc.interacoes.moderar') &&
     (roleNames.includes('admin-igreja') || roleNames.includes('admin-tenant'))
   ) {
     return true

@@ -14,6 +14,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class EccRecadoController extends Controller
 {
@@ -61,14 +62,24 @@ class EccRecadoController extends Controller
     {
         /** @var User $user */
         $user = $request->user();
-        $recado = $this->recados->create($request->validated(), $user);
+        $recado = $this->recados->create(
+            $request->safe()->except(['anexo']),
+            $user,
+            $request->file('anexo'),
+        );
 
         return response()->json(['data' => $this->recados->serialize($recado)], 201);
     }
 
     public function update(UpdateEccRecadoRequest $request, string $id): JsonResponse
     {
-        $recado = $this->recados->update($this->recados->find($id), $request->validated());
+        $removerAnexo = filter_var($request->input('remover_anexo'), FILTER_VALIDATE_BOOLEAN);
+        $recado = $this->recados->update(
+            $this->recados->find($id),
+            $request->safe()->except(['anexo', 'remover_anexo']),
+            $request->file('anexo'),
+            $removerAnexo,
+        );
 
         return response()->json(['data' => $this->recados->serialize($recado)]);
     }
@@ -78,5 +89,10 @@ class EccRecadoController extends Controller
         $this->recados->delete($this->recados->find($id));
 
         return response()->noContent();
+    }
+
+    public function anexo(string $id): StreamedResponse
+    {
+        return $this->recados->streamAnexo($this->recados->find($id));
     }
 }
