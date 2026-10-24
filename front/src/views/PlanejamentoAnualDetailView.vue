@@ -2,7 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '@/services/api'
-import { listPastorais } from '@/services/pastorais'
+import { createPastoral, listPastorais } from '@/services/pastorais'
 import {
   changeAnualStatus,
   createEvento,
@@ -43,7 +43,12 @@ import {
   labelStatusPlanejamento,
   labelStatusSolicitacao,
   mapaCoresPastorais,
+  GRADE_SEMANA_HORA_FIM,
+  GRADE_SEMANA_HORA_INICIO,
+  horasGradeSemana,
+  layoutEventoGradeSemana,
   mapPastoralLinks,
+  particionarEventosGradeSemana,
   pastoralIdsDoUsuario,
   proximosStatusPlanejamento,
   styleStatusSolicitacao,
@@ -63,10 +68,12 @@ import {
 } from '@/utils/planejamentoRecursos'
 import { getDisponibilidade, listRecursos } from '@/services/planejamentoRecursos'
 import PlanejamentoRecursosPicker from '@/components/planejamento/PlanejamentoRecursosPicker.vue'
-import Hora24Input from '@/components/form/Hora24Input.vue'
+import DateInput from '@/components/form/DateInput.vue'
+import SelectSearchable from '@/components/form/SelectSearchable.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useAuthAdminStore } from '@/stores/authAdmin'
 import { userHasPermission } from '@/utils/userRoles'
+import { brToIso, isoToBr } from '@/utils/dateBr'
 
 const WEEKDAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 
@@ -110,8 +117,15 @@ const dispLoading = ref(false)
 const capacidadeErro = ref('')
 const dragEventoId = ref('')
 const dropAlvo = ref('')
+const novaPastoralNome = ref('')
+const salvandoPastoral = ref(false)
+const pdfBusy = ref(false)
 let dispTimer = null
 let dispSeq = 0
+
+const horasGrade = horasGradeSemana(GRADE_SEMANA_HORA_INICIO, GRADE_SEMANA_HORA_FIM)
+const gradeHoraPx = 48
+const gradeBodyHeightPx = horasGrade.length * gradeHoraPx
 
 const emptyForm = () => ({
   pastoral_id: '',
@@ -170,6 +184,10 @@ const pastoraisOpcoes = computed(() => {
   if (!myPastoralIds.value.length) return pastorais.value
   return pastorais.value.filter((p) => myPastoralIds.value.includes(p.id))
 })
+
+const pastoraisSelectOptions = computed(() =>
+  pastoraisOpcoes.value.map((p) => ({ value: p.id, label: p.nome })),
+)
 
 const pastoraisPainel = computed(() => {
   if (canVerGlobal.value) return pastorais.value
@@ -232,7 +250,14 @@ const diaEventos = computed(() => {
 const espacosCatalogo = computed(() => recursosCatalogo.value.filter((r) => r.tipo === 'espaco'))
 const podeArrastar = computed(() => canGerir.value && anoStatus.value !== 'fechado')
 const dispParams = computed(() =>
-  disponibilidadeParams(form.value, editingEvento.value?.id || undefined),
+  disponibilidadeParams(
+    {
+      ...form.value,
+      data_inicio: brToIso(form.value.data_inicio) || '',
+      data_fim: brToIso(form.value.data_fim) || '',
+    },
+    editingEvento.value?.id || undefined,
+  ),
 )
 
 const statusSolicitacaoOptions = computed(() =>
@@ -253,6 +278,31 @@ function pastoralNome(id) {
 
 function pastoralCor(id) {
   return coresPastorais.value[id] || 'var(--color-primary)'
+}
+
+function eventosDoDia(iso) {
+  return byDay.value.get(iso) || []
+}
+
+function eventosSemHora(iso) {
+  return particionarEventosGradeSemana(eventosDoDia(iso)).semHora
+}
+
+function eventosComHora(iso) {
+  return particionarEventosGradeSemana(eventosDoDia(iso)).comHora
+}
+
+function estiloEventoGrade(ev) {
+  const layout = layoutEventoGradeSemana(ev, {
+    inicioHora: GRADE_SEMANA_HORA_INICIO,
+    fimHora: GRADE_SEMANA_HORA_FIM,
+  })
+  if (!layout) return {}
+  return {
+    top: `${layout.topPct}%`,
+    height: `${layout.heightPct}%`,
+    ...chipStyle(ev),
+  }
 }
 
 function chipStyle(ev) {
@@ -332,7 +382,8 @@ function openCreate(dayIso) {
   if (!podeCriar.value) return
   editingEvento.value = null
   form.value = emptyForm()
-  form.value.data_inicio = dayIso || diaSelecionado.value || ''
+  const iso = dayIso || diaSelecionado.value || ''
+  form.value.data_inicio = isoToBr(iso)
   form.value.pastoral_id = pastoraisOpcoes.value[0]?.id || ''
   selecaoRecursos.value = emptySelecaoRecursos()
   capacidadeErro.value = ''
@@ -346,8 +397,8 @@ function openEdit(ev) {
   form.value = {
     pastoral_id: ev.pastoral_id || '',
     titulo: ev.titulo || '',
-    data_inicio: (ev.data_inicio || '').slice(0, 10),
-    data_fim: ev.data_fim ? String(ev.data_fim).slice(0, 10) : '',
+    data_inicio: isoToBr((ev.data_inicio || '').slice(0, 10)),
+    data_fim: ev.data_fim ? isoToBr(String(ev.data_fim).slice(0, 10)) : '',
     hora_inicio: formatHoraCalendario(ev.hora_inicio) || '',
     hora_fim: formatHoraCalendario(ev.hora_fim) || '',
     participantes_media: ev.participantes_media ?? null,
@@ -468,11 +519,13 @@ async function copiarLinkPastoral(pastoralId) {
 
 function buildPayload() {
   const f = form.value
+  const dataInicio = brToIso(f.data_inicio)
+  const dataFim = brToIso(f.data_fim)
   const payload = {
     pastoral_id: f.pastoral_id,
     titulo: f.titulo.trim(),
-    data_inicio: f.data_inicio,
-    data_fim: f.data_fim || null,
+    data_inicio: dataInicio,
+    data_fim: dataFim || null,
     hora_inicio: f.hora_inicio || null,
     hora_fim: f.hora_fim || null,
     participantes_media:
@@ -551,7 +604,7 @@ async function salvarEvento() {
     return
   }
   if (!payload.data_inicio) {
-    innovToast('error', 'Evento', 'Informe a data')
+    innovToast('error', 'Evento', 'Informe a data no formato dd/mm/aaaa')
     return
   }
   if (!(payload.local_ids?.length || payload.local_texto || selecaoTemEspaco(selecaoRecursos.value))) {
@@ -647,16 +700,72 @@ async function mudarStatus(status) {
 }
 
 async function baixarPdf() {
+  if (pdfBusy.value || !anual.value) return
+  pdfBusy.value = true
   try {
     const blob = await downloadAnualPdf(anual.value.id, { mes: mesView.value })
+    if (blob?.type && blob.type.includes('json')) {
+      const text = await blob.text()
+      const body = JSON.parse(text)
+      throw Object.assign(new Error('pdf'), {
+        response: { data: body },
+      })
+    }
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
     a.download = `planejamento-${anual.value.ano}-${String(mesView.value).padStart(2, '0')}.pdf`
     a.click()
     URL.revokeObjectURL(url)
+    await carregarLinksPastorais()
+    innovToast(
+      'success',
+      'PDF',
+      'Download iniciado · links públicos das pastorais sem link foram criados',
+    )
   } catch (e) {
-    innovToast('error', 'PDF', e.response?.data?.message || 'Falha ao exportar')
+    let msg = 'Falha ao exportar'
+    const data = e.response?.data
+    if (data instanceof Blob) {
+      try {
+        const body = JSON.parse(await data.text())
+        msg = body.message || body.errors?.status?.[0] || msg
+      } catch {
+        /* ignore */
+      }
+    } else if (data?.message || data?.errors?.status?.[0]) {
+      msg = data.message || data.errors.status[0]
+    }
+    innovToast('error', 'PDF', msg)
+  } finally {
+    pdfBusy.value = false
+  }
+}
+
+async function incluirPastoral() {
+  if (!canGerir.value) return
+  const nome = novaPastoralNome.value.trim()
+  if (!nome) {
+    innovToast('error', 'Pastoral', 'Informe o nome')
+    return
+  }
+  salvandoPastoral.value = true
+  try {
+    const created = await createPastoral({ nome, ativa: true })
+    novaPastoralNome.value = ''
+    innovToast('success', 'Pastoral', 'Incluída no planejamento')
+    await load({ silent: true })
+    if (created?.id) {
+      try {
+        await gerarLinkPastoral(created)
+      } catch {
+        /* link opcional */
+      }
+    }
+  } catch (e) {
+    innovToast('error', 'Pastoral', e.response?.data?.message || 'Falha ao incluir')
+  } finally {
+    salvandoPastoral.value = false
   }
 }
 
@@ -727,13 +836,14 @@ onMounted(load)
             Espaços e recursos
           </button>
           <button
-            v-if="canGerir || anoStatus === 'fechado' || anoStatus === 'revisao'"
+            v-if="canGerir || anoStatus === 'fechado' || anoStatus === 'revisao' || anoStatus === 'coleta'"
             type="button"
             class="btn btn-primary"
             data-testid="planejamento-pdf"
+            :disabled="pdfBusy || anoStatus === 'rascunho'"
             @click="baixarPdf"
           >
-            PDF
+            {{ pdfBusy ? 'Gerando…' : 'PDF' }}
           </button>
         </div>
       </header>
@@ -842,7 +952,7 @@ onMounted(load)
 
       <div class="flex flex-col lg:flex-row gap-4 items-start">
         <aside
-          v-if="pastoraisPainel.length"
+          v-if="canGerir || pastoraisPainel.length"
           class="card p-4 w-full lg:w-56 shrink-0"
           data-testid="planejamento-filtro-pastorais"
         >
@@ -850,7 +960,7 @@ onMounted(load)
             <h2 class="font-serif text-[16px] font-medium m-0" style="color: var(--color-ink)">
               Pastorais
             </h2>
-            <div class="flex gap-1">
+            <div v-if="pastoraisPainel.length" class="flex gap-1">
               <button
                 type="button"
                 class="btn btn-ghost !py-0.5 !px-2 text-[11px]"
@@ -869,7 +979,7 @@ onMounted(load)
               </button>
             </div>
           </div>
-          <ul class="list-none p-0 m-0 space-y-1.5">
+          <ul v-if="pastoraisPainel.length" class="list-none p-0 m-0 space-y-1.5">
             <li v-for="p in pastoraisPainel" :key="p.id">
               <label
                 class="flex items-center gap-2 cursor-pointer rounded-md px-1.5 py-1.5 text-[13px]"
@@ -891,6 +1001,34 @@ onMounted(load)
               </label>
             </li>
           </ul>
+          <p v-else class="text-[12.5px] mb-3" style="color: var(--color-muted)">
+            Nenhuma pastoral ainda.
+          </p>
+          <form
+            v-if="canGerir"
+            class="mt-3 pt-3 flex flex-col gap-2"
+            style="border-top: 1px solid var(--color-line)"
+            data-testid="planejamento-incluir-pastoral"
+            @submit.prevent="incluirPastoral"
+          >
+            <label class="fld" for="pl-nova-pastoral">Incluir pastoral</label>
+            <input
+              id="pl-nova-pastoral"
+              v-model="novaPastoralNome"
+              class="input"
+              placeholder="Nome…"
+              maxlength="120"
+              data-testid="planejamento-nova-pastoral-nome"
+            />
+            <button
+              type="submit"
+              class="btn btn-accent text-xs w-full"
+              :disabled="salvandoPastoral"
+              data-testid="planejamento-nova-pastoral-salvar"
+            >
+              {{ salvandoPastoral ? 'Salvando…' : 'Incluir' }}
+            </button>
+          </form>
         </aside>
 
         <div class="card p-4 md:p-5 flex-1 min-w-0 w-full" data-testid="planejamento-grade">
@@ -930,101 +1068,240 @@ onMounted(load)
                 · arraste um evento para outro dia para mudar a data</template>
             </p>
           </div>
-          <div class="grid grid-cols-7 gap-1 text-center text-[11px] mb-1" style="color: var(--color-muted)">
-            <div v-for="d in WEEKDAYS" :key="d">{{ d }}</div>
-          </div>
-          <div class="grid grid-cols-7 gap-1">
-            <div
-              v-for="(cell, idx) in cells"
-              :key="idx"
-              :role="cell.iso && (visaoCalendario === 'semana' || cell.inMonth) ? 'button' : undefined"
-              :tabindex="cell.iso && (visaoCalendario === 'semana' || cell.inMonth) ? 0 : -1"
-              class="rounded-lg p-1.5 text-left"
-              :class="[
-                visaoCalendario === 'semana' ? 'min-h-[120px] md:min-h-[160px]' : 'min-h-[72px] md:min-h-[88px]',
-                cell.iso && (visaoCalendario === 'semana' || cell.inMonth) ? 'cursor-pointer' : '',
-              ]"
-              :style="
-                cell.iso && (visaoCalendario === 'semana' || cell.inMonth)
-                  ? {
-                      background:
-                        dropAlvo === cell.iso
-                          ? 'var(--color-accent-soft)'
-                          : diaSelecionado === cell.iso
-                            ? 'var(--color-primary-soft)'
-                            : 'var(--color-surface)',
+          <!-- Visão semanal com eixo de horas -->
+          <div
+            v-if="visaoCalendario === 'semana'"
+            class="overflow-x-auto"
+            data-testid="planejamento-semana-horas"
+          >
+            <div class="min-w-[720px]">
+              <div
+                class="grid gap-0"
+                style="grid-template-columns: 3.25rem repeat(7, minmax(0, 1fr))"
+              >
+                <div class="text-[10px] pr-1 pb-2" style="color: var(--color-muted)">GMT-03</div>
+                <div
+                  v-for="(cell, idx) in cells"
+                  :key="`h-${idx}`"
+                  class="text-center pb-2 cursor-pointer"
+                  :data-testid="cell.iso ? `planejamento-dia-${cell.iso}` : undefined"
+                  @click="cell.iso && selectDay(cell.iso)"
+                >
+                  <div class="text-[10px] uppercase tracking-wide" style="color: var(--color-muted)">
+                    {{ WEEKDAYS[idx] }}
+                  </div>
+                  <div
+                    class="font-serif text-[20px] leading-none mt-0.5"
+                    :style="{
                       color:
-                        diaSelecionado === cell.iso ? 'var(--color-on-primary)' : 'var(--color-ink)',
-                      border:
-                        dropAlvo === cell.iso
-                          ? '1px dashed var(--color-accent-dark)'
-                          : (byDay.get(cell.iso) || []).some(eventoTemConflito)
-                            ? '1.5px solid var(--color-accent-dark)'
-                            : '1px solid var(--color-line)',
-                      opacity: visaoCalendario === 'semana' && !cell.inMonth ? 0.55 : 1,
-                    }
-                  : { background: 'transparent', cursor: 'default' }
-              "
-              :data-testid="cell.iso ? `planejamento-dia-${cell.iso}` : undefined"
-              @click="cell.iso && (visaoCalendario === 'semana' || cell.inMonth) && selectDay(cell.iso)"
-              @keydown.enter.prevent="
-                cell.iso && (visaoCalendario === 'semana' || cell.inMonth) && selectDay(cell.iso)
-              "
-              @dragover.prevent="
-                cell.iso &&
-                  (visaoCalendario === 'semana' || cell.inMonth) &&
-                  dragEventoId &&
-                  (dropAlvo = cell.iso)
-              "
-              @dragleave="dropAlvo === cell.iso && (dropAlvo = '')"
-              @drop.prevent="
-                cell.iso && (visaoCalendario === 'semana' || cell.inMonth) && onDropDia(cell.iso)
-              "
-            >
-              <template v-if="cell.iso && (visaoCalendario === 'semana' || cell.inMonth)">
-                <div class="text-[12px] font-medium mb-0.5 flex items-center justify-between gap-1">
-                  <span>{{ cell.dia }}</span>
-                  <span
-                    v-if="(byDay.get(cell.iso) || []).some(eventoTemConflito)"
-                    class="text-[9px] font-semibold uppercase tracking-wide"
-                    style="color: var(--color-accent-dark)"
-                    data-testid="planejamento-dia-conflito"
+                        diaSelecionado === cell.iso ? 'var(--color-primary)' : 'var(--color-ink)',
+                    }"
                   >
-                    Conflito
-                  </span>
+                    {{ cell.dia }}
+                  </div>
+                </div>
+              </div>
+
+              <div
+                class="grid gap-0 mb-1"
+                style="grid-template-columns: 3.25rem repeat(7, minmax(0, 1fr))"
+              >
+                <div class="text-[10px] pr-1 pt-1" style="color: var(--color-muted)">Dia todo</div>
+                <div
+                  v-for="(cell, idx) in cells"
+                  :key="`a-${idx}`"
+                  class="min-h-[28px] px-0.5 py-0.5 rounded-sm"
+                  :style="{
+                    border: '1px solid var(--color-line)',
+                    background:
+                      dropAlvo === cell.iso ? 'var(--color-accent-soft)' : 'var(--color-surface)',
+                  }"
+                  @click="cell.iso && selectDay(cell.iso)"
+                  @dragover.prevent="cell.iso && dragEventoId && (dropAlvo = cell.iso)"
+                  @dragleave="dropAlvo === cell.iso && (dropAlvo = '')"
+                  @drop.prevent="cell.iso && onDropDia(cell.iso)"
+                >
+                  <div
+                    v-for="ev in eventosSemHora(cell.iso)"
+                    :key="ev.id"
+                    class="text-[10px] truncate leading-tight px-1 py-0.5 rounded mb-0.5 font-medium"
+                    :class="podeArrastar && podeEditar(ev) ? 'cursor-grab' : ''"
+                    :style="chipStyle(ev)"
+                    :draggable="podeArrastar && podeEditar(ev)"
+                    :data-testid="eventoTemConflito(ev) ? 'planejamento-chip-conflito' : 'planejamento-chip'"
+                    @dragstart="onDragStart(ev, $event)"
+                    @dragend="onDragEnd"
+                    @click.stop="selectDay(cell.iso)"
+                  >
+                    {{ labelEventoPlanejamentoPreview(ev) }}
+                  </div>
+                </div>
+              </div>
+
+              <div
+                class="grid gap-0 relative"
+                :style="{
+                  gridTemplateColumns: '3.25rem repeat(7, minmax(0, 1fr))',
+                  height: gradeBodyHeightPx + 'px',
+                }"
+              >
+                <div class="relative">
+                  <div
+                    v-for="(h, hi) in horasGrade"
+                    :key="h"
+                    class="absolute left-0 right-0 text-[10px] pr-1 -translate-y-1/2 text-right"
+                    :style="{ top: hi * gradeHoraPx + 'px', color: 'var(--color-muted)' }"
+                  >
+                    {{ h }}
+                  </div>
                 </div>
                 <div
-                  v-for="ev in (byDay.get(cell.iso) || []).slice(0, maxChipsPorDia)"
-                  :key="ev.id"
-                  class="text-[10px] truncate leading-tight px-1 py-0.5 rounded mt-0.5 font-medium"
-                  :class="podeArrastar && podeEditar(ev) ? 'cursor-grab' : ''"
-                  :style="chipStyle(ev)"
-                  :draggable="podeArrastar && podeEditar(ev)"
-                  :title="
-                    [
-                      ev.titulo,
-                      pastoralNome(ev.pastoral_id),
-                      labelRecursosEvento(ev),
-                      eventoTemConflito(ev) ? 'Conflito de agenda' : '',
-                    ]
-                      .filter(Boolean)
-                      .join(' · ')
-                  "
-                  :data-testid="eventoTemConflito(ev) ? 'planejamento-chip-conflito' : 'planejamento-chip'"
-                  @dragstart="onDragStart(ev, $event)"
-                  @dragend="onDragEnd"
+                  v-for="(cell, idx) in cells"
+                  :key="`c-${idx}`"
+                  class="relative cursor-pointer"
+                  :style="{
+                    borderLeft: '1px solid var(--color-line)',
+                    borderRight: idx === 6 ? '1px solid var(--color-line)' : undefined,
+                    background:
+                      dropAlvo === cell.iso
+                        ? 'var(--color-accent-soft)'
+                        : diaSelecionado === cell.iso
+                          ? 'color-mix(in srgb, var(--color-primary-soft) 55%, transparent)'
+                          : 'transparent',
+                    opacity: cell.inMonth ? 1 : 0.55,
+                  }"
+                  @click="cell.iso && selectDay(cell.iso)"
+                  @dragover.prevent="cell.iso && dragEventoId && (dropAlvo = cell.iso)"
+                  @dragleave="dropAlvo === cell.iso && (dropAlvo = '')"
+                  @drop.prevent="cell.iso && onDropDia(cell.iso)"
                 >
-                  {{ labelEventoPlanejamentoPreview(ev) }}
+                  <div
+                    v-for="(h, hi) in horasGrade"
+                    :key="`${cell.iso}-${h}`"
+                    class="absolute left-0 right-0"
+                    :style="{
+                      top: hi * gradeHoraPx + 'px',
+                      borderTop: '1px solid var(--color-line)',
+                      opacity: 0.7,
+                    }"
+                  />
+                  <div
+                    v-for="ev in eventosComHora(cell.iso)"
+                    :key="ev.id"
+                    class="absolute left-0.5 right-0.5 text-[10px] leading-tight px-1 py-0.5 rounded font-medium overflow-hidden z-[1]"
+                    :class="podeArrastar && podeEditar(ev) ? 'cursor-grab' : ''"
+                    :style="estiloEventoGrade(ev)"
+                    :draggable="podeArrastar && podeEditar(ev)"
+                    :title="
+                      [
+                        ev.titulo,
+                        pastoralNome(ev.pastoral_id),
+                        labelRecursosEvento(ev),
+                        eventoTemConflito(ev) ? 'Conflito de agenda' : '',
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')
+                    "
+                    :data-testid="eventoTemConflito(ev) ? 'planejamento-chip-conflito' : 'planejamento-chip'"
+                    @dragstart="onDragStart(ev, $event)"
+                    @dragend="onDragEnd"
+                    @click.stop="selectDay(cell.iso)"
+                  >
+                    {{ labelEventoPlanejamentoPreview(ev) }}
+                  </div>
                 </div>
-                <div
-                  v-if="(byDay.get(cell.iso) || []).length > maxChipsPorDia"
-                  class="text-[10px] opacity-70"
-                >
-                  +{{ (byDay.get(cell.iso) || []).length - maxChipsPorDia }}
-                </div>
-              </template>
+              </div>
             </div>
           </div>
+
+          <!-- Visão mensal -->
+          <template v-else>
+            <div class="grid grid-cols-7 gap-1 text-center text-[11px] mb-1" style="color: var(--color-muted)">
+              <div v-for="d in WEEKDAYS" :key="d">{{ d }}</div>
+            </div>
+            <div class="grid grid-cols-7 gap-1">
+              <div
+                v-for="(cell, idx) in cells"
+                :key="idx"
+                :role="cell.iso && cell.inMonth ? 'button' : undefined"
+                :tabindex="cell.iso && cell.inMonth ? 0 : -1"
+                class="rounded-lg p-1.5 text-left min-h-[72px] md:min-h-[88px]"
+                :class="cell.iso && cell.inMonth ? 'cursor-pointer' : ''"
+                :style="
+                  cell.iso && cell.inMonth
+                    ? {
+                        background:
+                          dropAlvo === cell.iso
+                            ? 'var(--color-accent-soft)'
+                            : diaSelecionado === cell.iso
+                              ? 'var(--color-primary-soft)'
+                              : 'var(--color-surface)',
+                        color:
+                          diaSelecionado === cell.iso ? 'var(--color-on-primary)' : 'var(--color-ink)',
+                        border:
+                          dropAlvo === cell.iso
+                            ? '1px dashed var(--color-accent-dark)'
+                            : (byDay.get(cell.iso) || []).some(eventoTemConflito)
+                              ? '1.5px solid var(--color-accent-dark)'
+                              : '1px solid var(--color-line)',
+                      }
+                    : { background: 'transparent', cursor: 'default' }
+                "
+                :data-testid="cell.iso ? `planejamento-dia-${cell.iso}` : undefined"
+                @click="cell.iso && cell.inMonth && selectDay(cell.iso)"
+                @keydown.enter.prevent="cell.iso && cell.inMonth && selectDay(cell.iso)"
+                @dragover.prevent="
+                  cell.iso && cell.inMonth && dragEventoId && (dropAlvo = cell.iso)
+                "
+                @dragleave="dropAlvo === cell.iso && (dropAlvo = '')"
+                @drop.prevent="cell.iso && cell.inMonth && onDropDia(cell.iso)"
+              >
+                <template v-if="cell.iso && cell.inMonth">
+                  <div class="text-[12px] font-medium mb-0.5 flex items-center justify-between gap-1">
+                    <span>{{ cell.dia }}</span>
+                    <span
+                      v-if="(byDay.get(cell.iso) || []).some(eventoTemConflito)"
+                      class="text-[9px] font-semibold uppercase tracking-wide"
+                      style="color: var(--color-accent-dark)"
+                      data-testid="planejamento-dia-conflito"
+                    >
+                      Conflito
+                    </span>
+                  </div>
+                  <div
+                    v-for="ev in (byDay.get(cell.iso) || []).slice(0, maxChipsPorDia)"
+                    :key="ev.id"
+                    class="text-[10px] truncate leading-tight px-1 py-0.5 rounded mt-0.5 font-medium"
+                    :class="podeArrastar && podeEditar(ev) ? 'cursor-grab' : ''"
+                    :style="chipStyle(ev)"
+                    :draggable="podeArrastar && podeEditar(ev)"
+                    :title="
+                      [
+                        ev.titulo,
+                        pastoralNome(ev.pastoral_id),
+                        labelRecursosEvento(ev),
+                        eventoTemConflito(ev) ? 'Conflito de agenda' : '',
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')
+                    "
+                    :data-testid="eventoTemConflito(ev) ? 'planejamento-chip-conflito' : 'planejamento-chip'"
+                    @dragstart="onDragStart(ev, $event)"
+                    @dragend="onDragEnd"
+                  >
+                    {{ labelEventoPlanejamentoPreview(ev) }}
+                  </div>
+                  <div
+                    v-if="(byDay.get(cell.iso) || []).length > maxChipsPorDia"
+                    class="text-[10px] opacity-70"
+                  >
+                    +{{ (byDay.get(cell.iso) || []).length - maxChipsPorDia }}
+                  </div>
+                </template>
+              </div>
+            </div>
+          </template>
+
         </div>
       </div>
 
@@ -1114,7 +1391,9 @@ onMounted(load)
           <div class="flex items-start justify-between gap-3 mb-4">
             <div>
               <p class="page-eyebrow">Dia selecionado</p>
-              <h3 class="font-serif text-lg" style="color: var(--color-ink)">{{ diaSelecionado }}</h3>
+              <h3 class="font-serif text-lg" style="color: var(--color-ink)">
+                {{ isoToBr(diaSelecionado) }}
+              </h3>
             </div>
             <button type="button" class="btn btn-ghost text-xs" @click="closeDayModal">Fechar</button>
           </div>
@@ -1226,18 +1505,15 @@ onMounted(load)
             <div class="grid gap-4 sm:grid-cols-2">
               <div>
                 <label class="fld" for="ev-pastoral">Pastoral</label>
-                <select
+                <SelectSearchable
                   id="ev-pastoral"
                   v-model="form.pastoral_id"
-                  class="input"
+                  :options="pastoraisSelectOptions"
+                  placeholder="Buscar pastoral…"
                   required
                   :disabled="!canGerir && !!editingEvento"
                   data-testid="planejamento-evento-pastoral"
-                >
-                  <option v-for="p in pastoraisOpcoes" :key="p.id" :value="p.id">
-                    {{ p.nome }}
-                  </option>
-                </select>
+                />
               </div>
               <div>
                 <label class="fld" for="ev-titulo">Título</label>
@@ -1249,27 +1525,32 @@ onMounted(load)
                   data-testid="planejamento-evento-titulo"
                 />
               </div>
+              <DateInput
+                v-model="form.data_inicio"
+                name="ev-inicio"
+                label="Data início"
+                required
+              />
+              <DateInput v-model="form.data_fim" name="ev-fim" label="Data fim" />
               <div>
-                <label class="fld" for="ev-inicio">Data início</label>
+                <label class="fld" for="ev-hi">Hora início</label>
                 <input
-                  id="ev-inicio"
-                  v-model="form.data_inicio"
-                  type="date"
+                  id="ev-hi"
+                  v-model="form.hora_inicio"
+                  type="time"
                   class="input"
-                  required
+                  data-testid="planejamento-evento-hora-inicio"
                 />
               </div>
               <div>
-                <label class="fld" for="ev-fim">Data fim</label>
-                <input id="ev-fim" v-model="form.data_fim" type="date" class="input" />
-              </div>
-              <div>
-                <label class="fld" for="ev-hi">Hora início</label>
-                <Hora24Input id="ev-hi" v-model="form.hora_inicio" />
-              </div>
-              <div>
                 <label class="fld" for="ev-hf">Hora fim</label>
-                <Hora24Input id="ev-hf" v-model="form.hora_fim" />
+                <input
+                  id="ev-hf"
+                  v-model="form.hora_fim"
+                  type="time"
+                  class="input"
+                  data-testid="planejamento-evento-hora-fim"
+                />
               </div>
               <div>
                 <label class="fld" for="ev-part">Participantes (média)</label>

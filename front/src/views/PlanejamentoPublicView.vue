@@ -23,7 +23,8 @@ import {
 } from '@/utils/planejamentoRecursos'
 import { getDisponibilidadePublica } from '@/services/planejamentoRecursos'
 import PlanejamentoRecursosPicker from '@/components/planejamento/PlanejamentoRecursosPicker.vue'
-import Hora24Input from '@/components/form/Hora24Input.vue'
+import DateInput from '@/components/form/DateInput.vue'
+import { brToIso, isoToBr } from '@/utils/dateBr'
 
 const WEEKDAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 
@@ -62,7 +63,12 @@ const headers = computed(() => ({
 }))
 
 const podePropor = computed(() => meta.value?.status === 'coleta')
-const dispParams = computed(() => disponibilidadeParams(form.value))
+const dispParams = computed(() =>
+  disponibilidadeParams({
+    ...form.value,
+    data_inicio: brToIso(form.value.data_inicio) || '',
+  }),
+)
 const temEspacos = computed(() => disponibilidade.value.some((d) => d.tipo === 'espaco'))
 const todayIso = new Date().toISOString().slice(0, 10)
 
@@ -95,7 +101,7 @@ function formatDiaLongo(iso) {
 function openDay(iso) {
   if (!iso) return
   diaSelecionado.value = iso
-  form.value = { ...emptyForm(), data_inicio: iso }
+  form.value = { ...emptyForm(), data_inicio: isoToBr(iso) }
   selecaoRecursos.value = emptySelecaoRecursos()
   capacidadeErro.value = ''
   showDayModal.value = true
@@ -162,6 +168,11 @@ async function criar() {
     innovToast('error', 'Planejamento', 'Escolha um espaço ou informe o local')
     return
   }
+  const dataInicio = brToIso(form.value.data_inicio)
+  if (!dataInicio) {
+    innovToast('error', 'Planejamento', 'Informe a data no formato dd/mm/aaaa')
+    return
+  }
   capacidadeErro.value = ''
   saving.value = true
   try {
@@ -169,7 +180,7 @@ async function criar() {
       `/public/planejamento/${token.value}/eventos`,
       {
         titulo: form.value.titulo,
-        data_inicio: form.value.data_inicio,
+        data_inicio: dataInicio,
         hora_inicio: form.value.hora_inicio || null,
         hora_fim: form.value.hora_fim || null,
         local_texto: form.value.local_texto.trim() || null,
@@ -179,7 +190,7 @@ async function criar() {
       { headers: headers.value },
     )
     innovToast('success', 'Planejamento', 'Proposta enviada')
-    form.value = { ...emptyForm(), data_inicio: diaSelecionado.value }
+    form.value = { ...emptyForm(), data_inicio: isoToBr(diaSelecionado.value) }
     selecaoRecursos.value = emptySelecaoRecursos()
     await load()
   } catch (err) {
@@ -414,18 +425,32 @@ onMounted(load)
             <input id="pub-titulo" v-model="form.titulo" class="input" required />
           </div>
           <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="fld" for="pub-data">Data</label>
-              <input id="pub-data" v-model="form.data_inicio" type="date" class="input" required />
-            </div>
+            <DateInput
+              v-model="form.data_inicio"
+              name="pub-data"
+              label="Data"
+              required
+            />
             <div class="grid grid-cols-2 gap-2">
               <div>
                 <label class="fld" for="pub-hora">Início</label>
-                <Hora24Input id="pub-hora" v-model="form.hora_inicio" />
+                <input
+                  id="pub-hora"
+                  v-model="form.hora_inicio"
+                  type="time"
+                  class="input"
+                  data-testid="planejamento-publico-hora-inicio"
+                />
               </div>
               <div>
                 <label class="fld" for="pub-hora-fim">Fim</label>
-                <Hora24Input id="pub-hora-fim" v-model="form.hora_fim" />
+                <input
+                  id="pub-hora-fim"
+                  v-model="form.hora_fim"
+                  type="time"
+                  class="input"
+                  data-testid="planejamento-publico-hora-fim"
+                />
               </div>
             </div>
           </div>

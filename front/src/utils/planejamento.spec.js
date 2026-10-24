@@ -28,6 +28,10 @@ import {
   unwrapItem,
   pastoralIdsDoUsuario,
   mapPastoralLinks,
+  horasGradeSemana,
+  minutosDoDia,
+  layoutEventoGradeSemana,
+  particionarEventosGradeSemana,
 } from './planejamento.js'
 
 describe('planejamento', () => {
@@ -222,5 +226,27 @@ describe('planejamento', () => {
       { p1: 'abc' },
     )
     assert.deepEqual(mapPastoralLinks(undefined), {})
+  })
+
+  it('grade semanal com horas posiciona eventos', () => {
+    assert.deepEqual(horasGradeSemana(6, 8), ['06:00', '07:00', '08:00'])
+    assert.equal(minutosDoDia('19:30:00'), 19 * 60 + 30)
+    assert.equal(minutosDoDia(null), null)
+
+    const layout = layoutEventoGradeSemana(
+      { hora_inicio: '08:00', hora_fim: '10:00' },
+      { inicioHora: 6, fimHora: 22 },
+    )
+    assert.ok(layout)
+    assert.ok(layout.topPct > 0)
+    assert.ok(layout.heightPct > 0)
+    assert.equal(layoutEventoGradeSemana({ titulo: 'Sem hora' }), null)
+
+    const parts = particionarEventosGradeSemana([
+      { id: '1', hora_inicio: '19:00' },
+      { id: '2', hora_inicio: null },
+    ])
+    assert.equal(parts.comHora.length, 1)
+    assert.equal(parts.semHora.length, 1)
   })
 })

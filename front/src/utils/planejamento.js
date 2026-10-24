@@ -481,3 +481,78 @@ export function mapPastoralLinks(tokens) {
   }
   return out
 }
+
+/** Primeira hora (incluída) da grade semanal com eixo de horas. */
+export const GRADE_SEMANA_HORA_INICIO = 6
+/** Última hora (incluída como rótulo; grade vai até fim+1h). */
+export const GRADE_SEMANA_HORA_FIM = 22
+
+/**
+ * Rótulos HH:00 da grade semanal (24h).
+ * @param {number} [inicio]
+ * @param {number} [fim]
+ * @returns {string[]}
+ */
+export function horasGradeSemana(inicio = GRADE_SEMANA_HORA_INICIO, fim = GRADE_SEMANA_HORA_FIM) {
+  const a = Math.max(0, Math.min(23, Math.floor(Number(inicio))))
+  const b = Math.max(a, Math.min(23, Math.floor(Number(fim))))
+  /** @type {string[]} */
+  const out = []
+  for (let h = a; h <= b; h++) {
+    out.push(`${String(h).padStart(2, '0')}:00`)
+  }
+  return out
+}
+
+/**
+ * Minutos desde 00:00 a partir de "HH:MM" / "HH:MM:SS".
+ * @param {string|null|undefined} hora
+ * @returns {number|null}
+ */
+export function minutosDoDia(hora) {
+  const curta = formatHoraCurta(hora)
+  if (!curta) return null
+  const m = curta.match(/^(\d{2}):(\d{2})$/)
+  if (!m) return null
+  return Number(m[1]) * 60 + Number(m[2])
+}
+
+/**
+ * Posição percentual de um evento na grade horária (top + height).
+ * Sem hora → null (vai para faixa “sem horário”).
+ *
+ * @param {{ hora_inicio?: string|null, hora_fim?: string|null }} evento
+ * @param {{ inicioHora?: number, fimHora?: number, minHeightPct?: number }} [opts]
+ * @returns {{ topPct: number, heightPct: number }|null}
+ */
+export function layoutEventoGradeSemana(evento, opts = {}) {
+  const inicioHora = opts.inicioHora ?? GRADE_SEMANA_HORA_INICIO
+  const fimHora = opts.fimHora ?? GRADE_SEMANA_HORA_FIM
+  const spanMin = Math.max(60, (fimHora + 1 - inicioHora) * 60)
+  const startBase = inicioHora * 60
+  const ini = minutosDoDia(evento?.hora_inicio)
+  if (ini === null) return null
+  let fim = minutosDoDia(evento?.hora_fim)
+  if (fim === null || fim <= ini) fim = ini + 60
+  const topMin = Math.max(0, Math.min(spanMin, ini - startBase))
+  const endMin = Math.max(topMin + 15, Math.min(spanMin, fim - startBase))
+  const topPct = (topMin / spanMin) * 100
+  const heightPct = Math.max(opts.minHeightPct ?? 3, ((endMin - topMin) / spanMin) * 100)
+  return { topPct, heightPct }
+}
+
+/**
+ * Particiona eventos do dia em com horário / sem horário.
+ * @param {Array<{ hora_inicio?: string|null }>|null|undefined} eventos
+ */
+export function particionarEventosGradeSemana(eventos) {
+  /** @type {typeof eventos} */
+  const comHora = []
+  /** @type {typeof eventos} */
+  const semHora = []
+  for (const ev of eventos || []) {
+    if (minutosDoDia(ev?.hora_inicio) !== null) comHora.push(ev)
+    else semHora.push(ev)
+  }
+  return { comHora, semHora }
+}

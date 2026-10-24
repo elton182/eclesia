@@ -159,6 +159,30 @@ class PlanejamentoAnualTest extends TestCase
             'status' => 'coleta',
         ])->assertOk()->assertJsonPath('data.status', 'coleta');
 
+        // Antes do PDF, nenhum link gerado manualmente
+        $tokensAntes = collect(
+            $this->tenantJson('GET', '/api/v1/planejamento/anuais/'.$id.'/pastorais/tokens')
+                ->assertOk()
+                ->json('data')
+        )->filter(fn ($t) => ($t['ativo'] ?? false) && ! empty($t['token']));
+        $this->assertCount(0, $tokensAntes);
+
+        // PDF na coleta: cria links faltantes + QR por pastoral
+        $pdfColeta = $this->tenantJson('GET', '/api/v1/planejamento/anuais/'.$id.'/pdf')
+            ->assertOk()
+            ->assertHeader('content-type', 'application/pdf');
+        $this->assertStringStartsWith('%PDF', $pdfColeta->getContent());
+
+        $tokensDepois = collect(
+            $this->tenantJson('GET', '/api/v1/planejamento/anuais/'.$id.'/pastorais/tokens')
+                ->assertOk()
+                ->json('data')
+        )->keyBy('pastoral_id');
+        $this->assertTrue($tokensDepois[$base['pastoral']['id']]['ativo'] ?? false);
+        $this->assertNotEmpty($tokensDepois[$base['pastoral']['id']]['token'] ?? null);
+        $this->assertTrue($tokensDepois[$base['pastoralB']['id']]['ativo'] ?? false);
+        $this->assertNotEmpty($tokensDepois[$base['pastoralB']['id']]['token'] ?? null);
+
         $this->tenantJson('POST', '/api/v1/planejamento/anuais/'.$id.'/status', [
             'status' => 'revisao',
         ])->assertOk()->assertJsonPath('data.status', 'revisao');
