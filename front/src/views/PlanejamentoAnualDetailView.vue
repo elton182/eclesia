@@ -119,7 +119,8 @@ const dragEventoId = ref('')
 const dropAlvo = ref('')
 const novaPastoralNome = ref('')
 const salvandoPastoral = ref(false)
-const pdfBusy = ref(false)
+/** @type {import('vue').Ref<''|'agenda'|'links'>} */
+const pdfBusy = ref('')
 let dispTimer = null
 let dispSeq = 0
 
@@ -699,11 +700,18 @@ async function mudarStatus(status) {
   }
 }
 
-async function baixarPdf() {
+/**
+ * @param {'agenda'|'links'} tipo
+ */
+async function baixarPdf(tipo) {
   if (pdfBusy.value || !anual.value) return
-  pdfBusy.value = true
+  pdfBusy.value = tipo
   try {
-    const blob = await downloadAnualPdf(anual.value.id, { mes: mesView.value })
+    const params =
+      tipo === 'links'
+        ? { tipo: 'links' }
+        : { tipo: 'agenda', mes: mesView.value }
+    const blob = await downloadAnualPdf(anual.value.id, params)
     if (blob?.type && blob.type.includes('json')) {
       const text = await blob.text()
       const body = JSON.parse(text)
@@ -714,31 +722,38 @@ async function baixarPdf() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `planejamento-${anual.value.ano}-${String(mesView.value).padStart(2, '0')}.pdf`
+    a.download =
+      tipo === 'links'
+        ? `planejamento-links-${anual.value.ano}.pdf`
+        : `planejamento-agenda-${anual.value.ano}-${String(mesView.value).padStart(2, '0')}.pdf`
     a.click()
     URL.revokeObjectURL(url)
-    await carregarLinksPastorais()
-    innovToast(
-      'success',
-      'PDF',
-      'Download iniciado · links públicos das pastorais sem link foram criados',
-    )
+    if (tipo === 'links') {
+      await carregarLinksPastorais()
+      innovToast(
+        'success',
+        'PDF',
+        'Links das pastorais · tokens faltantes foram criados',
+      )
+    } else {
+      innovToast('success', 'PDF', `Agenda de ${MES_NOMES[mesView.value] || mesView.value}`)
+    }
   } catch (e) {
     let msg = 'Falha ao exportar'
     const data = e.response?.data
     if (data instanceof Blob) {
       try {
         const body = JSON.parse(await data.text())
-        msg = body.message || body.errors?.status?.[0] || msg
+        msg = body.message || body.errors?.status?.[0] || body.errors?.mes?.[0] || msg
       } catch {
         /* ignore */
       }
-    } else if (data?.message || data?.errors?.status?.[0]) {
-      msg = data.message || data.errors.status[0]
+    } else if (data?.message || data?.errors?.status?.[0] || data?.errors?.mes?.[0]) {
+      msg = data.message || data.errors?.status?.[0] || data.errors?.mes?.[0]
     }
     innovToast('error', 'PDF', msg)
   } finally {
-    pdfBusy.value = false
+    pdfBusy.value = ''
   }
 }
 
@@ -835,16 +850,26 @@ onMounted(load)
           >
             Espaços e recursos
           </button>
-          <button
-            v-if="canGerir || anoStatus === 'fechado' || anoStatus === 'revisao' || anoStatus === 'coleta'"
-            type="button"
-            class="btn btn-primary"
-            data-testid="planejamento-pdf"
-            :disabled="pdfBusy || anoStatus === 'rascunho'"
-            @click="baixarPdf"
-          >
-            {{ pdfBusy ? 'Gerando…' : 'PDF' }}
-          </button>
+          <template v-if="canGerir || anoStatus === 'fechado' || anoStatus === 'revisao' || anoStatus === 'coleta'">
+            <button
+              type="button"
+              class="btn btn-ghost"
+              data-testid="planejamento-pdf-agenda"
+              :disabled="!!pdfBusy || anoStatus === 'rascunho'"
+              @click="baixarPdf('agenda')"
+            >
+              {{ pdfBusy === 'agenda' ? 'Gerando…' : 'PDF agenda' }}
+            </button>
+            <button
+              type="button"
+              class="btn btn-primary"
+              data-testid="planejamento-pdf-links"
+              :disabled="!!pdfBusy || anoStatus === 'rascunho'"
+              @click="baixarPdf('links')"
+            >
+              {{ pdfBusy === 'links' ? 'Gerando…' : 'PDF links' }}
+            </button>
+          </template>
         </div>
       </header>
 

@@ -80,7 +80,7 @@ export async function deleteEvento(eventoId) {
 
 /**
  * @param {string} anualId
- * @param {{ mes?: number }} [params]
+ * @param {{ tipo?: 'agenda'|'links', mes?: number }} [params]
  * @returns {Promise<Blob>}
  */
 export async function downloadAnualPdf(anualId, params = {}) {
