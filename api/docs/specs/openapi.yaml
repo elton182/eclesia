@@ -1093,6 +1093,9 @@ components:
         comentarios_count:
           type: integer
           description: Apenas comentários aprovados
+        leituras_count:
+          type: integer
+          description: Quantidade de visualizações (leituras registradas)
         lido_por_mim:
           type: boolean
         lido_em:
