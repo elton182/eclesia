@@ -718,7 +718,11 @@ async function baixarPdf() {
     a.click()
     URL.revokeObjectURL(url)
     await carregarLinksPastorais()
-    innovToast('success', 'PDF', 'Download iniciado')
+    innovToast(
+      'success',
+      'PDF',
+      'Download iniciado · links públicos das pastorais sem link foram criados',
+    )
   } catch (e) {
     let msg = 'Falha ao exportar'
     const data = e.response?.data

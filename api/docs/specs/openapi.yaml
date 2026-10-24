@@ -5649,7 +5649,8 @@ paths:
       description: |
         Disponível em `coleta`, `revisao` ou `fechado`. Query `mes` filtra um mês (1–12).
         Uma seção por pastoral ativa: QR Code do link público, URL abaixo e lista de eventos.
-        Gera o token público da pastoral se ainda não existir.
+        Ao gerar o PDF, cria automaticamente o link/token público de toda pastoral ativa
+        que ainda não tiver link ativo (não rotaciona links já existentes).
       security: [{bearerAuth: [], tenantHeader: [], igrejaHeader: []}]
       parameters:
         - {name: id, in: path, required: true, schema: {type: string}}

@@ -385,9 +385,10 @@ class PlanejamentoService
             ->get()
             ->groupBy('pastoral_id');
 
+        // Garante link público de cada pastoral ativa (cria só os que faltam).
         $secoes = [];
         foreach ($pastorais as $pastoral) {
-            $result = $this->createOrRotatePastoralTokenIfMissing($anual, $pastoral->id);
+            $result = $this->ensurePastoralPublicLink($anual, $pastoral->id);
             $url = $this->publicUrl->forToken($result['plain']);
             $secoes[] = [
                 'pastoral' => $pastoral,
@@ -417,11 +418,12 @@ class PlanejamentoService
     }
 
     /**
-     * Reusa token ativo; gera um novo se não houver.
+     * Garante link público da pastoral no ano: reusa o ativo ou cria se estiver faltando/revogado.
+     * Não rotaciona um link ativo existente.
      *
      * @return array{token: PlanejamentoPastoralToken, plain: string}
      */
-    private function createOrRotatePastoralTokenIfMissing(PlanejamentoAnual $anual, string $pastoralId): array
+    private function ensurePastoralPublicLink(PlanejamentoAnual $anual, string $pastoralId): array
     {
         $existente = PlanejamentoPastoralToken::query()
             ->where('planejamento_anual_id', $anual->id)
