@@ -33,15 +33,15 @@ Arquivo: PDF / DOC / DOCX / XLS / XLSX / JPG / PNG / WEBP, máx. **10 MB**, disk
 
 ## Critérios de aceite (testáveis)
 
-- [ ] Migration: colunas de anexo + tabela `ecc_leituras`.
-- [ ] Create/update multipart aceita `anexo`; `GET .../anexo` faz stream.
-- [ ] Listagem retorna `resumo`, `lido_por_mim`, `lido_em`, `tem_anexo` (sem corpo/texto completo para líder).
-- [ ] `GET .../{id}` retorna corpo completo; `POST .../{id}/ler` grava/atualiza `lido_em`.
-- [ ] `GET /ecc/mural/nao-lidos` → `{ recados, reflexoes }` (publicados válidos no escopo e sem leitura do user).
-- [ ] `GET .../{id}/engajamento` (admin): leituras, likes, comentários + contagens.
-- [ ] Front: cards resumidos → detalhe; badges nos dois itens do menu; download; painel engajamento.
-- [ ] Após ler, badge diminui sem depender só de `localStorage`.
-- [ ] Testes API + Vitest (resumo, badge).
+- [x] Migration: colunas de anexo + tabela `ecc_leituras`.
+- [x] Create/update multipart aceita `anexo`; `GET .../anexo` faz stream.
+- [x] Listagem retorna `resumo`, `lido_por_mim`, `lido_em`, `tem_anexo` (sem corpo/texto completo para líder).
+- [x] `GET .../{id}` retorna corpo completo; `POST .../{id}/ler` grava/atualiza `lido_em`.
+- [x] `GET /ecc/mural/nao-lidos` → `{ recados, reflexoes }` (publicados válidos no escopo e sem leitura do user).
+- [x] `GET .../{id}/engajamento` (admin): leituras, likes, comentários + contagens.
+- [x] Front: cards resumidos → detalhe; badges nos dois itens do menu; download; painel engajamento.
+- [x] Após ler, badge diminui sem depender só de `localStorage`.
+- [x] Testes API + Vitest (resumo, badge).
 
 ## Fora de escopo
 
