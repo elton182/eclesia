@@ -232,6 +232,82 @@ export function gradeSemanaCalendario(semanaInicioIso, opts = {}) {
   return cells
 }
 
+/** Faixa horária padrão da visão semanal (agenda). */
+export const SEMANA_HORA_INICIO = 6
+export const SEMANA_HORA_FIM = 22
+export const SEMANA_PX_POR_HORA = 48
+
+/**
+ * Labels de hora para a coluna lateral da visão semanal [inicio, fim).
+ * @param {number} [horaInicio=6]
+ * @param {number} [horaFim=22]
+ * @returns {Array<{ hora: number, label: string }>}
+ */
+export function horasGradeSemana(horaInicio = SEMANA_HORA_INICIO, horaFim = SEMANA_HORA_FIM) {
+  const ini = Number(horaInicio)
+  const fim = Number(horaFim)
+  if (!Number.isFinite(ini) || !Number.isFinite(fim) || fim <= ini) return []
+  /** @type {Array<{ hora: number, label: string }>} */
+  const out = []
+  for (let h = ini; h < fim; h++) {
+    out.push({ hora: h, label: `${String(h).padStart(2, '0')}:00` })
+  }
+  return out
+}
+
+/**
+ * Minutos desde meia-noite a partir de "HH:MM" / "HH:MM:SS".
+ * @param {string|null|undefined} hora
+ * @returns {number|null}
+ */
+export function minutosDoDia(hora) {
+  if (hora == null || hora === '') return null
+  const m = String(hora).match(/^(\d{1,2}):(\d{2})/)
+  if (!m) return null
+  const hh = Number(m[1])
+  const mm = Number(m[2])
+  if (hh < 0 || hh > 23 || mm < 0 || mm > 59) return null
+  return hh * 60 + mm
+}
+
+/**
+ * Posição absoluta (top/height em px) de um evento na grade horária semanal.
+ * Sem hora_inicio → allDay.
+ * @param {{ hora_inicio?: string|null, hora_fim?: string|null }|null|undefined} evento
+ * @param {{
+ *   horaInicio?: number,
+ *   horaFim?: number,
+ *   pxPorHora?: number,
+ * }} [opts]
+ * @returns {{ allDay: boolean, top: number, height: number }}
+ */
+export function layoutEventoNaGradeHoraria(evento, opts = {}) {
+  const horaInicio = opts.horaInicio ?? SEMANA_HORA_INICIO
+  const horaFim = opts.horaFim ?? SEMANA_HORA_FIM
+  const pxPorHora = opts.pxPorHora ?? SEMANA_PX_POR_HORA
+  const rangeMin = (horaFim - horaInicio) * 60
+  const startBound = horaInicio * 60
+  const endBound = horaFim * 60
+
+  const hi = minutosDoDia(evento?.hora_inicio)
+  if (hi == null) {
+    return { allDay: true, top: 0, height: 0 }
+  }
+  let hf = minutosDoDia(evento?.hora_fim)
+  if (hf == null || hf <= hi) hf = hi + 60
+
+  const clippedStart = Math.max(startBound, Math.min(endBound, hi))
+  const clippedEnd = Math.max(startBound, Math.min(endBound, hf))
+  if (clippedEnd <= startBound || clippedStart >= endBound) {
+    // Fora da faixa visível: marca fina na borda mais próxima
+    const topEdge = hi < startBound ? 0 : Math.max(0, rangeMin - pxPorHora / 2)
+    return { allDay: false, top: topEdge, height: Math.max(pxPorHora / 2, 18) }
+  }
+  const top = ((clippedStart - startBound) * pxPorHora) / 60
+  const height = Math.max(pxPorHora / 2, ((clippedEnd - clippedStart) * pxPorHora) / 60)
+  return { allDay: false, top, height }
+}
+
 /**
  * Células da grade mensal (Dom–Sáb). Fora do mês → iso null.
  * @param {number} ano

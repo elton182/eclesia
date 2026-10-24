@@ -10,6 +10,10 @@ import {
   inicioSemanaDomingo,
   addDiasIso,
   gradeSemanaCalendario,
+  horasGradeSemana,
+  minutosDoDia,
+  layoutEventoNaGradeHoraria,
+  SEMANA_PX_POR_HORA,
   toggleDataSelecionada,
   labelDiaCurto,
   resumoDiaMontagem,
@@ -112,6 +116,33 @@ describe('calendario', () => {
     assert.equal(cruzando[0].inMonth, false)
     assert.equal(cruzando[4].iso, '2026-10-01')
     assert.equal(cruzando[4].inMonth, true)
+  })
+
+  it('horasGradeSemana e layoutEventoNaGradeHoraria', () => {
+    const horas = horasGradeSemana(6, 9)
+    assert.deepEqual(
+      horas.map((h) => h.label),
+      ['06:00', '07:00', '08:00'],
+    )
+    assert.equal(minutosDoDia('19:30'), 19 * 60 + 30)
+    assert.equal(minutosDoDia(null), null)
+
+    const diaTodo = layoutEventoNaGradeHoraria({ titulo: 'Retiro' })
+    assert.equal(diaTodo.allDay, true)
+
+    const bloco = layoutEventoNaGradeHoraria(
+      { hora_inicio: '08:00', hora_fim: '10:00' },
+      { horaInicio: 6, horaFim: 22, pxPorHora: 48 },
+    )
+    assert.equal(bloco.allDay, false)
+    assert.equal(bloco.top, 2 * SEMANA_PX_POR_HORA) // 08:00 = 2h após 06:00
+    assert.equal(bloco.height, 2 * SEMANA_PX_POR_HORA)
+
+    const soInicio = layoutEventoNaGradeHoraria(
+      { hora_inicio: '07:00' },
+      { horaInicio: 6, pxPorHora: 48 },
+    )
+    assert.equal(soInicio.height, SEMANA_PX_POR_HORA) // 1h padrão
   })
 
   it('alterna datas selecionadas e formata label curto', () => {
