@@ -6,11 +6,15 @@ namespace App\Services;
 
 use App\Models\Casal;
 use App\Models\EccEquipe;
+use App\Models\EccLeitura;
 use App\Models\EccRecado;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class EccRecadoService
 {
@@ -42,10 +46,27 @@ class EccRecadoService
             $this->applyFeedConstraints($query);
         }
 
+        $user = auth()->user() instanceof User ? auth()->user() : null;
+
         return $query->get()
-            ->map(fn (EccRecado $r): array => $this->serialize($r))
+            ->map(fn (EccRecado $r): array => $this->serialize($r, listMode: true, user: $user))
             ->values()
             ->all();
+    }
+
+    /**
+     * IDs do feed publicados/válidos no escopo (para contagem de não lidos).
+     *
+     * @return list<string>
+     */
+    public function listFeedIdsForUnread(): array
+    {
+        $this->assertCanView();
+
+        $query = EccRecado::query()->where('igreja_id', $this->igrejaId());
+        $this->applyFeedConstraints($query);
+
+        return $query->pluck('id')->map(static fn (mixed $id): string => (string) $id)->values()->all();
     }
 
     public function novidadesCount(Carbon $desde): int
@@ -78,10 +99,14 @@ class EccRecadoService
     /**
      * @param  array<string, mixed>  $data
      */
-    public function create(array $data, User $user): EccRecado
+    public function create(array $data, User $user, ?UploadedFile $anexo = null): EccRecado
     {
         $this->assertCanManage();
         $payload = $this->normalizePayload($data);
+
+        if ($anexo !== null) {
+            $payload = [...$payload, ...EccMuralAnexo::store($anexo, $this->igrejaId(), 'recados')];
+        }
 
         return EccRecado::query()->create([
             ...$payload,
@@ -93,12 +118,29 @@ class EccRecadoService
     /**
      * @param  array<string, mixed>  $data
      */
-    public function update(EccRecado $recado, array $data): EccRecado
+    public function update(EccRecado $recado, array $data, ?UploadedFile $anexo = null, bool $removerAnexo = false): EccRecado
     {
         $this->assertCanManage();
         abort_unless((string) $recado->igreja_id === $this->igrejaId(), 404);
 
-        $recado->fill($this->normalizePayload($data, $recado));
+        $payload = $this->normalizePayload($data, $recado);
+
+        if ($removerAnexo && $recado->anexo_path) {
+            EccMuralAnexo::delete($recado->anexo_path);
+            $payload['anexo_path'] = null;
+            $payload['anexo_nome'] = null;
+            $payload['anexo_mime'] = null;
+            $payload['anexo_tamanho'] = null;
+        }
+
+        if ($anexo !== null) {
+            if ($recado->anexo_path) {
+                EccMuralAnexo::delete($recado->anexo_path);
+            }
+            $payload = [...$payload, ...EccMuralAnexo::store($anexo, $this->igrejaId(), 'recados')];
+        }
+
+        $recado->fill($payload);
         $recado->save();
 
         return $recado->refresh();
@@ -108,20 +150,37 @@ class EccRecadoService
     {
         $this->assertCanManage();
         abort_unless((string) $recado->igreja_id === $this->igrejaId(), 404);
+        EccMuralAnexo::delete($recado->anexo_path);
         $recado->delete();
+    }
+
+    public function streamAnexo(EccRecado $recado): StreamedResponse
+    {
+        abort_unless((string) $recado->igreja_id === $this->igrejaId(), 404);
+        $path = $recado->anexo_path;
+        abort_unless(is_string($path) && $path !== '' && Storage::disk('public')->exists($path), 404);
+
+        return Storage::disk('public')->response(
+            $path,
+            $recado->anexo_nome ?: 'anexo',
+            ['Content-Type' => $recado->anexo_mime ?: 'application/octet-stream'],
+        );
     }
 
     /**
      * @return array<string, mixed>
      */
-    public function serialize(EccRecado $recado): array
+    public function serialize(EccRecado $recado, bool $listMode = false, ?User $user = null): array
     {
-        $stats = app(EccInteracaoService::class)->statsFor('recado', (string) $recado->id);
+        $user ??= auth()->user() instanceof User ? auth()->user() : null;
+        $stats = app(EccInteracaoService::class)->statsFor('recado', (string) $recado->id, $user);
+        $leitura = app(EccLeituraService::class)->leituraDoUsuario(EccLeitura::ALVO_RECADO, (string) $recado->id, $user);
+        $anexo = EccMuralAnexo::meta($recado);
 
-        return [
+        $base = [
             'id' => (string) $recado->id,
             'titulo' => (string) $recado->titulo,
-            'corpo' => (string) $recado->corpo,
+            'resumo' => EccLeituraService::resumoTexto((string) $recado->corpo),
             'urgente' => (bool) $recado->urgente,
             'fixado' => (bool) $recado->fixado,
             'escopo' => (string) $recado->escopo,
@@ -134,9 +193,20 @@ class EccRecadoService
             'likes_count' => $stats['likes_count'],
             'liked_by_me' => $stats['liked_by_me'],
             'comentarios_count' => $stats['comentarios_count'],
+            'lido_por_mim' => $leitura['lido_por_mim'],
+            'lido_em' => $leitura['lido_em'],
+            ...$anexo,
             'created_at' => $recado->created_at?->toIso8601String(),
             'updated_at' => $recado->updated_at?->toIso8601String(),
         ];
+
+        if ($listMode) {
+            return $base;
+        }
+
+        $base['corpo'] = (string) $recado->corpo;
+
+        return $base;
     }
 
     /**
@@ -270,11 +340,18 @@ class EccRecadoService
             ? $this->parseNullableDateTime($data['valido_ate'])
             : $existing?->valido_ate;
 
+        $urgente = array_key_exists('urgente', $data)
+            ? $this->toBool($data['urgente'])
+            : (bool) ($existing?->urgente ?? false);
+        $fixado = array_key_exists('fixado', $data)
+            ? $this->toBool($data['fixado'])
+            : (bool) ($existing?->fixado ?? false);
+
         return [
             'titulo' => (string) ($data['titulo'] ?? $existing?->titulo),
             'corpo' => (string) ($data['corpo'] ?? $existing?->corpo),
-            'urgente' => (bool) ($data['urgente'] ?? $existing?->urgente ?? false),
-            'fixado' => (bool) ($data['fixado'] ?? $existing?->fixado ?? false),
+            'urgente' => $urgente,
+            'fixado' => $fixado,
             'escopo' => $escopo,
             'equipe_id' => $equipeId ? (string) $equipeId : null,
             'etapa' => $etapa,
@@ -282,6 +359,15 @@ class EccRecadoService
             'valido_ate' => $validoAte,
             'status' => $status,
         ];
+    }
+
+    private function toBool(mixed $value): bool
+    {
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        return filter_var($value, FILTER_VALIDATE_BOOLEAN);
     }
 
     private function parseNullableDateTime(mixed $value): ?Carbon

@@ -38,6 +38,8 @@ class UpdateEccRecadoRequest extends FormRequest
                 EccRecado::STATUS_RASCUNHO,
                 EccRecado::STATUS_PUBLICADO,
             ])],
+            'anexo' => ['nullable', 'file', 'max:10240'],
+            'remover_anexo' => ['sometimes', 'boolean'],
         ];
     }
 }

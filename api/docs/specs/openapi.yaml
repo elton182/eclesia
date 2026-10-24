@@ -1051,8 +1051,12 @@ components:
           description: ULID
         titulo:
           type: string
+        resumo:
+          type: string
+          description: Trecho do corpo (listagem)
         corpo:
           type: string
+          description: Corpo completo (somente no detalhe)
         urgente:
           type: boolean
         fixado:
@@ -1089,6 +1093,23 @@ components:
         comentarios_count:
           type: integer
           description: Apenas comentários aprovados
+        lido_por_mim:
+          type: boolean
+        lido_em:
+          type: string
+          format: date-time
+          nullable: true
+        tem_anexo:
+          type: boolean
+        anexo_nome:
+          type: string
+          nullable: true
+        anexo_mime:
+          type: string
+          nullable: true
+        anexo_tamanho:
+          type: integer
+          nullable: true
         created_at:
           type: string
           format: date-time
@@ -1103,11 +1124,15 @@ components:
           description: ULID
         titulo:
           type: string
+        resumo:
+          type: string
+          description: Trecho do texto (listagem)
         passagem_biblica:
           type: string
           nullable: true
         texto:
           type: string
+          description: Texto completo (somente no detalhe)
         imagem_url:
           type: string
           nullable: true
@@ -1129,12 +1154,66 @@ components:
           type: boolean
         comentarios_count:
           type: integer
+        lido_por_mim:
+          type: boolean
+        lido_em:
+          type: string
+          format: date-time
+          nullable: true
+        tem_anexo:
+          type: boolean
+        anexo_nome:
+          type: string
+          nullable: true
+        anexo_mime:
+          type: string
+          nullable: true
+        anexo_tamanho:
+          type: integer
+          nullable: true
         created_at:
           type: string
           format: date-time
         updated_at:
           type: string
           format: date-time
+    EccMuralEngajamento:
+      type: object
+      properties:
+        resumo:
+          type: object
+          properties:
+            leituras_count: {type: integer}
+            likes_count: {type: integer}
+            comentarios_count: {type: integer}
+            comentarios_aprovados_count: {type: integer}
+        leituras:
+          type: array
+          items:
+            type: object
+            properties:
+              user_id: {type: integer}
+              nome: {type: string, nullable: true}
+              lido_em: {type: string, format: date-time, nullable: true}
+        likes:
+          type: array
+          items:
+            type: object
+            properties:
+              user_id: {type: integer}
+              nome: {type: string, nullable: true}
+              em: {type: string, format: date-time, nullable: true}
+        comentarios:
+          type: array
+          items:
+            type: object
+            properties:
+              id: {type: string}
+              user_id: {type: integer}
+              nome: {type: string, nullable: true}
+              corpo: {type: string}
+              status: {type: string}
+              em: {type: string, format: date-time, nullable: true}
     EccComentario:
       type: object
       properties:
@@ -4152,12 +4231,36 @@ paths:
         '422':
           description: Validação / não provisionado
 
+  /ecc/mural/nao-lidos:
+    get:
+      summary: Contadores de recados e reflexões não lidos
+      description: >
+        Publicados válidos no escopo do usuário sem registro em ecc_leituras (SPEC-029).
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      responses:
+        '200':
+          description: Contagens
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      recados: {type: integer, minimum: 0}
+                      reflexoes: {type: integer, minimum: 0}
+        '403':
+          description: Sem permissão
   /ecc/recados:
     get:
       summary: Listar recados ECC
       description: >
         Com ecc.recados.view (líder): só publicados válidos no escopo do usuário.
         Com ecc.recados.manage: todos (filtro status opcional).
+        Listagem retorna resumo (sem corpo completo).
       security:
         - bearerAuth: []
           tenantHeader: []
@@ -4189,6 +4292,22 @@ paths:
       requestBody:
         required: true
         content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [titulo, corpo, escopo, status]
+              properties:
+                titulo: {type: string, maxLength: 180}
+                corpo: {type: string, maxLength: 10000}
+                urgente: {type: boolean}
+                fixado: {type: boolean}
+                escopo: {type: string, enum: [paroquia, etapa, equipe]}
+                equipe_id: {type: string, nullable: true}
+                etapa: {type: integer, nullable: true, minimum: 1, maximum: 3}
+                publicado_em: {type: string, format: date-time, nullable: true}
+                valido_ate: {type: string, format: date-time, nullable: true}
+                status: {type: string, enum: [rascunho, publicado]}
+                anexo: {type: string, format: binary}
           application/json:
             schema:
               type: object
@@ -4246,6 +4365,7 @@ paths:
   /ecc/recados/{id}:
     get:
       summary: Detalhe do recado
+      description: Retorna corpo completo.
       security:
         - bearerAuth: []
           tenantHeader: []
@@ -4274,6 +4394,22 @@ paths:
       requestBody:
         required: true
         content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                titulo: {type: string, maxLength: 180}
+                corpo: {type: string, maxLength: 10000}
+                urgente: {type: boolean}
+                fixado: {type: boolean}
+                escopo: {type: string, enum: [paroquia, etapa, equipe]}
+                equipe_id: {type: string, nullable: true}
+                etapa: {type: integer, nullable: true, minimum: 1, maximum: 3}
+                publicado_em: {type: string, format: date-time, nullable: true}
+                valido_ate: {type: string, format: date-time, nullable: true}
+                status: {type: string, enum: [rascunho, publicado]}
+                anexo: {type: string, format: binary}
+                remover_anexo: {type: boolean}
           application/json:
             schema:
               type: object
@@ -4288,6 +4424,7 @@ paths:
                 publicado_em: {type: string, format: date-time, nullable: true}
                 valido_ate: {type: string, format: date-time, nullable: true}
                 status: {type: string, enum: [rascunho, publicado]}
+                remover_anexo: {type: boolean}
       responses:
         '200':
           description: Atualizado
@@ -4297,6 +4434,31 @@ paths:
           description: Não encontrado
         '422':
           description: Validação
+    post:
+      summary: Atualizar recado (multipart)
+      description: Alias de PUT para upload de anexo via FormData.
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                titulo: {type: string}
+                corpo: {type: string}
+                anexo: {type: string, format: binary}
+                remover_anexo: {type: boolean}
+      responses:
+        '200':
+          description: Atualizado
     delete:
       summary: Remover recado
       security:
@@ -4314,6 +4476,69 @@ paths:
           description: Sem permissão
         '404':
           description: Não encontrado
+  /ecc/recados/{id}/ler:
+    post:
+      summary: Marcar recado como lido
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        '200':
+          description: Leitura registrada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      lido_por_mim: {type: boolean}
+                      lido_em: {type: string, format: date-time}
+  /ecc/recados/{id}/engajamento:
+    get:
+      summary: Engajamento do recado (admin)
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        '200':
+          description: Leituras, likes e comentários
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/EccMuralEngajamento'
+        '403':
+          description: Sem permissão
+  /ecc/recados/{id}/anexo:
+    get:
+      summary: Download do anexo do recado
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        '200':
+          description: Arquivo
+        '404':
+          description: Sem anexo
 
   /ecc/reflexoes:
     get:
@@ -4363,6 +4588,7 @@ paths:
                 publicado_em: {type: string, format: date}
                 status: {type: string, enum: [rascunho, publicado]}
                 imagem: {type: string, format: binary}
+                anexo: {type: string, format: binary}
       responses:
         '201':
           description: Criada
@@ -4373,6 +4599,7 @@ paths:
   /ecc/reflexoes/{id}:
     get:
       summary: Detalhe da reflexão
+      description: Retorna texto completo.
       security:
         - bearerAuth: []
           tenantHeader: []
@@ -4412,6 +4639,8 @@ paths:
                 status: {type: string, enum: [rascunho, publicado]}
                 imagem: {type: string, format: binary}
                 remover_imagem: {type: boolean}
+                anexo: {type: string, format: binary}
+                remover_anexo: {type: boolean}
       responses:
         '200':
           description: Atualizada
@@ -4438,6 +4667,59 @@ paths:
           description: Sem permissão
         '404':
           description: Não encontrada
+  /ecc/reflexoes/{id}/ler:
+    post:
+      summary: Marcar reflexão como lida
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        '200':
+          description: Leitura registrada
+  /ecc/reflexoes/{id}/engajamento:
+    get:
+      summary: Engajamento da reflexão (admin)
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        '200':
+          description: Leituras, likes e comentários
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/EccMuralEngajamento'
+        '403':
+          description: Sem permissão
+  /ecc/reflexoes/{id}/anexo:
+    get:
+      summary: Download do anexo da reflexão
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        '200':
+          description: Arquivo
+        '404':
+          description: Sem anexo
   /ecc/reflexoes/{id}/imagem:
     get:
       summary: Download da imagem da reflexão

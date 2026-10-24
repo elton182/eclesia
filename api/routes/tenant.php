@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\EccEventoController;
 use App\Http\Controllers\Api\EccFinanceiroController;
 use App\Http\Controllers\Api\EccFinanceiroDepositoController;
 use App\Http\Controllers\Api\EccInteracaoController;
+use App\Http\Controllers\Api\EccMuralController;
 use App\Http\Controllers\Api\EccRecadoController;
 use App\Http\Controllers\Api\EccReflexaoController;
 use App\Http\Controllers\Api\EventoTipoController;
@@ -193,6 +194,8 @@ Route::middleware([
     Route::post('ecc/financeiro/depositos/{id}/aprovar', [EccFinanceiroDepositoController::class, 'aprovar']);
     Route::post('ecc/financeiro/depositos/{id}/rejeitar', [EccFinanceiroDepositoController::class, 'rejeitar']);
 
+    Route::get('ecc/mural/nao-lidos', [EccMuralController::class, 'naoLidos']);
+
     Route::get('ecc/recados/novidades', [EccRecadoController::class, 'novidades']);
     Route::get('ecc/recados', [EccRecadoController::class, 'index']);
     Route::post('ecc/recados', [EccRecadoController::class, 'store']);
@@ -200,8 +203,11 @@ Route::middleware([
     Route::delete('ecc/recados/{id}/like', [EccInteracaoController::class, 'unlikeRecado']);
     Route::get('ecc/recados/{id}/comentarios', [EccInteracaoController::class, 'listComentariosRecado']);
     Route::post('ecc/recados/{id}/comentarios', [EccInteracaoController::class, 'storeComentarioRecado']);
+    Route::post('ecc/recados/{id}/ler', [EccMuralController::class, 'lerRecado']);
+    Route::get('ecc/recados/{id}/engajamento', [EccMuralController::class, 'engajamentoRecado']);
+    Route::get('ecc/recados/{id}/anexo', [EccRecadoController::class, 'anexo']);
     Route::get('ecc/recados/{id}', [EccRecadoController::class, 'show']);
-    Route::put('ecc/recados/{id}', [EccRecadoController::class, 'update']);
+    Route::match(['put', 'post'], 'ecc/recados/{id}', [EccRecadoController::class, 'update']);
     Route::delete('ecc/recados/{id}', [EccRecadoController::class, 'destroy']);
 
     Route::get('ecc/reflexoes', [EccReflexaoController::class, 'index']);
@@ -210,7 +216,10 @@ Route::middleware([
     Route::delete('ecc/reflexoes/{id}/like', [EccInteracaoController::class, 'unlikeReflexao']);
     Route::get('ecc/reflexoes/{id}/comentarios', [EccInteracaoController::class, 'listComentariosReflexao']);
     Route::post('ecc/reflexoes/{id}/comentarios', [EccInteracaoController::class, 'storeComentarioReflexao']);
+    Route::post('ecc/reflexoes/{id}/ler', [EccMuralController::class, 'lerReflexao']);
+    Route::get('ecc/reflexoes/{id}/engajamento', [EccMuralController::class, 'engajamentoReflexao']);
     Route::get('ecc/reflexoes/{id}/imagem', [EccReflexaoController::class, 'imagem']);
+    Route::get('ecc/reflexoes/{id}/anexo', [EccReflexaoController::class, 'anexo']);
     Route::get('ecc/reflexoes/{id}', [EccReflexaoController::class, 'show']);
     Route::match(['put', 'post'], 'ecc/reflexoes/{id}', [EccReflexaoController::class, 'update']);
     Route::delete('ecc/reflexoes/{id}', [EccReflexaoController::class, 'destroy']);

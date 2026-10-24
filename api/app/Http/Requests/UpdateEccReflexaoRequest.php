@@ -31,6 +31,8 @@ class UpdateEccReflexaoRequest extends FormRequest
             ])],
             'imagem' => ['nullable', 'file', 'image', 'max:5120'],
             'remover_imagem' => ['sometimes', 'boolean'],
+            'anexo' => ['nullable', 'file', 'max:10240'],
+            'remover_anexo' => ['sometimes', 'boolean'],
         ];
     }
 }

@@ -17,11 +17,7 @@ import {
   isSomenteLiderEquipe,
   isViewAsLider,
 } from '@/utils/userRoles'
-import {
-  defaultRecadosDesde,
-  formatRecadosBadge,
-  getRecadosLastSeen,
-} from '@/utils/liderRecados'
+import { formatMuralBadges } from '@/utils/eccMural'
 import PwaInstallNavButton from '@/components/base/PwaInstallNavButton.vue'
 import ViewAsLiderBanner from '@/components/ViewAsLiderBanner.vue'
 import LiderBottomNav from '@/components/ecc/LiderBottomNav.vue'
@@ -139,21 +135,30 @@ const liderShell = computed(
 )
 
 const recadosBadge = ref(null)
+const reflexoesBadge = ref(null)
 const tourHelpRequest = ref(0)
 provide('liderTourHelpRequest', tourHelpRequest)
 
-async function refreshRecadosBadge() {
+async function refreshMuralBadges() {
   if (!liderShell.value) {
     recadosBadge.value = null
+    reflexoesBadge.value = null
     return
   }
   try {
-    const desde = getRecadosLastSeen(localStorage) || defaultRecadosDesde()
-    const { data } = await api.get('/ecc/recados/novidades', { params: { desde } })
-    recadosBadge.value = formatRecadosBadge(data?.data?.count ?? 0)
+    const { data } = await api.get('/ecc/mural/nao-lidos')
+    const badges = formatMuralBadges(data?.data)
+    recadosBadge.value = badges.recados
+    reflexoesBadge.value = badges.reflexoes
   } catch {
     recadosBadge.value = null
+    reflexoesBadge.value = null
   }
+}
+
+/** @deprecated use refreshMuralBadges — mantido para evento do router-view */
+async function refreshRecadosBadge() {
+  await refreshMuralBadges()
 }
 
 const liderNavActive = computed(() => {
@@ -179,7 +184,7 @@ function requestLiderTourHelp() {
 watch(
   () => [liderShell.value, route.path],
   () => {
-    if (liderShell.value) refreshRecadosBadge()
+    if (liderShell.value) refreshMuralBadges()
   },
   { immediate: true },
 )
@@ -432,7 +437,29 @@ onUnmounted(() => {
           :disabled="item.stub"
           @click="onNav(item)"
         >
-          {{ item.label }}
+          <span class="inline-flex items-center gap-2">
+            {{ item.label }}
+            <span
+              v-if="liderShell && item.path === '/ecc/recados' && recadosBadge"
+              class="min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-semibold inline-flex items-center justify-center"
+              :style="
+                isActive(item)
+                  ? { background: 'var(--color-accent-dark)', color: '#fff' }
+                  : { background: 'var(--color-accent)', color: 'var(--color-primary)' }
+              "
+              data-testid="sidebar-recados-badge"
+            >{{ recadosBadge }}</span>
+            <span
+              v-if="liderShell && item.path === '/ecc/reflexoes' && reflexoesBadge"
+              class="min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-semibold inline-flex items-center justify-center"
+              :style="
+                isActive(item)
+                  ? { background: 'var(--color-accent-dark)', color: '#fff' }
+                  : { background: 'var(--color-accent)', color: 'var(--color-primary)' }
+              "
+              data-testid="sidebar-reflexoes-badge"
+            >{{ reflexoesBadge }}</span>
+          </span>
         </button>
       </nav>
     </aside>
@@ -523,7 +550,7 @@ onUnmounted(() => {
         class="flex-1 min-w-0 w-full"
         :class="liderShell ? 'pb-[72px] md:pb-0' : ''"
       >
-        <router-view @recados-seen="refreshRecadosBadge" />
+        <router-view @mural-seen="refreshMuralBadges" @recados-seen="refreshMuralBadges" />
       </main>
 
     </div>
@@ -533,6 +560,7 @@ onUnmounted(() => {
       v-if="liderShell"
       :active="liderNavActive"
       :recados-badge="recadosBadge"
+      :reflexoes-badge="reflexoesBadge"
       @navigate="onLiderNav"
     />
   </div>
