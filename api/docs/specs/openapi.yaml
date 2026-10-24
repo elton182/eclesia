@@ -1043,6 +1043,76 @@ components:
         updated_at:
           type: string
           format: date-time
+    EccPerguntaCampo:
+      type: object
+      properties:
+        id: {type: string}
+        ordem: {type: integer}
+        tipo: {type: string, enum: [texto_curto, texto_longo, lista]}
+        rotulo: {type: string}
+        obrigatorio: {type: boolean}
+        opcoes:
+          type: array
+          items: {type: string}
+          nullable: true
+    EccPerguntaEnvio:
+      type: object
+      properties:
+        id: {type: string}
+        pergunta_id: {type: string}
+        equipe_id: {type: string}
+        equipe_nome: {type: string}
+        enviado_por_user_id: {type: string}
+        enviado_por_nome: {type: string}
+        respostas:
+          type: object
+          additionalProperties: {type: string}
+        status: {type: string, enum: [enviado, respondido]}
+        enviado_em: {type: string, format: date-time}
+        resposta_responsavel: {type: string, nullable: true}
+        respondido_em: {type: string, format: date-time, nullable: true}
+        respondido_por_nome: {type: string}
+    EccPerguntaWrite:
+      type: object
+      required: [titulo, responsavel_user_id, campos]
+      properties:
+        titulo: {type: string, maxLength: 180}
+        descricao: {type: string, nullable: true}
+        responsavel_user_id: {type: string, description: ULID do usuário responsável}
+        campos:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [tipo, rotulo]
+            properties:
+              tipo: {type: string, enum: [texto_curto, texto_longo, lista]}
+              rotulo: {type: string}
+              obrigatorio: {type: boolean}
+              ordem: {type: integer}
+              opcoes:
+                type: array
+                items: {type: string}
+    EccPergunta:
+      type: object
+      properties:
+        id: {type: string}
+        titulo: {type: string}
+        descricao: {type: string, nullable: true}
+        status: {type: string, enum: [rascunho, disponivel, arquivado]}
+        responsavel_user_id: {type: string}
+        responsavel_nome: {type: string}
+        disponibilizado_em: {type: string, format: date-time, nullable: true}
+        campos_count: {type: integer}
+        envios_count: {type: integer, nullable: true}
+        meu_envio:
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/EccPerguntaEnvio'
+        campos:
+          type: array
+          items:
+            $ref: '#/components/schemas/EccPerguntaCampo'
     EccRecado:
       type: object
       properties:
@@ -4542,6 +4612,270 @@ paths:
           description: Arquivo
         '404':
           description: Sem anexo
+
+  /ecc/perguntas/resumo:
+    get:
+      summary: Resumo da caixa de perguntas para o líder
+      description: SPEC-030 — pendentes e com resposta (por equipes do líder).
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      responses:
+        '200':
+          description: Contagens
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      pendentes: {type: integer}
+                      com_resposta_nova: {type: integer}
+        '403':
+          description: Sem permissão
+
+  /ecc/perguntas:
+    get:
+      summary: Listar formulários da caixa de perguntas
+      description: >
+        Líder (ecc.perguntas.view): só status=disponivel.
+        Manage / responsável: todos (filtro status opcional).
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [rascunho, disponivel, arquivado]
+      responses:
+        '200':
+          description: Lista
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/EccPergunta'
+        '403':
+          description: Sem permissão
+    post:
+      summary: Criar formulário (admin)
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EccPerguntaWrite'
+      responses:
+        '201':
+          description: Criado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/EccPergunta'
+        '403':
+          description: Sem permissão
+        '422':
+          description: Validação
+
+  /ecc/perguntas/envios/{envioId}/responder:
+    post:
+      summary: Resposta do responsável ao envio
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: envioId
+          in: path
+          required: true
+          schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [resposta]
+              properties:
+                resposta: {type: string, maxLength: 5000}
+      responses:
+        '200':
+          description: Envio atualizado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/EccPerguntaEnvio'
+        '403':
+          description: Sem permissão
+
+  /ecc/perguntas/{id}:
+    get:
+      summary: Detalhe do formulário
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        '200':
+          description: Formulário com campos
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/EccPergunta'
+        '404':
+          description: Não encontrado
+    put:
+      summary: Atualizar formulário (admin)
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EccPerguntaWrite'
+      responses:
+        '200':
+          description: Atualizado
+        '422':
+          description: Validação
+    delete:
+      summary: Excluir formulário sem envios
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        '204':
+          description: Removido
+        '422':
+          description: Já há envios
+
+  /ecc/perguntas/{id}/disponibilizar:
+    post:
+      summary: Disponibilizar formulário aos líderes
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        '200':
+          description: Disponível
+        '422':
+          description: Sem campos
+
+  /ecc/perguntas/{id}/arquivar:
+    post:
+      summary: Arquivar formulário
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        '200':
+          description: Arquivado
+
+  /ecc/perguntas/{id}/envios:
+    get:
+      summary: Listar envios (admin ou responsável)
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        '200':
+          description: Envios
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/EccPerguntaEnvio'
+        '403':
+          description: Sem permissão
+    post:
+      summary: Enviar respostas (líder)
+      description: Um envio por equipe. Dispara evento Pusher ao responsável.
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [equipe_id, respostas]
+              properties:
+                equipe_id: {type: string}
+                respostas:
+                  type: object
+                  additionalProperties: {type: string}
+      responses:
+        '201':
+          description: Enviado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/EccPerguntaEnvio'
+        '422':
+          description: Validação ou já enviado
 
   /ecc/reflexoes:
     get:
