@@ -7,6 +7,8 @@ import { innovToast } from '@/plugins/toast'
 import { innovConfirm } from '@/plugins/dialog'
 import { userHasPermission } from '@/utils/userRoles'
 import { markRecadosSeen } from '@/utils/liderRecados'
+import EccInteracoesBlock from '@/components/ecc/EccInteracoesBlock.vue'
+import EccComentariosModeracao from '@/components/ecc/EccComentariosModeracao.vue'
 
 const emit = defineEmits(['recados-seen'])
 
@@ -35,11 +37,36 @@ function blankForm() {
   }
 }
 
-const canManage = computed(() =>
-  userHasPermission(auth.user, 'ecc.recados.manage', {
-    isSuperAdmin: authAdmin.isAuthenticated && !auth.isAuthenticated,
-  }),
+const authOpts = () => ({
+  isSuperAdmin: authAdmin.isAuthenticated && !auth.isAuthenticated,
+})
+
+const canManage = computed(() => userHasPermission(auth.user, 'ecc.recados.manage', authOpts()))
+
+const canModerar = computed(() =>
+  userHasPermission(auth.user, 'ecc.interacoes.moderar', authOpts())
+  || canManage.value,
 )
+
+async function onInteracaoUpdated(itemId, patch) {
+  items.value = items.value.map((it) => {
+    if (String(it.id) !== String(itemId)) return it
+    return {
+      ...it,
+      ...(patch.likes_count !== undefined ? { likes_count: patch.likes_count } : {}),
+      ...(patch.liked_by_me !== undefined ? { liked_by_me: patch.liked_by_me } : {}),
+    }
+  })
+  try {
+    const { data } = await api.get(`/ecc/recados/${itemId}`)
+    const fresh = data?.data
+    if (fresh) {
+      items.value = items.value.map((it) => (String(it.id) === String(itemId) ? fresh : it))
+    }
+  } catch {
+    /* mantém patch local */
+  }
+}
 
 function formatDate(iso) {
   if (!iso) return ''
@@ -182,6 +209,8 @@ onMounted(async () => {
       </button>
     </header>
 
+    <EccComentariosModeracao v-if="canModerar" class="mb-6" />
+
     <div v-if="showForm && canManage" class="card p-5 mb-6" data-testid="recados-form">
       <h2 class="font-serif text-[20px] mb-4" style="color: var(--color-ink)">
         {{ editingId ? 'Editar recado' : 'Novo recado' }}
@@ -298,6 +327,15 @@ onMounted(async () => {
             Remover
           </button>
         </div>
+        <EccInteracoesBlock
+          v-if="item.status === 'publicado'"
+          alvo-tipo="recado"
+          :alvo-id="item.id"
+          :likes-count="item.likes_count || 0"
+          :liked-by-me="!!item.liked_by_me"
+          :comentarios-count="item.comentarios_count || 0"
+          @updated="(p) => onInteracaoUpdated(item.id, p)"
+        />
       </li>
     </ul>
   </div>

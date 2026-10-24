@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\EccEquipeServicoController;
 use App\Http\Controllers\Api\EccEventoController;
 use App\Http\Controllers\Api\EccFinanceiroController;
 use App\Http\Controllers\Api\EccFinanceiroDepositoController;
+use App\Http\Controllers\Api\EccInteracaoController;
 use App\Http\Controllers\Api\EccRecadoController;
 use App\Http\Controllers\Api\EccReflexaoController;
 use App\Http\Controllers\Api\EventoTipoController;
@@ -195,16 +196,30 @@ Route::middleware([
     Route::get('ecc/recados/novidades', [EccRecadoController::class, 'novidades']);
     Route::get('ecc/recados', [EccRecadoController::class, 'index']);
     Route::post('ecc/recados', [EccRecadoController::class, 'store']);
+    Route::post('ecc/recados/{id}/like', [EccInteracaoController::class, 'likeRecado']);
+    Route::delete('ecc/recados/{id}/like', [EccInteracaoController::class, 'unlikeRecado']);
+    Route::get('ecc/recados/{id}/comentarios', [EccInteracaoController::class, 'listComentariosRecado']);
+    Route::post('ecc/recados/{id}/comentarios', [EccInteracaoController::class, 'storeComentarioRecado']);
     Route::get('ecc/recados/{id}', [EccRecadoController::class, 'show']);
     Route::put('ecc/recados/{id}', [EccRecadoController::class, 'update']);
     Route::delete('ecc/recados/{id}', [EccRecadoController::class, 'destroy']);
 
     Route::get('ecc/reflexoes', [EccReflexaoController::class, 'index']);
     Route::post('ecc/reflexoes', [EccReflexaoController::class, 'store']);
+    Route::post('ecc/reflexoes/{id}/like', [EccInteracaoController::class, 'likeReflexao']);
+    Route::delete('ecc/reflexoes/{id}/like', [EccInteracaoController::class, 'unlikeReflexao']);
+    Route::get('ecc/reflexoes/{id}/comentarios', [EccInteracaoController::class, 'listComentariosReflexao']);
+    Route::post('ecc/reflexoes/{id}/comentarios', [EccInteracaoController::class, 'storeComentarioReflexao']);
     Route::get('ecc/reflexoes/{id}/imagem', [EccReflexaoController::class, 'imagem']);
     Route::get('ecc/reflexoes/{id}', [EccReflexaoController::class, 'show']);
     Route::match(['put', 'post'], 'ecc/reflexoes/{id}', [EccReflexaoController::class, 'update']);
     Route::delete('ecc/reflexoes/{id}', [EccReflexaoController::class, 'destroy']);
+
+    Route::get('ecc/interacoes/comentarios', [EccInteracaoController::class, 'listModeracao']);
+    Route::post('ecc/interacoes/comentarios/{id}/aprovar', [EccInteracaoController::class, 'aprovar']);
+    Route::post('ecc/interacoes/comentarios/{id}/rejeitar', [EccInteracaoController::class, 'rejeitar']);
+    Route::post('ecc/interacoes/comentarios/{id}/ocultar', [EccInteracaoController::class, 'ocultar']);
+    Route::delete('ecc/interacoes/comentarios/{id}', [EccInteracaoController::class, 'destroyComentario']);
 
     Route::get('eventos/tipos', [EventoTipoController::class, 'index']);
     Route::post('eventos/tipos', [EventoTipoController::class, 'store']);

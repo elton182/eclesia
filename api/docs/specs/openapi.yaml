@@ -1082,6 +1082,13 @@ components:
         criado_por_user_id:
           type: string
           nullable: true
+        likes_count:
+          type: integer
+        liked_by_me:
+          type: boolean
+        comentarios_count:
+          type: integer
+          description: Apenas comentários aprovados
         created_at:
           type: string
           format: date-time
@@ -1116,12 +1123,32 @@ components:
         criado_por_user_id:
           type: string
           nullable: true
+        likes_count:
+          type: integer
+        liked_by_me:
+          type: boolean
+        comentarios_count:
+          type: integer
         created_at:
           type: string
           format: date-time
         updated_at:
           type: string
           format: date-time
+    EccComentario:
+      type: object
+      properties:
+        id: {type: string}
+        alvo_tipo: {type: string, enum: [recado, reflexao]}
+        alvo_id: {type: string}
+        corpo: {type: string}
+        status: {type: string, enum: [pendente, aprovado, rejeitado, oculto]}
+        user_id: {type: integer}
+        autor_nome: {type: string, nullable: true}
+        motivo_revisao: {type: string, nullable: true}
+        revisado_em: {type: string, format: date-time, nullable: true}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
 paths:
   /health:
     get:
@@ -4429,6 +4456,128 @@ paths:
           description: Sem permissão
         '404':
           description: Sem imagem / não encontrada
+
+  /ecc/recados/{id}/like:
+    post:
+      summary: Curtir recado
+      security: [{bearerAuth: [], tenantHeader: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string}}]
+      responses:
+        '200': {description: '{ liked, likes_count }'}
+        '403': {description: Sem permissão}
+        '404': {description: Fora do escopo}
+    delete:
+      summary: Remover curtida do recado
+      security: [{bearerAuth: [], tenantHeader: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string}}]
+      responses:
+        '200': {description: '{ liked, likes_count }'}
+  /ecc/recados/{id}/comentarios:
+    get:
+      summary: Listar comentários do recado
+      security: [{bearerAuth: [], tenantHeader: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string}}]
+      responses:
+        '200': {description: Lista (aprovados + próprios pendentes)}
+    post:
+      summary: Comentar recado
+      security: [{bearerAuth: [], tenantHeader: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string}}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [corpo]
+              properties:
+                corpo: {type: string, maxLength: 2000}
+      responses:
+        '201': {description: Comentário criado (pendente ou aprovado)}
+  /ecc/reflexoes/{id}/like:
+    post:
+      summary: Curtir reflexão
+      security: [{bearerAuth: [], tenantHeader: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string}}]
+      responses:
+        '200': {description: OK}
+    delete:
+      summary: Remover curtida da reflexão
+      security: [{bearerAuth: [], tenantHeader: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string}}]
+      responses:
+        '200': {description: OK}
+  /ecc/reflexoes/{id}/comentarios:
+    get:
+      summary: Listar comentários da reflexão
+      security: [{bearerAuth: [], tenantHeader: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string}}]
+      responses:
+        '200': {description: Lista}
+    post:
+      summary: Comentar reflexão
+      security: [{bearerAuth: [], tenantHeader: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string}}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [corpo]
+              properties:
+                corpo: {type: string, maxLength: 2000}
+      responses:
+        '201': {description: Criado}
+  /ecc/interacoes/comentarios:
+    get:
+      summary: Fila de moderação de comentários
+      description: Exige ecc.interacoes.moderar (ou manage de recados/reflexões). Padrão status=pendente.
+      security: [{bearerAuth: [], tenantHeader: []}]
+      parameters:
+        - {name: status, in: query, schema: {type: string, enum: [pendente, aprovado, rejeitado, oculto]}}
+        - {name: alvo_tipo, in: query, schema: {type: string, enum: [recado, reflexao]}}
+        - {name: alvo_id, in: query, schema: {type: string}}
+      responses:
+        '200': {description: Lista}
+        '403': {description: Sem permissão}
+  /ecc/interacoes/comentarios/{id}/aprovar:
+    post:
+      summary: Aprovar comentário
+      security: [{bearerAuth: [], tenantHeader: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string}}]
+      responses:
+        '200': {description: Aprovado}
+        '403': {description: Sem permissão}
+  /ecc/interacoes/comentarios/{id}/rejeitar:
+    post:
+      summary: Rejeitar comentário
+      security: [{bearerAuth: [], tenantHeader: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string}}]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                motivo: {type: string, maxLength: 500}
+      responses:
+        '200': {description: Rejeitado}
+  /ecc/interacoes/comentarios/{id}/ocultar:
+    post:
+      summary: Ocultar comentário aprovado
+      security: [{bearerAuth: [], tenantHeader: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string}}]
+      responses:
+        '200': {description: Oculto}
+  /ecc/interacoes/comentarios/{id}:
+    delete:
+      summary: Remover comentário (autor ou moderador)
+      security: [{bearerAuth: [], tenantHeader: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: string}}]
+      responses:
+        '204': {description: Removido}
+        '403': {description: Sem permissão}
 
   /calendario/locais:
     get:

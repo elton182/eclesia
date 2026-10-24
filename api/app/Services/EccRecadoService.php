@@ -116,6 +116,8 @@ class EccRecadoService
      */
     public function serialize(EccRecado $recado): array
     {
+        $stats = app(EccInteracaoService::class)->statsFor('recado', (string) $recado->id);
+
         return [
             'id' => (string) $recado->id,
             'titulo' => (string) $recado->titulo,
@@ -129,6 +131,9 @@ class EccRecadoService
             'valido_ate' => $recado->valido_ate?->toIso8601String(),
             'status' => (string) $recado->status,
             'criado_por_user_id' => $recado->criado_por_user_id ? (string) $recado->criado_por_user_id : null,
+            'likes_count' => $stats['likes_count'],
+            'liked_by_me' => $stats['liked_by_me'],
+            'comentarios_count' => $stats['comentarios_count'],
             'created_at' => $recado->created_at?->toIso8601String(),
             'updated_at' => $recado->updated_at?->toIso8601String(),
         ];

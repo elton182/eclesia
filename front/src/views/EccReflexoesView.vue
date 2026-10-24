@@ -6,6 +6,8 @@ import { useAuthAdminStore } from '@/stores/authAdmin'
 import { innovToast } from '@/plugins/toast'
 import { innovConfirm } from '@/plugins/dialog'
 import { userHasPermission } from '@/utils/userRoles'
+import EccInteracoesBlock from '@/components/ecc/EccInteracoesBlock.vue'
+import EccComentariosModeracao from '@/components/ecc/EccComentariosModeracao.vue'
 
 const auth = useAuthStore()
 const authAdmin = useAuthAdminStore()
@@ -30,10 +32,15 @@ function blankForm() {
   }
 }
 
-const canManage = computed(() =>
-  userHasPermission(auth.user, 'ecc.reflexoes.manage', {
-    isSuperAdmin: authAdmin.isAuthenticated && !auth.isAuthenticated,
-  }),
+const authOpts = () => ({
+  isSuperAdmin: authAdmin.isAuthenticated && !auth.isAuthenticated,
+})
+
+const canManage = computed(() => userHasPermission(auth.user, 'ecc.reflexoes.manage', authOpts()))
+
+const canModerar = computed(() =>
+  userHasPermission(auth.user, 'ecc.interacoes.moderar', authOpts())
+  || canManage.value,
 )
 
 function formatDate(iso) {
@@ -165,6 +172,8 @@ onMounted(load)
       </button>
     </header>
 
+    <EccComentariosModeracao v-if="canModerar" class="mb-6" />
+
     <div v-if="showForm && canManage" class="card p-5 mb-6" data-testid="reflexoes-form">
       <h2 class="font-serif text-[20px] mb-4" style="color: var(--color-ink)">
         {{ editingId ? 'Editar reflexão' : 'Nova reflexão' }}
@@ -250,6 +259,15 @@ onMounted(load)
       <div class="mt-4 text-[15px] leading-relaxed whitespace-pre-wrap" style="color: var(--color-ink)">
         {{ selected.texto }}
       </div>
+      <EccInteracoesBlock
+        v-if="selected.status === 'publicado'"
+        alvo-tipo="reflexao"
+        :alvo-id="selected.id"
+        :likes-count="selected.likes_count || 0"
+        :liked-by-me="!!selected.liked_by_me"
+        :comentarios-count="selected.comentarios_count || 0"
+        @updated="load"
+      />
     </article>
 
     <div v-if="loading" class="text-[13.5px]" style="color: var(--color-muted)">Carregando…</div>
@@ -310,6 +328,15 @@ onMounted(load)
               Remover
             </button>
           </div>
+          <EccInteracoesBlock
+            v-if="item.status === 'publicado'"
+            alvo-tipo="reflexao"
+            :alvo-id="item.id"
+            :likes-count="item.likes_count || 0"
+            :liked-by-me="!!item.liked_by_me"
+            :comentarios-count="item.comentarios_count || 0"
+            @updated="load"
+          />
         </template>
       </li>
     </ul>

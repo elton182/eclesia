@@ -75,7 +75,7 @@ Regras de feed (líder / `ecc.*.view`):
 
 - Push / e-mail de novo recado.
 - Papel canônico `diacono` (usa-se `ecc.reflexoes.manage` no admin).
-- Comentários, likes ou leitura confirmada no servidor.
+- Leitura confirmada no servidor (likes/comentários: SPEC-028).
 - Dark mode dedicado (seguir DESIGN-GUIDE / tokens do tenant).
 
 ## Evolução prevista

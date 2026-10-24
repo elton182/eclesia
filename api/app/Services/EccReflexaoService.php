@@ -132,6 +132,7 @@ class EccReflexaoService
     public function serialize(EccReflexao $reflexao): array
     {
         $temImagem = $reflexao->imagem_path !== null && $reflexao->imagem_path !== '';
+        $stats = app(EccInteracaoService::class)->statsFor('reflexao', (string) $reflexao->id);
 
         return [
             'id' => (string) $reflexao->id,
@@ -143,6 +144,9 @@ class EccReflexaoService
             'publicado_em' => $reflexao->publicado_em?->format('Y-m-d'),
             'status' => (string) $reflexao->status,
             'criado_por_user_id' => $reflexao->criado_por_user_id ? (string) $reflexao->criado_por_user_id : null,
+            'likes_count' => $stats['likes_count'],
+            'liked_by_me' => $stats['liked_by_me'],
+            'comentarios_count' => $stats['comentarios_count'],
             'created_at' => $reflexao->created_at?->toIso8601String(),
             'updated_at' => $reflexao->updated_at?->toIso8601String(),
         ];
