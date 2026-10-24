@@ -159,7 +159,16 @@ class PlanejamentoAnualTest extends TestCase
             'status' => 'coleta',
         ])->assertOk()->assertJsonPath('data.status', 'coleta');
 
-        // Antes do PDF, nenhum link gerado manualmente
+        // Agenda exige mês
+        $this->tenantJson('GET', '/api/v1/planejamento/anuais/'.$id.'/pdf?tipo=agenda')
+            ->assertStatus(422);
+
+        $agenda = $this->tenantJson('GET', '/api/v1/planejamento/anuais/'.$id.'/pdf?tipo=agenda&mes=3')
+            ->assertOk()
+            ->assertHeader('content-type', 'application/pdf');
+        $this->assertStringStartsWith('%PDF', $agenda->getContent());
+
+        // Antes do PDF de links, nenhum token gerado
         $tokensAntes = collect(
             $this->tenantJson('GET', '/api/v1/planejamento/anuais/'.$id.'/pastorais/tokens')
                 ->assertOk()
@@ -167,11 +176,11 @@ class PlanejamentoAnualTest extends TestCase
         )->filter(fn ($t) => ($t['ativo'] ?? false) && ! empty($t['token']));
         $this->assertCount(0, $tokensAntes);
 
-        // PDF na coleta: cria links faltantes + QR por pastoral
-        $pdfColeta = $this->tenantJson('GET', '/api/v1/planejamento/anuais/'.$id.'/pdf')
+        // PDF links: cria tokens faltantes + tabela Pastoral | QR
+        $linksPdf = $this->tenantJson('GET', '/api/v1/planejamento/anuais/'.$id.'/pdf?tipo=links')
             ->assertOk()
             ->assertHeader('content-type', 'application/pdf');
-        $this->assertStringStartsWith('%PDF', $pdfColeta->getContent());
+        $this->assertStringStartsWith('%PDF', $linksPdf->getContent());
 
         $tokensDepois = collect(
             $this->tenantJson('GET', '/api/v1/planejamento/anuais/'.$id.'/pastorais/tokens')
@@ -187,7 +196,7 @@ class PlanejamentoAnualTest extends TestCase
             'status' => 'revisao',
         ])->assertOk()->assertJsonPath('data.status', 'revisao');
 
-        $this->tenantJson('GET', '/api/v1/planejamento/anuais/'.$id.'/pdf')
+        $this->tenantJson('GET', '/api/v1/planejamento/anuais/'.$id.'/pdf?tipo=agenda&mes=10')
             ->assertOk()
             ->assertHeader('content-type', 'application/pdf');
 

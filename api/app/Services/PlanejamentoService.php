@@ -352,7 +352,20 @@ class PlanejamentoService
         $evento->delete();
     }
 
-    public function pdf(PlanejamentoAnual $anual, ?int $mes = null): Response
+    /**
+     * @param  'agenda'|'links'  $tipo
+     */
+    public function pdf(PlanejamentoAnual $anual, string $tipo, ?int $mes = null): Response
+    {
+        $this->assertPdfDisponivel($anual);
+
+        return match ($tipo) {
+            'links' => $this->pdfLinksPastorais($anual),
+            default => $this->pdfAgendaMes($anual, $mes),
+        };
+    }
+
+    private function assertPdfDisponivel(PlanejamentoAnual $anual): void
     {
         if (! in_array($anual->status, [
             PlanejamentoAnual::STATUS_COLETA,
@@ -363,6 +376,55 @@ class PlanejamentoService
                 'status' => ['PDF disponível a partir da coleta (também em revisão ou fechado).'],
             ]);
         }
+    }
+
+    /**
+     * Agenda do mês selecionado (eventos em ordem cronológica).
+     */
+    public function pdfAgendaMes(PlanejamentoAnual $anual, ?int $mes): Response
+    {
+        $this->assertPdfDisponivel($anual);
+
+        if ($mes === null || $mes < 1 || $mes > 12) {
+            throw ValidationException::withMessages([
+                'mes' => ['Informe o mês (1–12) para a agenda.'],
+            ]);
+        }
+
+        $igreja = $this->igrejaContext->current();
+        $anual->loadMissing('igreja');
+
+        $eventos = PlanejamentoEvento::query()
+            ->with(['locais', 'recursos', 'pastoral'])
+            ->where('planejamento_anual_id', $anual->id)
+            ->whereMonth('data_inicio', $mes)
+            ->whereYear('data_inicio', $anual->ano)
+            ->orderBy('data_inicio')
+            ->orderBy('hora_inicio')
+            ->get();
+
+        $meses = $this->nomesMeses();
+        $mesNome = $meses[$mes] ?? (string) $mes;
+
+        $pdf = Pdf::loadView('planejamento.anual-pdf-agenda', [
+            'anual' => $anual,
+            'eventos' => $eventos,
+            'mesFiltro' => $mes,
+            'mesNome' => $mesNome,
+            'igreja' => $anual->igreja ?? $igreja,
+        ])->setPaper('a4', 'portrait');
+
+        $nome = 'planejamento-agenda-'.$anual->ano.'-'.str_pad((string) $mes, 2, '0', STR_PAD_LEFT).'.pdf';
+
+        return $pdf->download($nome);
+    }
+
+    /**
+     * Tabela Pastoral | QR + link. Cria links faltantes das pastorais ativas.
+     */
+    public function pdfLinksPastorais(PlanejamentoAnual $anual): Response
+    {
+        $this->assertPdfDisponivel($anual);
 
         $igreja = $this->igrejaContext->current();
         $anual->loadMissing('igreja');
@@ -374,47 +436,36 @@ class PlanejamentoService
             ->orderBy('nome')
             ->get();
 
-        $eventos = PlanejamentoEvento::query()
-            ->with(['locais', 'recursos', 'pastoral'])
-            ->where('planejamento_anual_id', $anual->id)
-            ->when($mes !== null, function ($q) use ($anual, $mes) {
-                $q->whereMonth('data_inicio', $mes)->whereYear('data_inicio', $anual->ano);
-            })
-            ->orderBy('data_inicio')
-            ->orderBy('hora_inicio')
-            ->get()
-            ->groupBy('pastoral_id');
-
-        // Garante link público de cada pastoral ativa (cria só os que faltam).
-        $secoes = [];
+        $linhas = [];
         foreach ($pastorais as $pastoral) {
             $result = $this->ensurePastoralPublicLink($anual, $pastoral->id);
             $url = $this->publicUrl->forToken($result['plain']);
-            $secoes[] = [
+            $linhas[] = [
                 'pastoral' => $pastoral,
                 'link' => $url,
-                'qr_data_uri' => $this->qrCode->dataUriPng($url),
-                'eventos' => $eventos->get($pastoral->id, collect()),
+                'qr_data_uri' => $this->qrCode->dataUriPng($url, 3),
             ];
         }
 
-        $meses = [
+        $pdf = Pdf::loadView('planejamento.anual-pdf-links', [
+            'anual' => $anual,
+            'linhas' => $linhas,
+            'igreja' => $anual->igreja ?? $igreja,
+        ])->setPaper('a4', 'portrait');
+
+        return $pdf->download('planejamento-links-'.$anual->ano.'.pdf');
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function nomesMeses(): array
+    {
+        return [
             1 => 'Janeiro', 2 => 'Fevereiro', 3 => 'Março', 4 => 'Abril',
             5 => 'Maio', 6 => 'Junho', 7 => 'Julho', 8 => 'Agosto',
             9 => 'Setembro', 10 => 'Outubro', 11 => 'Novembro', 12 => 'Dezembro',
         ];
-
-        $pdf = Pdf::loadView('planejamento.anual-pdf', [
-            'anual' => $anual,
-            'secoes' => $secoes,
-            'mesFiltro' => $mes,
-            'mesNome' => $mes !== null ? ($meses[$mes] ?? (string) $mes) : null,
-            'igreja' => $anual->igreja ?? $igreja,
-        ])->setPaper('a4', 'portrait');
-
-        $nome = 'planejamento-'.$anual->ano.($mes !== null ? '-'.str_pad((string) $mes, 2, '0', STR_PAD_LEFT) : '').'.pdf';
-
-        return $pdf->download($nome);
     }
 
     /**

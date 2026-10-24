@@ -5645,15 +5645,18 @@ paths:
         '403': {description: Sem permissão / fora do escopo}
   /planejamento/anuais/{id}/pdf:
     get:
-      summary: Exportar PDF do planejamento anual (por pastoral + QR)
+      summary: Exportar PDF do planejamento (agenda do mês ou links/QR)
       description: |
-        Disponível em `coleta`, `revisao` ou `fechado`. Query `mes` filtra um mês (1–12).
-        Uma seção por pastoral ativa: QR Code do link público, URL abaixo e lista de eventos.
-        Ao gerar o PDF, cria automaticamente o link/token público de toda pastoral ativa
-        que ainda não tiver link ativo (não rotaciona links já existentes).
+        Disponível em `coleta`, `revisao` ou `fechado`.
+        - `tipo=agenda` (padrão): agenda do mês — exige `mes` (1–12).
+        - `tipo=links`: tabela Pastoral | QR + URL; cria tokens faltantes das pastorais ativas.
       security: [{bearerAuth: [], tenantHeader: [], igrejaHeader: []}]
       parameters:
         - {name: id, in: path, required: true, schema: {type: string}}
+        - name: tipo
+          in: query
+          required: false
+          schema: {type: string, enum: [agenda, links], default: agenda}
         - {name: mes, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 12}}
       responses:
         '200':
@@ -5665,7 +5668,7 @@ paths:
                 format: binary
         '401': {description: Não autenticado}
         '403': {description: Sem permissão}
-        '422': {description: Status não permite export}
+        '422': {description: Status não permite export / mês obrigatório na agenda}
   /planejamento/recursos:
     get:
       summary: Listar espaços e recursos da igreja (SPEC-019)

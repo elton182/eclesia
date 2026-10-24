@@ -151,9 +151,13 @@ class PlanejamentoController extends Controller
     {
         abort_unless($this->access->canView(), 403);
         $anual = $this->planejamento->findAnual($id);
+        $tipo = (string) $request->query('tipo', 'agenda');
+        if (! in_array($tipo, ['agenda', 'links'], true)) {
+            $tipo = 'agenda';
+        }
         $mes = $request->filled('mes') ? (int) $request->query('mes') : null;
 
-        return $this->planejamento->pdf($anual, $mes);
+        return $this->planejamento->pdf($anual, $tipo, $mes);
     }
 
     public function disponibilidade(PlanejamentoDisponibilidadeRequest $request, string $id): JsonResponse
