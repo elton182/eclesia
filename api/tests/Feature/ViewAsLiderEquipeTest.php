@@ -319,6 +319,7 @@ class ViewAsLiderEquipeTest extends TestCase
             'ecc.financeiro.depositos.submeter',
             'ecc.recados.view',
             'ecc.reflexoes.view',
+            'ecc.perguntas.view',
         ], ViewAsLiderService::LIDER_PERMISSIONS);
     }
 }
