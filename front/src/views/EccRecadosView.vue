@@ -101,14 +101,17 @@ async function openDetail(item) {
     selected.value = data?.data || null
     if (selected.value && !selected.value.lido_por_mim && selected.value.status === 'publicado') {
       const ler = await api.post(`/ecc/recados/${item.id}/ler`)
+      const lidoEm = ler.data?.data?.lido_em || selected.value.lido_em
+      const leituras = (selected.value.leituras_count || 0) + 1
       selected.value = {
         ...selected.value,
         lido_por_mim: true,
-        lido_em: ler.data?.data?.lido_em || selected.value.lido_em,
+        lido_em: lidoEm,
+        leituras_count: leituras,
       }
       items.value = items.value.map((it) =>
         String(it.id) === String(item.id)
-          ? { ...it, lido_por_mim: true, lido_em: selected.value.lido_em }
+          ? { ...it, lido_por_mim: true, lido_em: lidoEm, leituras_count: leituras }
           : it,
       )
       emit('mural-seen')
@@ -485,9 +488,14 @@ onMounted(async () => {
           <p class="text-[14px] mt-2 line-clamp-2 leading-relaxed" style="color: var(--color-muted)">
             {{ item.resumo }}
           </p>
-          <p class="text-[12px] mt-3" style="color: var(--color-muted)">
-            {{ formatDate(item.publicado_em) }}
-          </p>
+          <div
+            class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px]"
+            style="color: var(--color-muted)"
+          >
+            <span>{{ formatDate(item.publicado_em) }}</span>
+            <span data-testid="recado-lista-likes">{{ item.likes_count || 0 }} curtidas</span>
+            <span data-testid="recado-lista-visualizacoes">{{ item.leituras_count || 0 }} visualizações</span>
+          </div>
         </button>
       </li>
     </ul>
