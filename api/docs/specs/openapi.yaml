@@ -5645,8 +5645,11 @@ paths:
         '403': {description: Sem permissão / fora do escopo}
   /planejamento/anuais/{id}/pdf:
     get:
-      summary: Exportar PDF do planejamento anual (lista/grade)
-      description: Disponível em revisao ou fechado. Query `mes` filtra um mês (1–12).
+      summary: Exportar PDF do planejamento anual (por pastoral + QR)
+      description: |
+        Disponível em `coleta`, `revisao` ou `fechado`. Query `mes` filtra um mês (1–12).
+        Uma seção por pastoral ativa: QR Code do link público, URL abaixo e lista de eventos.
+        Gera o token público da pastoral se ainda não existir.
       security: [{bearerAuth: [], tenantHeader: [], igrejaHeader: []}]
       parameters:
         - {name: id, in: path, required: true, schema: {type: string}}

@@ -61,7 +61,7 @@ A tabela `pastorais` já existe para o site público (SPEC-005 / ADR-0003) e evo
 
 - [ ] `GET` listagem filtrável: por ano, mês, pastoral_id, status_solicitacao, local_id.
 - [ ] Visão agregada para gestor (todas as pastorais) e filtrada para coordenador (suas pastorais + leitura do global em `coleta`/`revisao`/`fechado` se tiver `planejamento.ver_global` — ver notas).
-- [ ] `GET .../anuais/{id}/pdf` retorna PDF (grade/lista anual ou mensal via query `mes`).
+- [x] `GET .../anuais/{id}/pdf` retorna PDF em `coleta`/`revisao`/`fechado` (query `mes` opcional): uma seção por pastoral com QR do link público, URL e eventos.
 
 ### Front
 

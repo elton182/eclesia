@@ -24,6 +24,8 @@ class PlanejamentoService
         private readonly IgrejaContext $igrejaContext,
         private readonly PlanejamentoAccessService $access,
         private readonly PlanejamentoRecursoService $recursos,
+        private readonly QrCodeService $qrCode,
+        private readonly PlanejamentoPublicUrl $publicUrl,
     ) {}
 
     public function listAnuais(?int $ano = null): Collection
@@ -352,13 +354,26 @@ class PlanejamentoService
 
     public function pdf(PlanejamentoAnual $anual, ?int $mes = null): Response
     {
-        if (! in_array($anual->status, [PlanejamentoAnual::STATUS_REVISAO, PlanejamentoAnual::STATUS_FECHADO], true)) {
+        if (! in_array($anual->status, [
+            PlanejamentoAnual::STATUS_COLETA,
+            PlanejamentoAnual::STATUS_REVISAO,
+            PlanejamentoAnual::STATUS_FECHADO,
+        ], true)) {
             throw ValidationException::withMessages([
-                'status' => ['PDF disponível apenas em revisão ou fechado.'],
+                'status' => ['PDF disponível a partir da coleta (também em revisão ou fechado).'],
             ]);
         }
 
-        // PDF sempre visão completa (gestor / ver_global)
+        $igreja = $this->igrejaContext->current();
+        $anual->loadMissing('igreja');
+
+        $pastorais = Pastoral::query()
+            ->where('igreja_id', $igreja->id)
+            ->where('ativa', true)
+            ->orderBy('ordem')
+            ->orderBy('nome')
+            ->get();
+
         $eventos = PlanejamentoEvento::query()
             ->with(['locais', 'recursos', 'pastoral'])
             ->where('planejamento_anual_id', $anual->id)
@@ -367,9 +382,21 @@ class PlanejamentoService
             })
             ->orderBy('data_inicio')
             ->orderBy('hora_inicio')
-            ->get();
+            ->get()
+            ->groupBy('pastoral_id');
 
-        $anual->load('igreja');
+        $secoes = [];
+        foreach ($pastorais as $pastoral) {
+            $result = $this->createOrRotatePastoralTokenIfMissing($anual, $pastoral->id);
+            $url = $this->publicUrl->forToken($result['plain']);
+            $secoes[] = [
+                'pastoral' => $pastoral,
+                'link' => $url,
+                'qr_data_uri' => $this->qrCode->dataUriPng($url),
+                'eventos' => $eventos->get($pastoral->id, collect()),
+            ];
+        }
+
         $meses = [
             1 => 'Janeiro', 2 => 'Fevereiro', 3 => 'Março', 4 => 'Abril',
             5 => 'Maio', 6 => 'Junho', 7 => 'Julho', 8 => 'Agosto',
@@ -378,15 +405,38 @@ class PlanejamentoService
 
         $pdf = Pdf::loadView('planejamento.anual-pdf', [
             'anual' => $anual,
-            'eventos' => $eventos,
+            'secoes' => $secoes,
             'mesFiltro' => $mes,
             'mesNome' => $mes !== null ? ($meses[$mes] ?? (string) $mes) : null,
-            'igreja' => $anual->igreja,
+            'igreja' => $anual->igreja ?? $igreja,
         ])->setPaper('a4', 'portrait');
 
         $nome = 'planejamento-'.$anual->ano.($mes !== null ? '-'.str_pad((string) $mes, 2, '0', STR_PAD_LEFT) : '').'.pdf';
 
         return $pdf->download($nome);
+    }
+
+    /**
+     * Reusa token ativo; gera um novo se não houver.
+     *
+     * @return array{token: PlanejamentoPastoralToken, plain: string}
+     */
+    private function createOrRotatePastoralTokenIfMissing(PlanejamentoAnual $anual, string $pastoralId): array
+    {
+        $existente = PlanejamentoPastoralToken::query()
+            ->where('planejamento_anual_id', $anual->id)
+            ->where('pastoral_id', $pastoralId)
+            ->whereNull('revogado_em')
+            ->first();
+
+        if ($existente !== null && $existente->isAtivo() && $existente->token_encrypted !== null) {
+            $plain = (string) $existente->token_encrypted;
+            $existente->setAttribute('plain_token', $plain);
+
+            return ['token' => $existente, 'plain' => $plain];
+        }
+
+        return $this->createOrRotatePastoralToken($anual, $pastoralId);
     }
 
     /**

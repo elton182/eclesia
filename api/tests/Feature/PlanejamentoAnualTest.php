@@ -159,6 +159,12 @@ class PlanejamentoAnualTest extends TestCase
             'status' => 'coleta',
         ])->assertOk()->assertJsonPath('data.status', 'coleta');
 
+        // PDF já disponível na coleta (QR + link por pastoral)
+        $pdfColeta = $this->tenantJson('GET', '/api/v1/planejamento/anuais/'.$id.'/pdf')
+            ->assertOk()
+            ->assertHeader('content-type', 'application/pdf');
+        $this->assertStringStartsWith('%PDF', $pdfColeta->getContent());
+
         $this->tenantJson('POST', '/api/v1/planejamento/anuais/'.$id.'/status', [
             'status' => 'revisao',
         ])->assertOk()->assertJsonPath('data.status', 'revisao');
