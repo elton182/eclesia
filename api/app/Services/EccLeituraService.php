@@ -64,6 +64,15 @@ class EccLeituraService
         ];
     }
 
+    public function countLeituras(string $alvoTipo, string $alvoId): int
+    {
+        return EccLeitura::query()
+            ->where('igreja_id', $this->igrejaId())
+            ->where('alvo_tipo', $alvoTipo)
+            ->where('alvo_id', $alvoId)
+            ->count();
+    }
+
     /**
      * @return array{recados: int, reflexoes: int}
      */

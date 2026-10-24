@@ -116,12 +116,12 @@ class EccMuralLeituraAnexoTest extends TestCase
     {
         $this->asAdmin();
         $corpo = str_repeat('Palavra longa do comunicado. ', 20);
-        $this->tenantJson('POST', '/api/v1/ecc/recados', [
+        $id = $this->tenantJson('POST', '/api/v1/ecc/recados', [
             'titulo' => 'Aviso longo',
             'corpo' => $corpo,
             'escopo' => 'paroquia',
             'status' => 'publicado',
-        ])->assertCreated();
+        ])->assertCreated()->json('data.id');
 
         $this->asLider();
         $item = $this->tenantJson('GET', '/api/v1/ecc/recados')->assertOk()->json('data.0');
@@ -129,6 +129,15 @@ class EccMuralLeituraAnexoTest extends TestCase
         $this->assertArrayNotHasKey('corpo', $item);
         $this->assertFalse($item['lido_por_mim']);
         $this->assertStringEndsWith('…', $item['resumo']);
+        $this->assertSame(0, $item['likes_count']);
+        $this->assertSame(0, $item['leituras_count']);
+
+        $this->tenantJson('POST', "/api/v1/ecc/recados/{$id}/like")->assertOk();
+        $this->tenantJson('POST', "/api/v1/ecc/recados/{$id}/ler")->assertOk();
+
+        $item2 = $this->tenantJson('GET', '/api/v1/ecc/recados')->assertOk()->json('data.0');
+        $this->assertSame(1, $item2['likes_count']);
+        $this->assertSame(1, $item2['leituras_count']);
     }
 
     public function test_ler_diminui_nao_lidos_e_grava_lido_em(): void

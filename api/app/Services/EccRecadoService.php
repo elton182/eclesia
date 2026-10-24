@@ -173,8 +173,9 @@ class EccRecadoService
     public function serialize(EccRecado $recado, bool $listMode = false, ?User $user = null): array
     {
         $user ??= auth()->user() instanceof User ? auth()->user() : null;
+        $leituras = app(EccLeituraService::class);
         $stats = app(EccInteracaoService::class)->statsFor('recado', (string) $recado->id, $user);
-        $leitura = app(EccLeituraService::class)->leituraDoUsuario(EccLeitura::ALVO_RECADO, (string) $recado->id, $user);
+        $leitura = $leituras->leituraDoUsuario(EccLeitura::ALVO_RECADO, (string) $recado->id, $user);
         $anexo = EccMuralAnexo::meta($recado);
 
         $base = [
@@ -193,6 +194,7 @@ class EccRecadoService
             'likes_count' => $stats['likes_count'],
             'liked_by_me' => $stats['liked_by_me'],
             'comentarios_count' => $stats['comentarios_count'],
+            'leituras_count' => $leituras->countLeituras(EccLeitura::ALVO_RECADO, (string) $recado->id),
             'lido_por_mim' => $leitura['lido_por_mim'],
             'lido_em' => $leitura['lido_em'],
             ...$anexo,
