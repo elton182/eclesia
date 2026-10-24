@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\EccFinanceiroController;
 use App\Http\Controllers\Api\EccFinanceiroDepositoController;
 use App\Http\Controllers\Api\EccInteracaoController;
 use App\Http\Controllers\Api\EccMuralController;
+use App\Http\Controllers\Api\EccPerguntaController;
 use App\Http\Controllers\Api\EccRecadoController;
 use App\Http\Controllers\Api\EccReflexaoController;
 use App\Http\Controllers\Api\EventoTipoController;
@@ -32,6 +33,8 @@ use App\Http\Middleware\AuthenticateTenantApi;
 use App\Http\Middleware\InitializeTenancyByPathSlug;
 use App\Http\Middleware\InitializeTenancyBySlug;
 use App\Http\Middleware\SetIgrejaFromHeader;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -139,6 +142,10 @@ Route::middleware([
     SetIgrejaFromHeader::class,
     'password.changed',
 ])->prefix('api/v1')->group(function () {
+    Route::post('broadcasting/auth', function (Request $request) {
+        return Broadcast::auth($request);
+    });
+
     Route::get('roles', [RolePermissionController::class, 'roles']);
     Route::get('permissions', [RolePermissionController::class, 'permissions']);
     Route::get('audit-logs', [AuditLogController::class, 'index']);
@@ -195,6 +202,18 @@ Route::middleware([
     Route::post('ecc/financeiro/depositos/{id}/rejeitar', [EccFinanceiroDepositoController::class, 'rejeitar']);
 
     Route::get('ecc/mural/nao-lidos', [EccMuralController::class, 'naoLidos']);
+
+    Route::get('ecc/perguntas/resumo', [EccPerguntaController::class, 'resumo']);
+    Route::get('ecc/perguntas', [EccPerguntaController::class, 'index']);
+    Route::post('ecc/perguntas', [EccPerguntaController::class, 'store']);
+    Route::post('ecc/perguntas/envios/{envioId}/responder', [EccPerguntaController::class, 'responder']);
+    Route::get('ecc/perguntas/{id}/envios', [EccPerguntaController::class, 'listEnvios']);
+    Route::post('ecc/perguntas/{id}/envios', [EccPerguntaController::class, 'storeEnvio']);
+    Route::post('ecc/perguntas/{id}/disponibilizar', [EccPerguntaController::class, 'disponibilizar']);
+    Route::post('ecc/perguntas/{id}/arquivar', [EccPerguntaController::class, 'arquivar']);
+    Route::get('ecc/perguntas/{id}', [EccPerguntaController::class, 'show']);
+    Route::put('ecc/perguntas/{id}', [EccPerguntaController::class, 'update']);
+    Route::delete('ecc/perguntas/{id}', [EccPerguntaController::class, 'destroy']);
 
     Route::get('ecc/recados/novidades', [EccRecadoController::class, 'novidades']);
     Route::get('ecc/recados', [EccRecadoController::class, 'index']);

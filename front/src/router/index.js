@@ -12,6 +12,8 @@ import WelcomeView from '../views/WelcomeView.vue'
 import MinhaEquipeView from '../views/MinhaEquipeView.vue'
 import EccRecadosView from '../views/EccRecadosView.vue'
 import EccReflexoesView from '../views/EccReflexoesView.vue'
+import EccPerguntasView from '../views/EccPerguntasView.vue'
+import EccPerguntaDetailView from '../views/EccPerguntaDetailView.vue'
 import { homePathForUser, isSomenteLiderEquipe } from '../utils/userRoles'
 import TenantsView from '../views/TenantsView.vue'
 import UsersView from '../views/UsersView.vue'
@@ -236,6 +238,16 @@ const router = createRouter({
           path: 'ecc/reflexoes',
           name: 'ecc-reflexoes',
           component: EccReflexoesView,
+        },
+        {
+          path: 'ecc/perguntas',
+          name: 'ecc-perguntas',
+          component: EccPerguntasView,
+        },
+        {
+          path: 'ecc/perguntas/:id',
+          name: 'ecc-pergunta-detail',
+          component: EccPerguntaDetailView,
         },
         {
           path: 'ecc/equipes',

@@ -69,7 +69,9 @@ export function userHasPermission(user, permission, opts = {}) {
   if (permission === 'ecc.casais.atualizar' && roleNames.includes('lider-equipe')) return true
   if (permission === 'ecc.financeiro.depositos.submeter' && roleNames.includes('lider-equipe')) return true
   if (
-    (permission === 'ecc.recados.view' || permission === 'ecc.reflexoes.view') &&
+    (permission === 'ecc.recados.view'
+      || permission === 'ecc.reflexoes.view'
+      || permission === 'ecc.perguntas.view') &&
     roleNames.includes('lider-equipe')
   ) {
     return true
@@ -77,6 +79,7 @@ export function userHasPermission(user, permission, opts = {}) {
   if (
     (permission === 'ecc.recados.manage'
       || permission === 'ecc.reflexoes.manage'
+      || permission === 'ecc.perguntas.manage'
       || permission === 'ecc.interacoes.moderar') &&
     (roleNames.includes('admin-igreja') || roleNames.includes('admin-tenant'))
   ) {

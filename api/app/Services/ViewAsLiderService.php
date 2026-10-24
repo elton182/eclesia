@@ -27,6 +27,7 @@ class ViewAsLiderService
         'ecc.financeiro.depositos.submeter',
         'ecc.recados.view',
         'ecc.reflexoes.view',
+        'ecc.perguntas.view',
     ];
 
     private const CACHE_TTL_SECONDS = 43200; // 12h
