@@ -63,10 +63,12 @@ import {
 } from '@/utils/planejamentoRecursos'
 import { getDisponibilidade, listRecursos } from '@/services/planejamentoRecursos'
 import PlanejamentoRecursosPicker from '@/components/planejamento/PlanejamentoRecursosPicker.vue'
-import Hora24Input from '@/components/form/Hora24Input.vue'
+import DateInput from '@/components/form/DateInput.vue'
+import SelectSearchable from '@/components/form/SelectSearchable.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useAuthAdminStore } from '@/stores/authAdmin'
 import { userHasPermission } from '@/utils/userRoles'
+import { brToIso, isoToBr } from '@/utils/dateBr'
 
 const WEEKDAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 
@@ -171,6 +173,10 @@ const pastoraisOpcoes = computed(() => {
   return pastorais.value.filter((p) => myPastoralIds.value.includes(p.id))
 })
 
+const pastoraisSelectOptions = computed(() =>
+  pastoraisOpcoes.value.map((p) => ({ value: p.id, label: p.nome })),
+)
+
 const pastoraisPainel = computed(() => {
   if (canVerGlobal.value) return pastorais.value
   return pastoraisOpcoes.value
@@ -232,7 +238,14 @@ const diaEventos = computed(() => {
 const espacosCatalogo = computed(() => recursosCatalogo.value.filter((r) => r.tipo === 'espaco'))
 const podeArrastar = computed(() => canGerir.value && anoStatus.value !== 'fechado')
 const dispParams = computed(() =>
-  disponibilidadeParams(form.value, editingEvento.value?.id || undefined),
+  disponibilidadeParams(
+    {
+      ...form.value,
+      data_inicio: brToIso(form.value.data_inicio) || '',
+      data_fim: brToIso(form.value.data_fim) || '',
+    },
+    editingEvento.value?.id || undefined,
+  ),
 )
 
 const statusSolicitacaoOptions = computed(() =>
@@ -332,7 +345,8 @@ function openCreate(dayIso) {
   if (!podeCriar.value) return
   editingEvento.value = null
   form.value = emptyForm()
-  form.value.data_inicio = dayIso || diaSelecionado.value || ''
+  const iso = dayIso || diaSelecionado.value || ''
+  form.value.data_inicio = isoToBr(iso)
   form.value.pastoral_id = pastoraisOpcoes.value[0]?.id || ''
   selecaoRecursos.value = emptySelecaoRecursos()
   capacidadeErro.value = ''
@@ -346,8 +360,8 @@ function openEdit(ev) {
   form.value = {
     pastoral_id: ev.pastoral_id || '',
     titulo: ev.titulo || '',
-    data_inicio: (ev.data_inicio || '').slice(0, 10),
-    data_fim: ev.data_fim ? String(ev.data_fim).slice(0, 10) : '',
+    data_inicio: isoToBr((ev.data_inicio || '').slice(0, 10)),
+    data_fim: ev.data_fim ? isoToBr(String(ev.data_fim).slice(0, 10)) : '',
     hora_inicio: formatHoraCalendario(ev.hora_inicio) || '',
     hora_fim: formatHoraCalendario(ev.hora_fim) || '',
     participantes_media: ev.participantes_media ?? null,
@@ -468,11 +482,13 @@ async function copiarLinkPastoral(pastoralId) {
 
 function buildPayload() {
   const f = form.value
+  const dataInicio = brToIso(f.data_inicio)
+  const dataFim = brToIso(f.data_fim)
   const payload = {
     pastoral_id: f.pastoral_id,
     titulo: f.titulo.trim(),
-    data_inicio: f.data_inicio,
-    data_fim: f.data_fim || null,
+    data_inicio: dataInicio,
+    data_fim: dataFim || null,
     hora_inicio: f.hora_inicio || null,
     hora_fim: f.hora_fim || null,
     participantes_media:
@@ -1114,7 +1130,9 @@ onMounted(load)
           <div class="flex items-start justify-between gap-3 mb-4">
             <div>
               <p class="page-eyebrow">Dia selecionado</p>
-              <h3 class="font-serif text-lg" style="color: var(--color-ink)">{{ diaSelecionado }}</h3>
+              <h3 class="font-serif text-lg" style="color: var(--color-ink)">
+                {{ isoToBr(diaSelecionado) }}
+              </h3>
             </div>
             <button type="button" class="btn btn-ghost text-xs" @click="closeDayModal">Fechar</button>
           </div>
@@ -1226,18 +1244,15 @@ onMounted(load)
             <div class="grid gap-4 sm:grid-cols-2">
               <div>
                 <label class="fld" for="ev-pastoral">Pastoral</label>
-                <select
+                <SelectSearchable
                   id="ev-pastoral"
                   v-model="form.pastoral_id"
-                  class="input"
+                  :options="pastoraisSelectOptions"
+                  placeholder="Buscar pastoral…"
                   required
                   :disabled="!canGerir && !!editingEvento"
                   data-testid="planejamento-evento-pastoral"
-                >
-                  <option v-for="p in pastoraisOpcoes" :key="p.id" :value="p.id">
-                    {{ p.nome }}
-                  </option>
-                </select>
+                />
               </div>
               <div>
                 <label class="fld" for="ev-titulo">Título</label>
@@ -1249,27 +1264,32 @@ onMounted(load)
                   data-testid="planejamento-evento-titulo"
                 />
               </div>
+              <DateInput
+                v-model="form.data_inicio"
+                name="ev-inicio"
+                label="Data início"
+                required
+              />
+              <DateInput v-model="form.data_fim" name="ev-fim" label="Data fim" />
               <div>
-                <label class="fld" for="ev-inicio">Data início</label>
+                <label class="fld" for="ev-hi">Hora início</label>
                 <input
-                  id="ev-inicio"
-                  v-model="form.data_inicio"
-                  type="date"
+                  id="ev-hi"
+                  v-model="form.hora_inicio"
+                  type="time"
                   class="input"
-                  required
+                  data-testid="planejamento-evento-hora-inicio"
                 />
               </div>
               <div>
-                <label class="fld" for="ev-fim">Data fim</label>
-                <input id="ev-fim" v-model="form.data_fim" type="date" class="input" />
-              </div>
-              <div>
-                <label class="fld" for="ev-hi">Hora início</label>
-                <Hora24Input id="ev-hi" v-model="form.hora_inicio" />
-              </div>
-              <div>
                 <label class="fld" for="ev-hf">Hora fim</label>
-                <Hora24Input id="ev-hf" v-model="form.hora_fim" />
+                <input
+                  id="ev-hf"
+                  v-model="form.hora_fim"
+                  type="time"
+                  class="input"
+                  data-testid="planejamento-evento-hora-fim"
+                />
               </div>
               <div>
                 <label class="fld" for="ev-part">Participantes (média)</label>
