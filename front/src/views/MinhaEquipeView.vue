@@ -6,7 +6,7 @@ import { useTenantStore } from '@/stores/tenant'
 import { useAuthStore } from '@/stores/auth'
 import { innovToast } from '@/plugins/toast'
 import { casalEle, casalEla } from '@/utils/casalDisplay'
-import { equipesLideradasIds } from '@/utils/userRoles'
+import { equipesLideradasIds, userHasPermission } from '@/utils/userRoles'
 import { formatMoney } from '@/utils/eccFinanceiro'
 import {
   buildDepositoFormData,
@@ -21,6 +21,7 @@ import {
   liderEquipeTourSteps,
   markLiderTourSeen,
 } from '@/utils/liderEquipeTour'
+import { labelResumoPerguntas, temAtividadePerguntas } from '@/utils/eccPerguntas'
 
 const router = useRouter()
 const route = useRoute()
@@ -41,6 +42,10 @@ const formDeposito = ref({
   valor: '',
   comprovante: null,
 })
+const perguntasResumo = ref({ pendentes: 0, com_resposta_nova: 0 })
+const canVerPerguntas = computed(() => userHasPermission(authStore.user, 'ecc.perguntas.view'))
+const perguntasLabel = computed(() => labelResumoPerguntas(perguntasResumo.value))
+const perguntasAtivas = computed(() => temAtividadePerguntas(perguntasResumo.value))
 
 const tourHelpRequest = inject('liderTourHelpRequest', ref(0))
 
@@ -95,6 +100,19 @@ async function loadDepositos() {
   }
 }
 
+async function loadPerguntasResumo() {
+  if (!canVerPerguntas.value) {
+    perguntasResumo.value = { pendentes: 0, com_resposta_nova: 0 }
+    return
+  }
+  try {
+    const { data } = await api.get('/ecc/perguntas/resumo')
+    perguntasResumo.value = data?.data || { pendentes: 0, com_resposta_nova: 0 }
+  } catch {
+    perguntasResumo.value = { pendentes: 0, com_resposta_nova: 0 }
+  }
+}
+
 async function load() {
   if (!tenantStore.slug) {
     innovToast('error', 'Organização', 'Nenhuma organização selecionada.')
@@ -112,7 +130,7 @@ async function load() {
     if (!equipes.value.some((equipe) => String(equipe.id) === String(equipeId.value))) {
       equipeId.value = escolherEquipeInicial(equipes.value)
     }
-    await loadDepositos()
+    await Promise.all([loadDepositos(), loadPerguntasResumo()])
   } catch (e) {
     innovToast('error', 'Erro', e.response?.data?.message || 'Falha ao carregar a equipe')
   } finally {
@@ -258,6 +276,36 @@ onMounted(async () => {
     </div>
 
     <template v-else>
+      <button
+        v-if="canVerPerguntas"
+        type="button"
+        class="card p-4 mb-5 w-full text-left cursor-pointer border-0"
+        data-testid="minha-equipe-perguntas"
+        @click="router.push({ name: 'ecc-perguntas' })"
+      >
+        <div class="flex items-center justify-between gap-3">
+          <div>
+            <div class="text-[15px] font-medium" style="color: var(--color-ink)">
+              Caixa de perguntas
+            </div>
+            <p class="text-[13px] mt-0.5" style="color: var(--color-muted)">
+              {{ perguntasLabel || 'Ver formulários disponíveis' }}
+            </p>
+          </div>
+          <span
+            v-if="perguntasAtivas"
+            class="min-w-[22px] h-[22px] px-1.5 rounded-full text-[11px] font-semibold flex items-center justify-center"
+            style="background: var(--color-accent-dark); color: #fff"
+            data-testid="minha-equipe-perguntas-badge"
+          >
+            {{ (perguntasResumo.pendentes || perguntasResumo.com_resposta_nova) > 9
+              ? '9+'
+              : (perguntasResumo.pendentes || perguntasResumo.com_resposta_nova) }}
+          </span>
+          <span v-else class="text-[18px]" style="color: var(--color-muted)" aria-hidden="true">›</span>
+        </div>
+      </button>
+
       <div class="flex items-baseline justify-between gap-3 mb-3">
         <h2 class="text-[15px] font-medium" style="color: var(--color-ink)">
           Casais da equipe

@@ -268,6 +268,9 @@ const navItems = computed(() => {
     items.push({ label: 'Recados', path: '/ecc/recados' })
     items.push({ label: 'Reflexões', path: '/ecc/reflexoes' })
   }
+  if (can('ecc.perguntas.view') || can('ecc.perguntas.manage')) {
+    items.push({ label: 'Perguntas', path: '/ecc/perguntas' })
+  }
   items.push({ label: 'Relatórios', path: '/ecc/relatorios', stub: true })
   return items
 })
