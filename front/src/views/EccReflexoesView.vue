@@ -217,7 +217,7 @@ onMounted(load)
           Reflexões
         </h1>
         <p class="mt-2 text-[14px]" style="color: var(--color-muted)">
-          Palavra do diácono — leia e revisit o histórico.
+          Palavra do diácono — leia e revisite o histórico.
         </p>
       </div>
       <button
