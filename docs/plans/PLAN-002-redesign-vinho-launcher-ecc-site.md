@@ -260,7 +260,7 @@ Reaproveitar ordenação/publish da API atual por baixo; a UI é nova e fiel ao 
 
 - Sidebar flat atual vs ModuleLayout: regressão de deep-links; migrar rotas com redirects.
 - Novos blocos Site aumentam SPEC-005 — tratar como evolução da spec (patch) + OpenAPI; **bloquear merge do 1g se faltar seção do mock**.
-- Pressão para reusar `Innov*` pode quebrar fidelidade — nestas três telas, layout custom vence.
+- Pressão para reutilizar `Innov*` pode quebrar fidelidade — nestas três telas, layout custom vence.
 - Ficha 1f com sacramentos/histórico ricos exige dados que ainda não existem — UI degrada com honestidade (fora do gate 100%).
 
 ## Critérios de aceite

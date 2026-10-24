@@ -2,7 +2,7 @@
 
 **Status:** superseded  
 **Data:** 2026-09-16  
-**Supersedido em:** 2026-09-20  
+**Substituído em:** 2026-09-20  
 **Relacionados:** [ADR-0002](./ADR-0002-hierarquia-tenant-igreja.md), [SPEC-007](../specs/SPEC-007-escalas-genericas.md) (rejected)
 
 ## Contexto

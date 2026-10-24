@@ -61,7 +61,7 @@ No banco do tenant, escopado por `igreja_id`:
 - [ ] Ao criar tenant, seed cria 1 igreja padrão.
 - [ ] PII em `pessoas` e contatos usam `$encryptable` + colunas TEXT.
 - [ ] CRUD equipes e casais sob `/api/v1/ecc/...` com `X-Tenant`.
-- [ ] Importação: cria/reusa equipe pelo nome; cria 2 pessoas + casal; retorna contagem e erros por linha.
+- [ ] Importação: cria/reutiliza equipe pelo nome; cria 2 pessoas + casal; retorna contagem e erros por linha.
 - [ ] 401 sem auth; isolamento por tenant (outro slug não vê dados).
 - [ ] Front: página **Casais** (`/ecc/casais`) com import Excel/CSV e ficha `/ecc/casais/:id`. Gestão dedicada de equipes em `/ecc/equipes` ([SPEC-021](SPEC-021-ecc-gestao-equipes-acesso.md)).
 

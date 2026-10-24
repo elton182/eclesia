@@ -469,7 +469,7 @@ class PlanejamentoService
     }
 
     /**
-     * Garante link público da pastoral no ano: reusa o ativo ou cria se estiver faltando/revogado.
+     * Garante link público da pastoral no ano: reutiliza o ativo ou cria se estiver faltando/revogado.
      * Não rotaciona um link ativo existente.
      *
      * @return array{token: PlanejamentoPastoralToken, plain: string}

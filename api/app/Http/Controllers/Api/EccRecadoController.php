@@ -36,7 +36,7 @@ class EccRecadoController extends Controller
         $desdeRaw = $request->query('desde');
         if (! is_string($desdeRaw) || trim($desdeRaw) === '') {
             throw ValidationException::withMessages([
-                'desde' => ['Informe o instante desde.'],
+                'desde' => ['Informe a data/hora inicial.'],
             ]);
         }
 
