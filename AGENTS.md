@@ -4,7 +4,7 @@ Responda em **português brasileiro** neste repositório.
 
 ## O que é o projeto
 
-**Eclesia** é uma plataforma SaaS de gestão eclesial (modular) nascida como monorepo a partir dos bases Innov (`innov-base-api` / `innov-base-front`).
+**Eclesia** é uma plataforma SaaS de gestão eclesial (modular) nascida como monorepo a partir das bases Innov (`innov-base-api` / `innov-base-front`).
 
 Visão de produto: `docs/product/BRIEF.md`. Plano da 1ª fase: `docs/plans/PLAN-001-fundacao-nucleo-ecc.md`.
 

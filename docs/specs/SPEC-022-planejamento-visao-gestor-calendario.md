@@ -50,7 +50,7 @@ Na visão do gestor do planejamento anual (`/planejamento/:id`), a grade é só 
 
 ## Contrato de API
 
-Sem mudança de contrato. Reusa `GET /planejamento/anuais/{id}/eventos` (com `locais` / `local_ids`) e o payload `conflitos[]` de create/update.
+Sem mudança de contrato. Reutiliza `GET /planejamento/anuais/{id}/eventos` (com `locais` / `local_ids`) e o payload `conflitos[]` de create/update.
 
 ## Notas
 

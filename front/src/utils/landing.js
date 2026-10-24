@@ -129,7 +129,7 @@ export const MODULOS = [
     nome: 'Dízimo',
     situacao: 'roadmap',
     icone: 'dizimo',
-    descricao: 'Dizimistas, contribuições, carnês e recibos.',
+    descricao: 'Dízimistas, contribuições, carnês e recibos.',
   },
   {
     chave: 'financeiro',
