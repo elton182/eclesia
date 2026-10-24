@@ -41,9 +41,10 @@ class EccReflexaoController extends Controller
         /** @var User $user */
         $user = $request->user();
         $reflexao = $this->reflexoes->create(
-            $request->safe()->except('imagem'),
+            $request->safe()->except(['imagem', 'anexo']),
             $request->file('imagem'),
             $user,
+            $request->file('anexo'),
         );
 
         return response()->json(['data' => $this->reflexoes->serialize($reflexao)], 201);
@@ -51,12 +52,15 @@ class EccReflexaoController extends Controller
 
     public function update(UpdateEccReflexaoRequest $request, string $id): JsonResponse
     {
-        $remover = filter_var($request->input('remover_imagem'), FILTER_VALIDATE_BOOLEAN);
+        $removerImagem = filter_var($request->input('remover_imagem'), FILTER_VALIDATE_BOOLEAN);
+        $removerAnexo = filter_var($request->input('remover_anexo'), FILTER_VALIDATE_BOOLEAN);
         $reflexao = $this->reflexoes->update(
             $this->reflexoes->find($id),
-            $request->safe()->except(['imagem', 'remover_imagem']),
+            $request->safe()->except(['imagem', 'remover_imagem', 'anexo', 'remover_anexo']),
             $request->file('imagem'),
-            $remover,
+            $removerImagem,
+            $request->file('anexo'),
+            $removerAnexo,
         );
 
         return response()->json(['data' => $this->reflexoes->serialize($reflexao)]);
@@ -76,6 +80,11 @@ class EccReflexaoController extends Controller
         abort_unless(is_string($path) && $path !== '' && Storage::disk('public')->exists($path), 404);
 
         return Storage::disk('public')->response($path);
+    }
+
+    public function anexo(string $id): StreamedResponse
+    {
+        return $this->reflexoes->streamAnexo($this->reflexoes->find($id));
     }
 
     /**

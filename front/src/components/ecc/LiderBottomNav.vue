@@ -9,6 +9,10 @@ defineProps({
     type: String,
     default: null,
   },
+  reflexoesBadge: {
+    type: String,
+    default: null,
+  },
 })
 
 defineEmits(['navigate'])
@@ -98,16 +102,32 @@ defineEmits(['navigate'])
           class="absolute top-0 left-1/2 -translate-x-1/2 h-[3px] w-10 rounded-b-full"
           style="background: var(--color-accent-dark)"
         />
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path
-            d="M5 4h9a3 3 0 0 1 3 3v13l-4.5-2.5L8 20V7a3 3 0 0 0-3-3Z"
-            stroke="currentColor"
-            stroke-width="1.7"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          />
-          <path d="M8 7h7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
-        </svg>
+        <span class="relative inline-flex">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path
+              d="M5 4h9a3 3 0 0 1 3 3v13l-4.5-2.5L8 20V7a3 3 0 0 0-3-3Z"
+              stroke="currentColor"
+              stroke-width="1.7"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+            <path d="M8 7h7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
+          </svg>
+          <span
+            v-if="reflexoesBadge"
+            class="absolute -top-1 -right-2 min-w-[14px] h-[14px] px-0.5 rounded-full text-[9px] font-semibold flex items-center justify-center leading-none"
+            style="background: var(--color-accent-dark); color: #fff"
+            data-testid="lider-nav-reflexoes-badge"
+          >
+            {{ reflexoesBadge === '1' ? '' : reflexoesBadge }}
+            <span v-if="reflexoesBadge === '1'" class="sr-only">1 nova</span>
+            <span
+              v-if="reflexoesBadge === '1'"
+              class="w-1.5 h-1.5 rounded-full bg-white"
+              aria-hidden="true"
+            />
+          </span>
+        </span>
         <span class="text-[11px] font-medium">Reflexões</span>
       </button>
     </div>
