@@ -39,6 +39,11 @@ describe('MODULOS', () => {
       assert.ok(modulo.icone, `módulo ${modulo.chave} sem ícone`)
     }
   })
+
+  it('acentua Dízimistas na descrição do módulo dízimo', () => {
+    const dizimo = MODULOS.find((m) => m.chave === 'dizimo')
+    assert.ok(dizimo.descricao.includes('Dízimistas'))
+  })
 })
 
 describe('rotuloSituacaoModulo', () => {

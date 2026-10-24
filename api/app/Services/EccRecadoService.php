@@ -311,7 +311,7 @@ class EccRecadoService
         if ($escopo === EccRecado::ESCOPO_EQUIPE) {
             if ($equipeId === null || $equipeId === '') {
                 throw ValidationException::withMessages([
-                    'equipe_id' => ['Informe a equipe para escopo equipe.'],
+                    'equipe_id' => ['Informe a equipe quando o escopo for equipe.'],
                 ]);
             }
             $this->assertEquipeNaIgreja((string) $equipeId);
@@ -320,7 +320,7 @@ class EccRecadoService
             $etapaInt = $etapa !== null ? (int) $etapa : null;
             if ($etapaInt === null || $etapaInt < 1 || $etapaInt > 3) {
                 throw ValidationException::withMessages([
-                    'etapa' => ['Informe a etapa (1–3) para escopo etapa.'],
+                    'etapa' => ['Informe a etapa (1–3) quando o escopo for etapa.'],
                 ]);
             }
             $etapa = $etapaInt;

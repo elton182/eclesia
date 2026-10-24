@@ -123,7 +123,7 @@ Implementar **apenas o ECC** na primeira fase; os demais são visão de futuro.
 | **ECC** *(primeiro)* | Encontro, equipes de serviço, escala, perseverança, eventos e caixa |
 | Catequese | Turmas, catequistas, catequizandos, presença, etapas |
 | Sacramentos | Assentos, certidões, livros |
-| Dízimo | Dizimistas, contribuições, carnês, recibos |
+| Dízimo | Dízimistas, contribuições, carnês, recibos |
 | Financeiro | Contas, receitas/despesas, caixa geral |
 | Pastorais | Pastorais/movimentos, membros, reuniões |
 | Site | Site público por tenant (CMS, comunicados, pastorais na vitrine, formulários) — ver SPEC-005 / ADR-0003 |

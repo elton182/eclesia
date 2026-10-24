@@ -1,8 +1,8 @@
 # ADR-0001 — Multi-tenant e LGPD desde o dia zero
 
-**Status:** accepted (parcialmente supersedido)  
+**Status:** accepted (parcialmente substituído)  
 **Data:** 2026-09-03  
-**Supersedido em parte por:** [ADR-0002](./ADR-0002-hierarquia-tenant-igreja.md) (hierarquia Tenant→Igreja e identificação do tenant)
+**Substituído em parte por:** [ADR-0002](./ADR-0002-hierarquia-tenant-igreja.md) (hierarquia Tenant→Igreja e identificação do tenant)
 
 ## Contexto
 

@@ -3,7 +3,7 @@
 ## Stack
 
 - PHP 8.2+, Laravel 12, Sanctum
-- `stancl/tenancy` — multi-tenant (DB por igreja)
+- `stancl/tenancy` — multi-tenant (DB por tenant / organização)
 - `elgibor-solution/laravel-database-encryption` — LGPD em repouso
 
 ## Estrutura relevante
