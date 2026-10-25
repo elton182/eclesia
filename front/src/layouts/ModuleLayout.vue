@@ -18,10 +18,16 @@ import {
   isViewAsLider,
 } from '@/utils/userRoles'
 import { formatMuralBadges } from '@/utils/eccMural'
+import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
+import { faBars } from '@fortawesome/free-solid-svg-icons'
+import { library } from '@fortawesome/fontawesome-svg-core'
 import PwaInstallNavButton from '@/components/base/PwaInstallNavButton.vue'
 import ViewAsLiderBanner from '@/components/ViewAsLiderBanner.vue'
 import LiderBottomNav from '@/components/ecc/LiderBottomNav.vue'
+import { asideNavClasses } from '@/utils/mobileNav'
 import fallbackLogo from '@/assets/logo-icon.png'
+
+library.add(faBars)
 
 const props = defineProps({
   moduleKey: {
@@ -304,13 +310,28 @@ function isActive(item) {
 
 function onNav(item) {
   if (item.stub) return
+  closeMobileNav()
   router.push({ path: item.path, query: item.query || {} })
 }
 
 const userMenuOpen = ref(false)
+const mobileNavOpen = ref(false)
+
+const sidebarClass = computed(() =>
+  asideNavClasses({ open: mobileNavOpen.value || false }) + ' px-3.5 py-5',
+)
+
+function closeMobileNav() {
+  mobileNavOpen.value = false
+}
+
+function toggleMobileNav() {
+  mobileNavOpen.value = !mobileNavOpen.value
+}
 
 async function logout() {
   userMenuOpen.value = false
+  closeMobileNav()
   if (isPlatformAdmin.value) {
     tenantStore.clear()
     igrejaStore.reset()
@@ -329,8 +350,18 @@ function onDocumentClick(e) {
   }
 }
 
+function onKeydown(e) {
+  if (e.key === 'Escape') closeMobileNav()
+}
+
+watch(
+  () => route.fullPath,
+  () => closeMobileNav(),
+)
+
 onMounted(async () => {
   document.addEventListener('click', onDocumentClick)
+  document.addEventListener('keydown', onKeydown)
   if (tenantStore.slug) {
     await branding.ensureLoaded()
   }
@@ -345,6 +376,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   document.removeEventListener('click', onDocumentClick)
+  document.removeEventListener('keydown', onKeydown)
 })
 </script>
 
@@ -355,9 +387,16 @@ onUnmounted(() => {
     data-testid="module-layout"
   >
     <ViewAsLiderBanner v-if="viewAsLider" />
+    <div
+      v-if="mobileNavOpen && !liderShell"
+      class="fixed inset-0 z-40 md:hidden"
+      style="background: rgba(42, 20, 24, 0.45)"
+      data-testid="module-nav-backdrop"
+      @click="closeMobileNav"
+    />
     <div class="flex flex-1 min-h-0">
     <aside
-      class="hidden md:flex w-[214px] shrink-0 flex-col gap-5 px-3.5 py-5"
+      :class="sidebarClass"
       style="background: var(--color-primary); color: var(--color-on-primary)"
       data-testid="module-sidebar"
     >
@@ -469,19 +508,33 @@ onUnmounted(() => {
 
     <div class="flex-1 min-w-0 flex flex-col w-full">
       <header
-        v-if="moduleKey !== 'site'"
+        v-if="moduleKey !== 'site' || !liderShell"
         class="h-14 shrink-0 flex items-center justify-between px-4 md:px-6 gap-3"
         style="background: var(--color-surface); border-bottom: 1px solid var(--color-line)"
+        :class="moduleKey === 'site' ? 'md:hidden' : ''"
       >
         <div
           class="flex items-center gap-2.5 min-w-0 text-[13px]"
           style="color: var(--color-muted)"
         >
+          <button
+            v-if="!liderShell"
+            type="button"
+            class="md:hidden w-9 h-9 rounded-lg flex items-center justify-center border-0 cursor-pointer shrink-0"
+            style="background: var(--color-primary-soft); color: var(--color-on-primary)"
+            aria-label="Abrir menu de navegação"
+            :aria-expanded="mobileNavOpen"
+            data-testid="module-nav-toggle"
+            @click="toggleMobileNav"
+          >
+            <FontAwesomeIcon :icon="faBars" class="text-[15px]" />
+          </button>
           <router-link
-            v-if="!liderShell && (!somenteLider || route.path !== '/ecc/minha-equipe')"
-            :to="somenteLider ? '/ecc/minha-equipe' : '/inicio'"
+            v-if="!liderShell && moduleKey !== 'site'"
+            to="/inicio"
             class="md:hidden no-underline"
             style="color: var(--color-primary-hover)"
+            data-testid="module-back-launcher-mobile"
           >
             ←
           </router-link>
