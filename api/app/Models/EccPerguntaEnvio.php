@@ -40,6 +40,7 @@ class EccPerguntaEnvio extends Model
         'resposta_responsavel',
         'respondido_em',
         'respondido_por_user_id',
+        'resposta_vista_em',
     ];
 
     /**
@@ -51,6 +52,7 @@ class EccPerguntaEnvio extends Model
             'respostas' => 'array',
             'enviado_em' => 'datetime',
             'respondido_em' => 'datetime',
+            'resposta_vista_em' => 'datetime',
         ];
     }
 

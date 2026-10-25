@@ -55,6 +55,7 @@ LGPD: `resposta_responsavel` e valores de campos livres em `respostas` podem con
 - [ ] `mensagem_pos_envio` opcional — exibida ao líder após o envio (e ao reabrir o próprio envio).
 - [ ] `rotulo_resposta` opcional — rótulo do campo de resposta (admin e líder); padrão “Resposta à equipe”.
 - [ ] Listagem/detalhe de envios (admin): nome da equipe + casal piloto; `enviado_em` e `respondido_em` visíveis no admin e no líder.
+- [ ] Badge `com_resposta_nova` some após o líder abrir o detalhe com resposta (`resposta_vista_em`).
 - [ ] Campos: criados/atualizados no body do formulário (array `campos[]`); lista exige `opcoes` ≥ 1.
 - [ ] Líder: lista só `disponivel` (+ envios da(s) equipe(s) dele); 403 em manage.
 - [ ] `POST /ecc/perguntas/{id}/envios` — valida obrigatórios; 422 se já existe envio da equipe; dispara evento broadcast.

@@ -1075,6 +1075,11 @@ components:
         resposta_responsavel: {type: string, nullable: true}
         respondido_em: {type: string, format: date-time, nullable: true}
         respondido_por_nome: {type: string}
+        resposta_vista_em:
+          type: string
+          format: date-time
+          nullable: true
+          description: Quando o líder visualizou a resposta (some do badge com_resposta_nova)
     EccPerguntaWrite:
       type: object
       required: [titulo, responsavel_user_id, campos]

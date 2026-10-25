@@ -45,6 +45,16 @@ class EccPerguntaController extends Controller
         $user = auth()->user() instanceof User ? auth()->user() : null;
         $equipeIds = $user ? ($this->visibility->restrictedEquipeIds($user) ?? []) : [];
 
+        // Líder que abre o detalhe com resposta já disponível deixa de ver o badge.
+        if (
+            $user
+            && $equipeIds !== []
+            && ! $this->visibility->userCan('ecc.perguntas.manage')
+        ) {
+            $this->perguntas->marcarRespostasVistas($pergunta, $user, $equipeIds);
+            $pergunta->unsetRelation('envios');
+        }
+
         return response()->json([
             'data' => $this->perguntas->serialize($pergunta, $user, $equipeIds, listMode: false),
         ]);
