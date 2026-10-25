@@ -28,7 +28,7 @@ A secretaria/admin precisa solicitar informações às equipes (ex.: confirmaç�
 
 | Entidade | Tabela | Notas |
 |----------|--------|-------|
-| Formulário | `ecc_perguntas` | `igreja_id`, `titulo`, `descricao?`, `status` (`rascunho`\|`disponivel`\|`arquivado`), `responsavel_user_id` (FK `users.id`), `disponibilizado_em?`, `criado_por_user_id` |
+| Formulário | `ecc_perguntas` | `igreja_id`, `titulo`, `descricao?`, `mensagem_pos_envio?` (texto ao líder após enviar), `status` (`rascunho`\|`disponivel`\|`arquivado`), `responsavel_user_id` (FK `users.id`), `disponibilizado_em?`, `criado_por_user_id` |
 | Campo | `ecc_pergunta_campos` | `pergunta_id`, `ordem`, `tipo` (`texto_curto`\|`texto_longo`\|`lista`), `rotulo`, `obrigatorio`, `opcoes` JSON nullable (lista) |
 | Envio | `ecc_pergunta_envios` | `pergunta_id`, `equipe_id`, `enviado_por_user_id`, `respostas` JSON `{campo_id: valor}`, `status` (`enviado`\|`respondido`), `enviado_em`, `resposta_responsavel` TEXT `$encryptable`, `respondido_em?`, `respondido_por_user_id?` |
 
@@ -51,6 +51,8 @@ LGPD: `resposta_responsavel` e valores de campos livres em `respostas` podem con
 - [ ] Migration tenant: três tabelas + sync de permissões.
 - [ ] Seed: permissões; líder ganha `view`; admins `view`+`manage`.
 - [ ] `GET/POST /ecc/perguntas`, `GET/PUT/DELETE /ecc/perguntas/{id}`, `POST .../disponibilizar`, `POST .../arquivar`.
+- [ ] Front admin: editar formulário (título, descrição, mensagem pós-envio, responsável; campos enquanto não houver envios).
+- [ ] `mensagem_pos_envio` opcional — exibida ao líder após o envio (e ao reabrir o próprio envio).
 - [ ] Campos: criados/atualizados no body do formulário (array `campos[]`); lista exige `opcoes` ≥ 1.
 - [ ] Líder: lista só `disponivel` (+ envios da(s) equipe(s) dele); 403 em manage.
 - [ ] `POST /ecc/perguntas/{id}/envios` — valida obrigatórios; 422 se já existe envio da equipe; dispara evento broadcast.

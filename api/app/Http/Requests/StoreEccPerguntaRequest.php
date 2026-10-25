@@ -23,6 +23,7 @@ class StoreEccPerguntaRequest extends FormRequest
         return [
             'titulo' => ['required', 'string', 'max:180'],
             'descricao' => ['nullable', 'string', 'max:2000'],
+            'mensagem_pos_envio' => ['nullable', 'string', 'max:2000'],
             'responsavel_user_id' => ['required', 'string', 'max:26'],
             'campos' => ['required', 'array', 'min:1'],
             'campos.*.tipo' => ['required', 'string', Rule::in([

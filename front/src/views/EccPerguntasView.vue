@@ -31,6 +31,7 @@ function blankForm() {
   return {
     titulo: '',
     descricao: '',
+    mensagem_pos_envio: '',
     responsavel_user_id: '',
     campos: [campoVazio('texto_curto')],
   }
@@ -86,6 +87,7 @@ async function save() {
     const payload = {
       titulo: form.value.titulo,
       descricao: form.value.descricao || null,
+      mensagem_pos_envio: form.value.mensagem_pos_envio || null,
       responsavel_user_id: form.value.responsavel_user_id,
       campos: form.value.campos.map((c, i) => ({
         tipo: c.tipo,
@@ -172,6 +174,18 @@ onUnmounted(() => {
         <div>
           <label class="fld" for="perg-desc">Descrição (opcional)</label>
           <textarea id="perg-desc" v-model="form.descricao" class="input min-h-[72px]" rows="2" />
+        </div>
+        <div>
+          <label class="fld" for="perg-msg">Mensagem após resposta do líder (opcional)</label>
+          <textarea
+            id="perg-msg"
+            v-model="form.mensagem_pos_envio"
+            class="input min-h-[72px]"
+            rows="2"
+            maxlength="2000"
+            placeholder="Ex.: Obrigado! A secretaria vai analisar e retornar."
+            data-testid="perguntas-mensagem-pos"
+          />
         </div>
         <div>
           <label class="fld" for="perg-resp">Usuário responsável</label>

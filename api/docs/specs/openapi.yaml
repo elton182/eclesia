@@ -1078,6 +1078,10 @@ components:
       properties:
         titulo: {type: string, maxLength: 180}
         descricao: {type: string, nullable: true}
+        mensagem_pos_envio:
+          type: string
+          nullable: true
+          description: Mensagem exibida ao líder após enviar as respostas
         responsavel_user_id: {type: string, description: ULID do usuário responsável}
         campos:
           type: array
@@ -1099,11 +1103,13 @@ components:
         id: {type: string}
         titulo: {type: string}
         descricao: {type: string, nullable: true}
+        mensagem_pos_envio: {type: string, nullable: true}
         status: {type: string, enum: [rascunho, disponivel, arquivado]}
         responsavel_user_id: {type: string}
         responsavel_nome: {type: string}
         disponibilizado_em: {type: string, format: date-time, nullable: true}
         campos_count: {type: integer}
+        tem_envios: {type: boolean}
         envios_count: {type: integer, nullable: true}
         meu_envio:
           nullable: true

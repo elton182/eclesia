@@ -30,6 +30,7 @@ class EccPerguntaService
 
         $query = EccPergunta::query()
             ->with(['campos', 'responsavel'])
+            ->withCount('envios')
             ->where('igreja_id', $this->igrejaId())
             ->orderByDesc('disponibilizado_em')
             ->orderByDesc('created_at');
@@ -116,6 +117,7 @@ class EccPerguntaService
 
         $pergunta = EccPergunta::query()
             ->with(['campos', 'responsavel', 'envios.equipe'])
+            ->withCount('envios')
             ->where('igreja_id', $this->igrejaId())
             ->whereKey($id)
             ->firstOrFail();
@@ -359,15 +361,17 @@ class EccPerguntaService
             'id' => (string) $pergunta->id,
             'titulo' => (string) $pergunta->titulo,
             'descricao' => $pergunta->descricao,
+            'mensagem_pos_envio' => $pergunta->mensagem_pos_envio,
             'status' => (string) $pergunta->status,
             'responsavel_user_id' => (string) ($pergunta->responsavel?->ulid ?? ''),
             'responsavel_nome' => (string) ($pergunta->responsavel?->name ?? ''),
             'disponibilizado_em' => $pergunta->disponibilizado_em?->toIso8601String(),
             'campos_count' => $pergunta->campos->count(),
+            'tem_envios' => ((int) ($pergunta->envios_count ?? $pergunta->envios()->count())) > 0,
             'meu_envio' => $meuEnvio,
             'envios_count' => $this->visibility->userCan('ecc.perguntas.manage')
                 || ($user && (int) $pergunta->responsavel_user_id === (int) $user->id)
-                ? $pergunta->envios()->count()
+                ? (int) ($pergunta->envios_count ?? $pergunta->envios()->count())
                 : null,
         ];
 
@@ -434,13 +438,24 @@ class EccPerguntaService
             ]);
         }
 
+        $descricao = $existing?->descricao;
+        if (array_key_exists('descricao', $data)) {
+            $descricao = ($data['descricao'] !== null && $data['descricao'] !== '')
+                ? (string) $data['descricao']
+                : null;
+        }
+
+        $mensagemPos = $existing?->mensagem_pos_envio;
+        if (array_key_exists('mensagem_pos_envio', $data)) {
+            $mensagemPos = ($data['mensagem_pos_envio'] !== null && trim((string) $data['mensagem_pos_envio']) !== '')
+                ? trim((string) $data['mensagem_pos_envio'])
+                : null;
+        }
+
         return [
             'titulo' => (string) ($data['titulo'] ?? $existing?->titulo),
-            'descricao' => array_key_exists('descricao', $data)
-                ? (($data['descricao'] !== null && $data['descricao'] !== '')
-                    ? (string) $data['descricao']
-                    : null)
-                : $existing?->descricao,
+            'descricao' => $descricao,
+            'mensagem_pos_envio' => $mensagemPos,
             'status' => $existing?->status ?? EccPergunta::STATUS_RASCUNHO,
             'responsavel_user_id' => $responsavelId,
         ];

@@ -132,6 +132,7 @@ class EccPerguntasTest extends TestCase
         return [
             'titulo' => 'Confirmação de encontro',
             'descricao' => 'Responda até sexta',
+            'mensagem_pos_envio' => 'Obrigado! A secretaria vai analisar e retornar.',
             'responsavel_user_id' => $responsavelUlid ?? (string) $this->admin->ulid,
             'campos' => [
                 [
@@ -177,9 +178,39 @@ class EccPerguntasTest extends TestCase
 
         $this->assertSame('rascunho', $created['status']);
         $this->assertCount(3, $created['campos']);
+        $this->assertSame(
+            'Obrigado! A secretaria vai analisar e retornar.',
+            $created['mensagem_pos_envio'],
+        );
         $perguntaId = $created['id'];
         $campoCurtoId = $created['campos'][0]['id'];
         $campoListaId = $created['campos'][1]['id'];
+
+        $edited = $this->tenantJson('PUT', "/api/v1/ecc/perguntas/{$perguntaId}", [
+            'titulo' => 'Confirmação de encontro (atualizado)',
+            'mensagem_pos_envio' => 'Recebemos sua resposta. Aguarde o retorno.',
+            'campos' => [
+                [
+                    'tipo' => 'texto_curto',
+                    'rotulo' => 'Quantidade de casais',
+                    'obrigatorio' => true,
+                    'ordem' => 0,
+                ],
+                [
+                    'tipo' => 'lista',
+                    'rotulo' => 'Vai participar?',
+                    'obrigatorio' => true,
+                    'ordem' => 1,
+                    'opcoes' => ['Sim', 'Não', 'Talvez'],
+                ],
+            ],
+        ])->assertOk()->json('data');
+
+        $this->assertSame('Confirmação de encontro (atualizado)', $edited['titulo']);
+        $this->assertSame('Recebemos sua resposta. Aguarde o retorno.', $edited['mensagem_pos_envio']);
+        $this->assertCount(2, $edited['campos']);
+        $campoCurtoId = $edited['campos'][0]['id'];
+        $campoListaId = $edited['campos'][1]['id'];
 
         Sanctum::actingAs($this->liderAlpha);
         $this->tenantJson('GET', '/api/v1/ecc/perguntas')
