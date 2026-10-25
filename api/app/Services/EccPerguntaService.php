@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Events\EccPerguntaEnvioCriado;
+use App\Models\Casal;
 use App\Models\EccEquipe;
 use App\Models\EccPergunta;
 use App\Models\EccPerguntaCampo;
@@ -295,7 +296,11 @@ class EccPerguntaService
         abort_unless($canManage || $isResponsavel, 403);
 
         return $pergunta->envios()
-            ->with(['equipe', 'enviadoPor', 'respondidoPor'])
+            ->with([
+                'equipe.casais' => static fn ($q) => $q->where('piloto', true)->with(['pessoaA:id,nome', 'pessoaB:id,nome']),
+                'enviadoPor',
+                'respondidoPor',
+            ])
             ->orderByDesc('enviado_em')
             ->get()
             ->map(fn (EccPerguntaEnvio $e): array => $this->serializeEnvio($e))
@@ -349,7 +354,9 @@ class EccPerguntaService
             $envio = EccPerguntaEnvio::query()
                 ->where('pergunta_id', $pergunta->id)
                 ->whereIn('equipe_id', $equipeIds)
-                ->with('equipe')
+                ->with([
+                    'equipe.casais' => static fn ($q) => $q->where('piloto', true)->with(['pessoaA:id,nome', 'pessoaB:id,nome']),
+                ])
                 ->orderByDesc('enviado_em')
                 ->first();
             if ($envio) {
@@ -362,6 +369,7 @@ class EccPerguntaService
             'titulo' => (string) $pergunta->titulo,
             'descricao' => $pergunta->descricao,
             'mensagem_pos_envio' => $pergunta->mensagem_pos_envio,
+            'rotulo_resposta' => $this->rotuloRespostaEfetivo($pergunta->rotulo_resposta),
             'status' => (string) $pergunta->status,
             'responsavel_user_id' => (string) ($pergunta->responsavel?->ulid ?? ''),
             'responsavel_nome' => (string) ($pergunta->responsavel?->name ?? ''),
@@ -396,13 +404,18 @@ class EccPerguntaService
      */
     public function serializeEnvio(EccPerguntaEnvio $envio): array
     {
-        $envio->loadMissing(['equipe', 'enviadoPor', 'respondidoPor']);
+        $envio->loadMissing([
+            'equipe.casais' => static fn ($q) => $q->where('piloto', true)->with(['pessoaA:id,nome', 'pessoaB:id,nome']),
+            'enviadoPor',
+            'respondidoPor',
+        ]);
 
         return [
             'id' => (string) $envio->id,
             'pergunta_id' => (string) $envio->pergunta_id,
             'equipe_id' => (string) $envio->equipe_id,
             'equipe_nome' => (string) ($envio->equipe?->nome ?? ''),
+            'casal_piloto' => $this->formatCasalPiloto($envio->equipe),
             'enviado_por_user_id' => (string) ($envio->enviadoPor?->ulid ?? ''),
             'enviado_por_nome' => (string) ($envio->enviadoPor?->name ?? ''),
             'respostas' => $envio->respostas ?? [],
@@ -412,6 +425,36 @@ class EccPerguntaService
             'respondido_em' => $envio->respondido_em?->toIso8601String(),
             'respondido_por_nome' => (string) ($envio->respondidoPor?->name ?? ''),
         ];
+    }
+
+    public function rotuloRespostaEfetivo(?string $rotulo): string
+    {
+        $limpo = trim((string) $rotulo);
+
+        return $limpo !== '' ? $limpo : 'Resposta à equipe';
+    }
+
+    private function formatCasalPiloto(?EccEquipe $equipe): string
+    {
+        if (! $equipe) {
+            return '';
+        }
+
+        $pilotos = $equipe->casais
+            ->map(function (Casal $casal): string {
+                $a = trim((string) ($casal->pessoaA?->nome ?? ''));
+                $b = trim((string) ($casal->pessoaB?->nome ?? ''));
+                if ($a !== '' && $b !== '') {
+                    return $a.' & '.$b;
+                }
+
+                return $a !== '' ? $a : $b;
+            })
+            ->filter(static fn (string $nome): bool => $nome !== '')
+            ->values()
+            ->all();
+
+        return $pilotos === [] ? '' : implode('; ', $pilotos);
     }
 
     /**
@@ -452,10 +495,18 @@ class EccPerguntaService
                 : null;
         }
 
+        $rotuloResposta = $existing?->rotulo_resposta;
+        if (array_key_exists('rotulo_resposta', $data)) {
+            $rotuloResposta = ($data['rotulo_resposta'] !== null && trim((string) $data['rotulo_resposta']) !== '')
+                ? trim((string) $data['rotulo_resposta'])
+                : null;
+        }
+
         return [
             'titulo' => (string) ($data['titulo'] ?? $existing?->titulo),
             'descricao' => $descricao,
             'mensagem_pos_envio' => $mensagemPos,
+            'rotulo_resposta' => $rotuloResposta,
             'status' => $existing?->status ?? EccPergunta::STATUS_RASCUNHO,
             'responsavel_user_id' => $responsavelId,
         ];

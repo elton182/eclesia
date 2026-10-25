@@ -10,6 +10,7 @@ import {
   campoVazio,
   labelStatusPergunta,
   labelTipoCampo,
+  ROTULO_RESPOSTA_PADRAO,
 } from '@/utils/eccPerguntas'
 import { listenPerguntaEnvio, pusherConfigured } from '@/utils/pusherEcho'
 
@@ -32,6 +33,7 @@ function blankForm() {
     titulo: '',
     descricao: '',
     mensagem_pos_envio: '',
+    rotulo_resposta: ROTULO_RESPOSTA_PADRAO,
     responsavel_user_id: '',
     campos: [campoVazio('texto_curto')],
   }
@@ -88,6 +90,7 @@ async function save() {
       titulo: form.value.titulo,
       descricao: form.value.descricao || null,
       mensagem_pos_envio: form.value.mensagem_pos_envio || null,
+      rotulo_resposta: form.value.rotulo_resposta || null,
       responsavel_user_id: form.value.responsavel_user_id,
       campos: form.value.campos.map((c, i) => ({
         tipo: c.tipo,
@@ -186,6 +189,20 @@ onUnmounted(() => {
             placeholder="Ex.: Obrigado! A secretaria vai analisar e retornar."
             data-testid="perguntas-mensagem-pos"
           />
+        </div>
+        <div>
+          <label class="fld" for="perg-rotulo">Rótulo da resposta à equipe</label>
+          <input
+            id="perg-rotulo"
+            v-model="form.rotulo_resposta"
+            class="input"
+            maxlength="120"
+            :placeholder="ROTULO_RESPOSTA_PADRAO"
+            data-testid="perguntas-rotulo-resposta"
+          >
+          <p class="text-[12px] mt-1" style="color: var(--color-muted)">
+            Texto do campo em que o responsável responde (visível também ao líder).
+          </p>
         </div>
         <div>
           <label class="fld" for="perg-resp">Usuário responsável</label>

@@ -133,6 +133,7 @@ class EccPerguntasTest extends TestCase
             'titulo' => 'Confirmação de encontro',
             'descricao' => 'Responda até sexta',
             'mensagem_pos_envio' => 'Obrigado! A secretaria vai analisar e retornar.',
+            'rotulo_resposta' => 'Retorno da secretaria',
             'responsavel_user_id' => $responsavelUlid ?? (string) $this->admin->ulid,
             'campos' => [
                 [
@@ -182,13 +183,24 @@ class EccPerguntasTest extends TestCase
             'Obrigado! A secretaria vai analisar e retornar.',
             $created['mensagem_pos_envio'],
         );
+        $this->assertSame('Retorno da secretaria', $created['rotulo_resposta']);
         $perguntaId = $created['id'];
         $campoCurtoId = $created['campos'][0]['id'];
         $campoListaId = $created['campos'][1]['id'];
 
+        $this->tenantJson('POST', '/api/v1/ecc/casais', [
+            'equipe_id' => $this->equipeAlphaId,
+            'nome' => 'Carlos Piloto',
+            'email' => 'carlos.piloto@paroquia-perguntas.local',
+            'nome_conjuge' => 'Ana Piloto',
+            'email_conjuge' => 'ana.piloto@paroquia-perguntas.local',
+            'piloto' => true,
+        ])->assertCreated();
+
         $edited = $this->tenantJson('PUT', "/api/v1/ecc/perguntas/{$perguntaId}", [
             'titulo' => 'Confirmação de encontro (atualizado)',
             'mensagem_pos_envio' => 'Recebemos sua resposta. Aguarde o retorno.',
+            'rotulo_resposta' => 'Resposta da secretaria',
             'campos' => [
                 [
                     'tipo' => 'texto_curto',
@@ -208,6 +220,7 @@ class EccPerguntasTest extends TestCase
 
         $this->assertSame('Confirmação de encontro (atualizado)', $edited['titulo']);
         $this->assertSame('Recebemos sua resposta. Aguarde o retorno.', $edited['mensagem_pos_envio']);
+        $this->assertSame('Resposta da secretaria', $edited['rotulo_resposta']);
         $this->assertCount(2, $edited['campos']);
         $campoCurtoId = $edited['campos'][0]['id'];
         $campoListaId = $edited['campos'][1]['id'];
@@ -244,6 +257,9 @@ class EccPerguntasTest extends TestCase
         ])->assertCreated()->json('data');
 
         $this->assertSame('enviado', $envio['status']);
+        $this->assertNotEmpty($envio['enviado_em']);
+        $this->assertStringContainsString('Carlos Piloto', (string) $envio['casal_piloto']);
+        $this->assertStringContainsString('Ana Piloto', (string) $envio['casal_piloto']);
 
         Event::assertDispatched(EccPerguntaEnvioCriado::class, function (EccPerguntaEnvioCriado $e): bool {
             return $e->responsavelUlid === (string) $this->admin->ulid;
@@ -278,13 +294,19 @@ class EccPerguntasTest extends TestCase
 
         $this->assertSame('respondido', $respondido['status']);
         $this->assertSame('Obrigado, confirmado na agenda.', $respondido['resposta_responsavel']);
+        $this->assertNotEmpty($respondido['respondido_em']);
+        $this->assertStringContainsString('Carlos Piloto', (string) $respondido['casal_piloto']);
 
         Sanctum::actingAs($this->liderAlpha);
-        $meu = $this->tenantJson('GET', "/api/v1/ecc/perguntas/{$perguntaId}")
+        $detailLider = $this->tenantJson('GET', "/api/v1/ecc/perguntas/{$perguntaId}")
             ->assertOk()
-            ->json('data.meu_envio');
+            ->json('data');
+        $this->assertSame('Resposta da secretaria', $detailLider['rotulo_resposta']);
+        $meu = $detailLider['meu_envio'];
         $this->assertSame('respondido', $meu['status']);
         $this->assertSame('Obrigado, confirmado na agenda.', $meu['resposta_responsavel']);
+        $this->assertNotEmpty($meu['enviado_em']);
+        $this->assertNotEmpty($meu['respondido_em']);
 
         $resumoDepois = $this->tenantJson('GET', '/api/v1/ecc/perguntas/resumo')
             ->assertOk()
