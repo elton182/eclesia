@@ -72,3 +72,35 @@ export function campoVazio(tipo = 'texto_curto') {
     opcoes: tipo === 'lista' ? [''] : [],
   }
 }
+
+/** Rótulo padrão da resposta do responsável (admin ↔ líder). */
+export const ROTULO_RESPOSTA_PADRAO = 'Resposta à equipe'
+
+/**
+ * @param {string|null|undefined} rotulo
+ */
+export function rotuloRespostaEfetivo(rotulo) {
+  const limpo = String(rotulo || '').trim()
+  return limpo || ROTULO_RESPOSTA_PADRAO
+}
+
+/**
+ * @param {string|null|undefined} iso
+ */
+export function formatDateTimePergunta(iso) {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return '—'
+  return d.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
+}
+
+/**
+ * @param {{ equipe_nome?: string, casal_piloto?: string }|null|undefined} envio
+ */
+export function labelEquipeComPiloto(envio) {
+  const equipe = String(envio?.equipe_nome || '').trim()
+  const piloto = String(envio?.casal_piloto || '').trim()
+  if (!equipe) return piloto || '—'
+  if (!piloto) return equipe
+  return `${equipe} · ${piloto}`
+}

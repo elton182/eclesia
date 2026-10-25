@@ -6,6 +6,9 @@ import {
   labelStatusPergunta,
   labelTipoCampo,
   campoVazio,
+  rotuloRespostaEfetivo,
+  labelEquipeComPiloto,
+  ROTULO_RESPOSTA_PADRAO,
 } from './eccPerguntas.js'
 
 describe('eccPerguntas', () => {
@@ -30,5 +33,15 @@ describe('eccPerguntas', () => {
   it('campoVazio lista inicia com opção em branco', () => {
     assert.deepEqual(campoVazio('lista').opcoes, [''])
     assert.deepEqual(campoVazio('texto_curto').opcoes, [])
+  })
+
+  it('rotuloRespostaEfetivo usa padrão quando vazio', () => {
+    assert.equal(rotuloRespostaEfetivo(''), ROTULO_RESPOSTA_PADRAO)
+    assert.equal(rotuloRespostaEfetivo('Retorno da secretaria'), 'Retorno da secretaria')
+  })
+
+  it('labelEquipeComPiloto junta equipe e casal piloto', () => {
+    assert.equal(labelEquipeComPiloto({ equipe_nome: 'Alpha', casal_piloto: 'Ana & João' }), 'Alpha · Ana & João')
+    assert.equal(labelEquipeComPiloto({ equipe_nome: 'Alpha' }), 'Alpha')
   })
 })

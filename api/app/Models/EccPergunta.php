@@ -28,6 +28,8 @@ class EccPergunta extends Model
         'igreja_id',
         'titulo',
         'descricao',
+        'mensagem_pos_envio',
+        'rotulo_resposta',
         'status',
         'responsavel_user_id',
         'disponibilizado_em',

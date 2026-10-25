@@ -1062,6 +1062,9 @@ components:
         pergunta_id: {type: string}
         equipe_id: {type: string}
         equipe_nome: {type: string}
+        casal_piloto:
+          type: string
+          description: Nome(s) do casal piloto da equipe (Ele & Ela)
         enviado_por_user_id: {type: string}
         enviado_por_nome: {type: string}
         respostas:
@@ -1078,6 +1081,14 @@ components:
       properties:
         titulo: {type: string, maxLength: 180}
         descricao: {type: string, nullable: true}
+        mensagem_pos_envio:
+          type: string
+          nullable: true
+          description: Mensagem exibida ao líder após enviar as respostas
+        rotulo_resposta:
+          type: string
+          nullable: true
+          description: Rótulo do campo de resposta do responsável (padrão "Resposta à equipe")
         responsavel_user_id: {type: string, description: ULID do usuário responsável}
         campos:
           type: array
@@ -1099,11 +1110,14 @@ components:
         id: {type: string}
         titulo: {type: string}
         descricao: {type: string, nullable: true}
+        mensagem_pos_envio: {type: string, nullable: true}
+        rotulo_resposta: {type: string, description: Rótulo efetivo (com padrão se vazio)}
         status: {type: string, enum: [rascunho, disponivel, arquivado]}
         responsavel_user_id: {type: string}
         responsavel_nome: {type: string}
         disponibilizado_em: {type: string, format: date-time, nullable: true}
         campos_count: {type: integer}
+        tem_envios: {type: boolean}
         envios_count: {type: integer, nullable: true}
         meu_envio:
           nullable: true

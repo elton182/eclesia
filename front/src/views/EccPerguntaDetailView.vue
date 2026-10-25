@@ -6,7 +6,15 @@ import { useAuthStore } from '@/stores/auth'
 import { innovToast } from '@/plugins/toast'
 import { innovConfirm } from '@/plugins/dialog'
 import { userHasPermission } from '@/utils/userRoles'
-import { labelStatusPergunta, labelTipoCampo } from '@/utils/eccPerguntas'
+import {
+  campoVazio,
+  formatDateTimePergunta,
+  labelEquipeComPiloto,
+  labelStatusPergunta,
+  labelTipoCampo,
+  rotuloRespostaEfetivo,
+  ROTULO_RESPOSTA_PADRAO,
+} from '@/utils/eccPerguntas'
 
 const route = useRoute()
 const router = useRouter()
@@ -15,12 +23,15 @@ const auth = useAuthStore()
 const loading = ref(true)
 const pergunta = ref(null)
 const envios = ref([])
+const users = ref([])
 const saving = ref(false)
 const answering = ref(false)
+const editing = ref(false)
 const respostas = ref({})
 const equipeId = ref('')
 const respostaTexto = ref('')
 const envioSelecionado = ref(null)
+const editForm = ref(blankEditForm())
 
 const canManage = computed(() => userHasPermission(auth.user, 'ecc.perguntas.manage'))
 const isResponsavel = computed(
@@ -36,6 +47,24 @@ const jaEnviou = computed(() => Boolean(meuEnvio.value))
 const podeEnviar = computed(
   () => pergunta.value?.status === 'disponivel' && !jaEnviou.value && !canManage.value,
 )
+const podeEditar = computed(
+  () => canManage.value && pergunta.value && pergunta.value.status !== 'arquivado',
+)
+const podeEditarCampos = computed(
+  () => podeEditar.value && !pergunta.value?.tem_envios,
+)
+const rotuloResposta = computed(() => rotuloRespostaEfetivo(pergunta.value?.rotulo_resposta))
+
+function blankEditForm() {
+  return {
+    titulo: '',
+    descricao: '',
+    mensagem_pos_envio: '',
+    rotulo_resposta: ROTULO_RESPOSTA_PADRAO,
+    responsavel_user_id: '',
+    campos: [campoVazio('texto_curto')],
+  }
+}
 
 watch(
   () => pergunta.value?.campos,
@@ -59,6 +88,9 @@ async function load() {
     if (canReply.value) {
       await loadEnvios()
     }
+    if (canManage.value) {
+      await loadUsers()
+    }
   } catch (e) {
     innovToast('error', 'Perguntas', e.response?.data?.message || 'Não encontrado')
     router.push({ name: 'ecc-perguntas' })
@@ -73,6 +105,84 @@ async function loadEnvios() {
     envios.value = data?.data || []
   } catch {
     envios.value = []
+  }
+}
+
+async function loadUsers() {
+  try {
+    const { data } = await api.get('/users', { params: { per_page: 100 } })
+    users.value = data?.data || data || []
+  } catch {
+    users.value = []
+  }
+}
+
+function startEdit() {
+  if (!pergunta.value) return
+  editForm.value = {
+    titulo: pergunta.value.titulo || '',
+    descricao: pergunta.value.descricao || '',
+    mensagem_pos_envio: pergunta.value.mensagem_pos_envio || '',
+    rotulo_resposta: pergunta.value.rotulo_resposta || ROTULO_RESPOSTA_PADRAO,
+    responsavel_user_id: pergunta.value.responsavel_user_id || '',
+    campos: (pergunta.value.campos || []).map((c) => ({
+      tipo: c.tipo,
+      rotulo: c.rotulo,
+      obrigatorio: c.obrigatorio,
+      opcoes: c.tipo === 'lista' ? [...(c.opcoes || [])] : [],
+    })),
+  }
+  if (!editForm.value.campos.length) {
+    editForm.value.campos = [campoVazio('texto_curto')]
+  }
+  editing.value = true
+}
+
+function cancelEdit() {
+  editing.value = false
+}
+
+function addCampo(tipo) {
+  editForm.value.campos.push(campoVazio(tipo))
+}
+
+function removeCampo(idx) {
+  if (editForm.value.campos.length <= 1) return
+  editForm.value.campos.splice(idx, 1)
+}
+
+function addOpcao(campo) {
+  if (!Array.isArray(campo.opcoes)) campo.opcoes = []
+  campo.opcoes.push('')
+}
+
+async function saveEdit() {
+  saving.value = true
+  try {
+    const payload = {
+      titulo: editForm.value.titulo,
+      descricao: editForm.value.descricao || null,
+      mensagem_pos_envio: editForm.value.mensagem_pos_envio || null,
+      rotulo_resposta: editForm.value.rotulo_resposta || null,
+      responsavel_user_id: editForm.value.responsavel_user_id,
+    }
+    if (podeEditarCampos.value) {
+      payload.campos = editForm.value.campos.map((c, i) => ({
+        tipo: c.tipo,
+        rotulo: c.rotulo,
+        obrigatorio: c.obrigatorio,
+        ordem: i,
+        opcoes: c.tipo === 'lista' ? (c.opcoes || []).filter((o) => String(o).trim()) : undefined,
+      }))
+    }
+    const { data } = await api.put(`/ecc/perguntas/${route.params.id}`, payload)
+    pergunta.value = data?.data
+    editing.value = false
+    innovToast('success', 'Perguntas', 'Formulário atualizado.')
+  } catch (e) {
+    innovToast('error', 'Perguntas', e.response?.data?.message || 'Não foi possível salvar')
+  } finally {
+    saving.value = false
   }
 }
 
@@ -102,6 +212,7 @@ async function arquivar() {
   try {
     const { data } = await api.post(`/ecc/perguntas/${route.params.id}/arquivar`)
     pergunta.value = data?.data
+    editing.value = false
     innovToast('success', 'Perguntas', 'Arquivado.')
   } catch (e) {
     innovToast('error', 'Perguntas', e.response?.data?.message || 'Falha ao arquivar')
@@ -188,7 +299,16 @@ onMounted(load)
 
       <div v-if="canManage" class="flex flex-wrap gap-2 mb-6">
         <button
-          v-if="pergunta.status === 'rascunho'"
+          v-if="podeEditar && !editing"
+          type="button"
+          class="btn btn-primary"
+          data-testid="pergunta-editar"
+          @click="startEdit"
+        >
+          Editar formulário
+        </button>
+        <button
+          v-if="pergunta.status === 'rascunho' && !editing"
           type="button"
           class="btn btn-primary"
           data-testid="pergunta-disponibilizar"
@@ -206,6 +326,105 @@ onMounted(load)
           Arquivar
         </button>
       </div>
+
+      <!-- Admin: editar -->
+      <section v-if="editing && podeEditar" class="card p-5 mb-6" data-testid="pergunta-edit-form">
+        <h2 class="font-serif text-[20px] mb-4" style="color: var(--color-ink)">Editar formulário</h2>
+        <form class="space-y-4" @submit.prevent="saveEdit">
+          <div>
+            <label class="fld" for="edit-titulo">Título</label>
+            <input id="edit-titulo" v-model="editForm.titulo" class="input" required maxlength="180" data-testid="pergunta-edit-titulo">
+          </div>
+          <div>
+            <label class="fld" for="edit-desc">Descrição (opcional)</label>
+            <textarea id="edit-desc" v-model="editForm.descricao" class="input min-h-[72px]" rows="2" />
+          </div>
+          <div>
+            <label class="fld" for="edit-msg">Mensagem após resposta do líder (opcional)</label>
+            <textarea
+              id="edit-msg"
+              v-model="editForm.mensagem_pos_envio"
+              class="input min-h-[72px]"
+              rows="2"
+              maxlength="2000"
+              placeholder="Ex.: Obrigado! A secretaria vai analisar e retornar."
+              data-testid="pergunta-edit-mensagem-pos"
+            />
+            <p class="text-[12px] mt-1" style="color: var(--color-muted)">
+              Aparece para o líder depois que ele envia as respostas.
+            </p>
+          </div>
+          <div>
+            <label class="fld" for="edit-rotulo">Rótulo da resposta à equipe</label>
+            <input
+              id="edit-rotulo"
+              v-model="editForm.rotulo_resposta"
+              class="input"
+              maxlength="120"
+              :placeholder="ROTULO_RESPOSTA_PADRAO"
+              data-testid="pergunta-edit-rotulo-resposta"
+            >
+          </div>
+          <div>
+            <label class="fld" for="edit-resp">Usuário responsável</label>
+            <select id="edit-resp" v-model="editForm.responsavel_user_id" class="input" required data-testid="pergunta-edit-responsavel">
+              <option disabled value="">Selecione…</option>
+              <option v-for="u in users" :key="u.id" :value="u.id">
+                {{ u.name }} <template v-if="u.username || u.email">({{ u.username || u.email }})</template>
+              </option>
+            </select>
+          </div>
+
+          <div v-if="podeEditarCampos" class="space-y-3">
+            <div class="flex items-center justify-between gap-2">
+              <h3 class="text-[14px] font-medium" style="color: var(--color-ink)">Campos</h3>
+              <div class="flex flex-wrap gap-2">
+                <button type="button" class="btn btn-ghost text-[12px]" @click="addCampo('texto_curto')">+ Curto</button>
+                <button type="button" class="btn btn-ghost text-[12px]" @click="addCampo('texto_longo')">+ Longo</button>
+                <button type="button" class="btn btn-ghost text-[12px]" @click="addCampo('lista')">+ Lista</button>
+              </div>
+            </div>
+            <div
+              v-for="(campo, idx) in editForm.campos"
+              :key="idx"
+              class="rounded-[10px] border p-3 space-y-2"
+              style="border-color: var(--color-line)"
+            >
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-[12px]" style="color: var(--color-muted)">{{ labelTipoCampo(campo.tipo) }}</span>
+                <button type="button" class="btn btn-ghost text-[12px]" :disabled="editForm.campos.length <= 1" @click="removeCampo(idx)">
+                  Remover
+                </button>
+              </div>
+              <input v-model="campo.rotulo" class="input" :placeholder="`Rótulo do campo ${idx + 1}`" required>
+              <label class="flex items-center gap-2 text-[13px]" style="color: var(--color-ink)">
+                <input v-model="campo.obrigatorio" type="checkbox">
+                Obrigatório
+              </label>
+              <div v-if="campo.tipo === 'lista'" class="space-y-2">
+                <input
+                  v-for="(op, oi) in campo.opcoes"
+                  :key="oi"
+                  v-model="campo.opcoes[oi]"
+                  class="input"
+                  :placeholder="`Opção ${oi + 1}`"
+                >
+                <button type="button" class="btn btn-ghost text-[12px]" @click="addOpcao(campo)">+ Opção</button>
+              </div>
+            </div>
+          </div>
+          <p v-else class="text-[13px]" style="color: var(--color-muted)">
+            Já existem envios — título, mensagem e responsável podem mudar; os campos ficam travados.
+          </p>
+
+          <div class="flex gap-2 justify-end">
+            <button type="button" class="btn btn-ghost" @click="cancelEdit">Cancelar</button>
+            <button type="submit" class="btn btn-primary" :disabled="saving" data-testid="pergunta-edit-salvar">
+              {{ saving ? 'Salvando…' : 'Salvar alterações' }}
+            </button>
+          </div>
+        </form>
+      </section>
 
       <!-- Líder: formulário de envio -->
       <section v-if="podeEnviar" class="card p-5 mb-6" data-testid="pergunta-envio-form">
@@ -261,10 +480,24 @@ onMounted(load)
       <!-- Líder: já enviou -->
       <section v-if="meuEnvio" class="card p-5 mb-6" data-testid="pergunta-meu-envio">
         <h2 class="font-serif text-[20px] mb-3" style="color: var(--color-ink)">Seu envio</h2>
-        <p class="text-[12px] mb-3" style="color: var(--color-muted)">
+        <p class="text-[12px] mb-1" style="color: var(--color-muted)">
           {{ labelStatusPergunta(meuEnvio.status) }}
           · {{ meuEnvio.equipe_nome }}
         </p>
+        <p class="text-[12px] mb-3" style="color: var(--color-muted)" data-testid="pergunta-meu-envio-datas">
+          Enviado em {{ formatDateTimePergunta(meuEnvio.enviado_em) }}
+          <template v-if="meuEnvio.respondido_em">
+            · Respondido em {{ formatDateTimePergunta(meuEnvio.respondido_em) }}
+          </template>
+        </p>
+        <div
+          v-if="pergunta.mensagem_pos_envio"
+          class="mb-4 rounded-[10px] px-3 py-3 text-[14px] whitespace-pre-wrap"
+          style="background: var(--color-accent-soft); color: var(--color-ink)"
+          data-testid="pergunta-mensagem-pos-envio"
+        >
+          {{ pergunta.mensagem_pos_envio }}
+        </div>
         <dl class="space-y-2 text-[14px]">
           <div v-for="(val, key) in meuEnvio.respostas" :key="key">
             <dt class="text-[12px]" style="color: var(--color-muted)">{{ rotuloCampo(key) }}</dt>
@@ -277,18 +510,21 @@ onMounted(load)
           style="border-color: var(--color-line)"
           data-testid="pergunta-resposta-responsavel"
         >
-          <p class="text-[12px] mb-1" style="color: var(--color-muted)">Resposta do responsável</p>
+          <p class="text-[12px] mb-1" style="color: var(--color-muted)">{{ rotuloResposta }}</p>
           <p class="text-[14px] whitespace-pre-wrap" style="color: var(--color-ink)">
             {{ meuEnvio.resposta_responsavel }}
           </p>
+          <p v-if="meuEnvio.respondido_em" class="text-[12px] mt-2" style="color: var(--color-muted)">
+            {{ formatDateTimePergunta(meuEnvio.respondido_em) }}
+          </p>
         </div>
         <p v-else class="mt-4 text-[13px]" style="color: var(--color-muted)">
-          Aguardando resposta do responsável.
+          Aguardando {{ rotuloResposta.toLowerCase() }}.
         </p>
       </section>
 
       <!-- Admin/responsável: inbox -->
-      <section v-if="canReply" class="mb-6" data-testid="pergunta-envios">
+      <section v-if="canReply && !editing" class="mb-6" data-testid="pergunta-envios">
         <h2 class="font-serif text-[20px] mb-3" style="color: var(--color-ink)">Envios das equipes</h2>
         <ul class="flex flex-col gap-3">
           <li
@@ -306,26 +542,46 @@ onMounted(load)
             @click="selecionarEnvio(envio)"
           >
             <div class="flex justify-between gap-2">
-              <div class="font-medium" style="color: var(--color-ink)">{{ envio.equipe_nome }}</div>
-              <span class="text-[11px]" style="color: var(--color-muted)">{{ labelStatusPergunta(envio.status) }}</span>
+              <div>
+                <div class="font-medium" style="color: var(--color-ink)">{{ envio.equipe_nome }}</div>
+                <p
+                  v-if="envio.casal_piloto"
+                  class="text-[13px] mt-0.5"
+                  style="color: var(--color-muted)"
+                  data-testid="pergunta-envio-piloto"
+                >
+                  Casal piloto: {{ envio.casal_piloto }}
+                </p>
+              </div>
+              <span class="text-[11px] shrink-0" style="color: var(--color-muted)">{{ labelStatusPergunta(envio.status) }}</span>
             </div>
             <p class="text-[12px] mt-1" style="color: var(--color-muted)">
               por {{ envio.enviado_por_nome || '—' }}
+              · {{ formatDateTimePergunta(envio.enviado_em) }}
+              <template v-if="envio.respondido_em">
+                · resp. {{ formatDateTimePergunta(envio.respondido_em) }}
+              </template>
             </p>
           </li>
         </ul>
 
         <div v-if="envioSelecionado" class="card p-5 mt-4" data-testid="pergunta-responder-panel">
-          <h3 class="font-medium mb-3" style="color: var(--color-ink)">
-            {{ envioSelecionado.equipe_nome }}
+          <h3 class="font-medium mb-1" style="color: var(--color-ink)">
+            {{ labelEquipeComPiloto(envioSelecionado) }}
           </h3>
+          <p class="text-[12px] mb-3" style="color: var(--color-muted)" data-testid="pergunta-envio-selecionado-datas">
+            Pergunta em {{ formatDateTimePergunta(envioSelecionado.enviado_em) }}
+            <template v-if="envioSelecionado.respondido_em">
+              · Resposta em {{ formatDateTimePergunta(envioSelecionado.respondido_em) }}
+            </template>
+          </p>
           <dl class="space-y-2 text-[14px] mb-4">
             <div v-for="(val, key) in envioSelecionado.respostas" :key="key">
               <dt class="text-[12px]" style="color: var(--color-muted)">{{ rotuloCampo(key) }}</dt>
               <dd style="color: var(--color-ink)">{{ val }}</dd>
             </div>
           </dl>
-          <label class="fld" for="resp-admin">Sua resposta à equipe</label>
+          <label class="fld" for="resp-admin">{{ rotuloResposta }}</label>
           <textarea
             id="resp-admin"
             v-model="respostaTexto"
@@ -345,8 +601,7 @@ onMounted(load)
         </div>
       </section>
 
-      <!-- Preview campos (admin em rascunho) -->
-      <section v-if="canManage && pergunta.status === 'rascunho'" class="mt-4">
+      <section v-if="canManage && !editing && pergunta.campos?.length" class="mt-4">
         <h2 class="text-[14px] font-medium mb-2" style="color: var(--color-ink)">Campos do formulário</h2>
         <ul class="text-[13px] space-y-1" style="color: var(--color-muted)">
           <li v-for="c in pergunta.campos" :key="c.id">
@@ -354,6 +609,9 @@ onMounted(load)
             <template v-if="c.obrigatorio"> · obrigatório</template>
           </li>
         </ul>
+        <p v-if="pergunta.mensagem_pos_envio" class="text-[13px] mt-3" style="color: var(--color-muted)">
+          Mensagem pós-envio: {{ pergunta.mensagem_pos_envio }}
+        </p>
       </section>
     </template>
   </div>

@@ -23,6 +23,8 @@ class UpdateEccPerguntaRequest extends FormRequest
         return [
             'titulo' => ['sometimes', 'required', 'string', 'max:180'],
             'descricao' => ['nullable', 'string', 'max:2000'],
+            'mensagem_pos_envio' => ['nullable', 'string', 'max:2000'],
+            'rotulo_resposta' => ['nullable', 'string', 'max:120'],
             'responsavel_user_id' => ['sometimes', 'required', 'string', 'max:26'],
             'campos' => ['sometimes', 'array', 'min:1'],
             'campos.*.tipo' => ['required_with:campos', 'string', Rule::in([
