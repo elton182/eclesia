@@ -1,16 +1,44 @@
 <script setup>
 import { RouterView } from 'vue-router'
-import { ref } from 'vue'
+import { onMounted, onUnmounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import TopNavbar from '@/components/layout/TopNavbar.vue'
 import Sidebar from '@/components/layout/Sidebar.vue'
 import { useIgrejaStore } from '@/stores/igreja'
 
-const isSidebarOpen = ref(true)
+const route = useRoute()
+const isSidebarOpen = ref(false)
 const igrejaStore = useIgrejaStore()
 
 const toggleSidebar = () => {
   isSidebarOpen.value = !isSidebarOpen.value
 }
+
+const closeSidebarMobile = () => {
+  if (typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches) {
+    isSidebarOpen.value = false
+  }
+}
+
+function onKeydown(e) {
+  if (e.key === 'Escape') closeSidebarMobile()
+}
+
+onMounted(() => {
+  if (window.matchMedia('(min-width: 768px)').matches) {
+    isSidebarOpen.value = true
+  }
+  document.addEventListener('keydown', onKeydown)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('keydown', onKeydown)
+})
+
+watch(
+  () => route.fullPath,
+  () => closeSidebarMobile(),
+)
 </script>
 
 <template>
@@ -20,11 +48,16 @@ const toggleSidebar = () => {
       @toggle-sidebar="toggleSidebar"
     />
 
+    <div
+      v-if="isSidebarOpen"
+      class="fixed inset-0 top-16 z-30 md:hidden"
+      style="background: rgba(42, 20, 24, 0.45)"
+      data-testid="admin-nav-backdrop"
+      @click="isSidebarOpen = false"
+    />
+
     <div class="flex pt-16">
-      <Sidebar
-        :is-open="isSidebarOpen"
-        class="fixed left-0 top-16 h-[calc(100vh-4rem)] z-40"
-      />
+      <Sidebar :is-open="isSidebarOpen" />
 
       <main
         :class="[

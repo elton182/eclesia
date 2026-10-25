@@ -18,13 +18,16 @@ import { useAuthAdminStore } from '@/stores/authAdmin'
 import { useAuthStore } from '@/stores/auth'
 import { useBrandingStore } from '@/stores/branding'
 import { userHasPermission, canSeeEccCasaisNav } from '@/utils/userRoles'
+import { adminAsideClasses } from '@/utils/mobileNav'
 import fallbackLogo from '@/assets/logo-icon.png'
 
 library.add(faBuilding, faHeart, faUserShield, faHouse, faChurch, faGlobe, faClipboardList, faPalette)
 
-defineProps({
+const props = defineProps({
   isOpen: { type: Boolean, default: true },
 })
+
+const asideClass = computed(() => adminAsideClasses({ open: props.isOpen }))
 
 const route = useRoute()
 const tenantStore = useTenantStore()
@@ -98,11 +101,9 @@ const eccItems = computed(() => {
 
 <template>
   <aside
-    :class="[
-      'transition-all duration-300 ease-in-out overflow-y-auto hidden md:flex flex-col',
-      isOpen ? 'w-60' : 'w-20',
-    ]"
+    :class="asideClass"
     style="background: var(--color-primary); color: var(--color-on-primary, #F7EDE0)"
+    data-testid="admin-sidebar"
   >
     <div class="px-4 pt-5 pb-4 flex items-center gap-3 border-b border-white/10">
       <img
