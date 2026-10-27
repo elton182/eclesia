@@ -19,6 +19,11 @@
             color: #333;
             margin-top: 6px;
         }
+        /* href absoluto evita perder hífen do tenant quando a URL quebra de linha no PDF */
+        .link-url a {
+            color: #333;
+            text-decoration: none;
+        }
         .empty { color: #666; font-style: italic; }
     </style>
 </head>
@@ -46,7 +51,9 @@
                         <td class="pastoral">{{ $linha['pastoral']->nome }}</td>
                         <td>
                             <img class="qr" src="{{ $linha['qr_data_uri'] }}" alt="QR Code">
-                            <div class="link-url">{{ $linha['link'] }}</div>
+                            <div class="link-url">
+                                <a href="{{ $linha['link'] }}">{{ \App\Services\PlanejamentoPublicUrl::forPdfDisplay($linha['link']) }}</a>
+                            </div>
                         </td>
                     </tr>
                 @endforeach

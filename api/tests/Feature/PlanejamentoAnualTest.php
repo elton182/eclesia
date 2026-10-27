@@ -180,7 +180,13 @@ class PlanejamentoAnualTest extends TestCase
         $linksPdf = $this->tenantJson('GET', '/api/v1/planejamento/anuais/'.$id.'/pdf?tipo=links')
             ->assertOk()
             ->assertHeader('content-type', 'application/pdf');
-        $this->assertStringStartsWith('%PDF', $linksPdf->getContent());
+        $pdfBin = $linksPdf->getContent();
+        $this->assertStringStartsWith('%PDF', $pdfBin);
+        // Anotação /URI deve preservar hífen do tenant (quebra de linha no texto não pode corromper o clique)
+        $this->assertMatchesRegularExpression(
+            '#/URI\s*\([^)]*tenant=demo-planejamento[^)]*\)#',
+            $pdfBin
+        );
 
         $tokensDepois = collect(
             $this->tenantJson('GET', '/api/v1/planejamento/anuais/'.$id.'/pastorais/tokens')
