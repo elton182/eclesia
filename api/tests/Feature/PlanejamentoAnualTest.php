@@ -247,9 +247,12 @@ class PlanejamentoAnualTest extends TestCase
             'hora_inicio' => '19:00',
             'hora_fim' => '21:00',
             'local_ids' => [$local['id']],
+            'recorrencia_texto' => 'toda 1ª terça',
         ])->assertCreated()
             ->assertJsonPath('data.status_solicitacao', 'proposta')
             ->json('data');
+
+        $this->assertArrayNotHasKey('recorrencia_texto', $eventoA);
 
         // Gestor cria evento conflitante
         Sanctum::actingAs($this->admin);

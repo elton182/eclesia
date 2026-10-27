@@ -23,7 +23,6 @@ class StorePlanejamentoEventoPublicoRequest extends FormRequest
             'hora_inicio' => ['nullable', 'date_format:H:i'],
             'hora_fim' => ['nullable', 'date_format:H:i'],
             'participantes_media' => ['nullable', 'integer', 'min:0'],
-            'recorrencia_texto' => ['nullable', 'string', 'max:255'],
             'observacoes' => ['nullable', 'string'],
             'local_texto' => ['nullable', 'string', 'max:255'],
             'recursos' => ['sometimes', 'array', 'max:30'],

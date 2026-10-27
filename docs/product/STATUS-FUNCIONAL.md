@@ -242,7 +242,7 @@ Marca do **site** ≠ marca do **app** (ver branding abaixo).
 | PDF | Export do planejamento |
 | Link/token público | Existe no código para coleta por pastoral |
 
-**Não tem:** ligação automática com o calendário oficial; recorrência só como texto livre.
+**Não tem:** ligação automática com o calendário oficial; recorrência (cada data é um evento separado).
 
 ---
 

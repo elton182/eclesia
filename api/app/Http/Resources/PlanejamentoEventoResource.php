@@ -54,7 +54,6 @@ class PlanejamentoEventoResource extends JsonResource
             'hora_inicio' => $horaInicio,
             'hora_fim' => $horaFim,
             'participantes_media' => $this->participantes_media,
-            'recorrencia_texto' => $this->recorrencia_texto,
             'observacoes' => $this->observacoes,
             'local_texto' => $this->local_texto,
             'local_ids' => $this->whenLoaded('locais', fn () => $this->locais->pluck('id')->values()->all()),

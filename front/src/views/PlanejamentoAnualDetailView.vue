@@ -136,7 +136,6 @@ const emptyForm = () => ({
   hora_inicio: '',
   hora_fim: '',
   participantes_media: null,
-  recorrencia_texto: '',
   observacoes: '',
   local_ids: [],
   local_texto: '',
@@ -403,7 +402,6 @@ function openEdit(ev) {
     hora_inicio: formatHoraCalendario(ev.hora_inicio) || '',
     hora_fim: formatHoraCalendario(ev.hora_fim) || '',
     participantes_media: ev.participantes_media ?? null,
-    recorrencia_texto: ev.recorrencia_texto || '',
     observacoes: ev.observacoes || '',
     local_ids: (ev.locais || []).map((l) => l.id || l).filter(Boolean),
     local_texto: ev.local_texto || '',
@@ -533,7 +531,6 @@ function buildPayload() {
       f.participantes_media === '' || f.participantes_media == null
         ? null
         : Number(f.participantes_media),
-    recorrencia_texto: f.recorrencia_texto || null,
     observacoes: f.observacoes || null,
     local_ids: f.local_ids,
     local_texto: f.local_texto || null,
@@ -1585,15 +1582,6 @@ onMounted(load)
                   type="number"
                   min="0"
                   class="input"
-                />
-              </div>
-              <div>
-                <label class="fld" for="ev-rec">Recorrência (texto)</label>
-                <input
-                  id="ev-rec"
-                  v-model="form.recorrencia_texto"
-                  class="input"
-                  placeholder="Ex.: toda 1ª terça"
                 />
               </div>
             </div>

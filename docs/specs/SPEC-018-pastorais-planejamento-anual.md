@@ -51,7 +51,7 @@ A tabela `pastorais` já existe para o site público (SPEC-005 / ADR-0003) e evo
 
 ### Eventos
 
-- [ ] Campos: `pastoral_id`, `titulo`, `data_inicio`, `data_fim` (nullable = mesmo dia), `hora_inicio`, `hora_fim` (nullable), `participantes_media` (nullable), `recorrencia_texto` (nullable), `observacoes` (nullable), `status_solicitacao`, `motivo_ajuste` (nullable).
+- [ ] Campos: `pastoral_id`, `titulo`, `data_inicio`, `data_fim` (nullable = mesmo dia), `hora_inicio`, `hora_fim` (nullable), `participantes_media` (nullable), `observacoes` (nullable), `status_solicitacao`, `motivo_ajuste` (nullable).
 - [ ] Locais: N:N com `calendario_locais` (catálogo de espaço da igreja — ADR-0006); pelo menos um local ou texto livre `local_texto` (legado/externo).
 - [ ] `status_solicitacao` ∈ `proposta` \| `confirmado` \| `ajuste_solicitado` \| `reagendado` \| `recusado` \| `cotidiano`.
 - [ ] Gestor altera `status_solicitacao` + `motivo_ajuste`; coordenador não altera status (exceto implícito `proposta` ao criar/reenviar após ajuste).
@@ -75,7 +75,7 @@ A tabela `pastorais` já existe para o site público (SPEC-005 / ADR-0003) e evo
 - Ligação / publicação automática no calendário oficial (SPEC-012) ou em `evento_agenda`.
 - Bloqueio hard de conflito na gravação (por `calendario_locais`; para espaços/recursos ver SPEC-019).
 - ~~Link público sem login~~ — adicionado depois: token por pastoral (`/planejamento/anuais/{id}/pastorais/{id}/token` + `/public/planejamento/{token}`).
-- Recorrência estruturada (RRULE); só texto livre nesta versão.
+- Recorrência (texto livre ou RRULE); cada ocorrência é um evento separado.
 - App nativo; importação automática da planilha Google (pode ser seed/manual depois).
 - Sub-hierarquia comunidade/capela (ADR-0002).
 

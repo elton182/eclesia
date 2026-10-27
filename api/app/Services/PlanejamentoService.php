@@ -223,7 +223,6 @@ class PlanejamentoService
                 'hora_inicio' => $data['hora_inicio'] ?? null,
                 'hora_fim' => $data['hora_fim'] ?? null,
                 'participantes_media' => $data['participantes_media'] ?? null,
-                'recorrencia_texto' => $data['recorrencia_texto'] ?? null,
                 'observacoes' => $data['observacoes'] ?? null,
                 'local_texto' => $data['local_texto'] ?? null,
                 'status_solicitacao' => $status,
@@ -278,7 +277,7 @@ class PlanejamentoService
 
         $fillable = [
             'pastoral_id', 'titulo', 'data_inicio', 'data_fim', 'hora_inicio', 'hora_fim',
-            'participantes_media', 'recorrencia_texto', 'observacoes', 'local_texto',
+            'participantes_media', 'observacoes', 'local_texto',
         ];
 
         foreach ($fillable as $key) {
