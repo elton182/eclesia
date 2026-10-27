@@ -52,4 +52,29 @@ class PlanejamentoPublicUrlTest extends TestCase
         $this->assertStringStartsWith('data:image/png;base64,', $uri);
         $this->assertGreaterThan(100, strlen($uri));
     }
+
+    public function test_qr_preserva_hifen_do_tenant_no_payload(): void
+    {
+        $url = 'https://apostolus.com.br/planejamento/publico/tok123?tenant=sao-jose-operario';
+        $uri = app(QrCodeService::class)->dataUriPng($url, 3);
+
+        $this->assertMatchesRegularExpression('#^data:image/png;base64,#', $uri);
+        $png = base64_decode(substr($uri, strlen('data:image/png;base64,')), true);
+        $this->assertNotFalse($png);
+
+        $path = tempnam(sys_get_temp_dir(), 'qr-');
+        $this->assertNotFalse($path);
+        $pngPath = $path.'.png';
+        rename($path, $pngPath);
+        file_put_contents($pngPath, $png);
+
+        try {
+            $decoded = (string) (new \chillerlan\QRCode\QRCode)->readFromFile($pngPath);
+            $this->assertSame($url, $decoded);
+            $this->assertStringContainsString('tenant=sao-jose-operario', $decoded);
+            $this->assertStringNotContainsString('tenant=saojose-operario', $decoded);
+        } finally {
+            @unlink($pngPath);
+        }
+    }
 }
