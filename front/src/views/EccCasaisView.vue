@@ -20,8 +20,10 @@ import {
   atividadeStatusLabel,
   emptyAtividadeRow,
   emptyPreferenciaRow,
+  equipesDisponiveisParaPreferencia,
   etapasPayload,
   normalizeEtapasForm,
+  preferenciasPayload,
 } from '@/utils/eccFicha'
 import {
   FICHA_STEPS,
@@ -364,12 +366,7 @@ const payload = () => {
         status: a.status,
         observacao: a.observacao || null,
       })),
-    preferencias: (preferencias || [])
-      .filter((p) => p.equipe_servico_id)
-      .map((p, i) => ({
-        equipe_servico_id: p.equipe_servico_id,
-        ordem: p.ordem ? Number(p.ordem) : i + 1,
-      })),
+    preferencias: preferenciasPayload(preferencias),
   }
 }
 
@@ -1050,9 +1047,15 @@ onUnmounted(() => {
               </div>
               <div>
                 <label class="fld">Equipe</label>
-                <select v-model="pref.equipe_servico_id" class="input">
+                <select v-model="pref.equipe_servico_id" class="input" data-testid="preferencia-equipe">
                   <option value="">—</option>
-                  <option v-for="eq in equipesServico" :key="eq.id" :value="eq.id">{{ eq.nome }}</option>
+                  <option
+                    v-for="eq in equipesDisponiveisParaPreferencia(equipesServico, form.preferencias, idx)"
+                    :key="eq.id"
+                    :value="eq.id"
+                  >
+                    {{ eq.nome }}
+                  </option>
                 </select>
               </div>
               <button type="button" class="btn btn-ghost" @click="removePreferencia(idx)">Remover</button>

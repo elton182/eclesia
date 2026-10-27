@@ -87,3 +87,45 @@ export function emptyPreferenciaRow(ordem = 1) {
     ordem,
   }
 }
+
+/**
+ * Monta payload de preferências: omite vazias e deduplica equipe_servico_id
+ * (mantém a primeira ocorrência e a ordem informada / índice).
+ * @param {Array<{equipe_servico_id?: string, ordem?: number|string}>|null|undefined} preferencias
+ * @returns {Array<{equipe_servico_id: string, ordem: number}>}
+ */
+export function preferenciasPayload(preferencias) {
+  const seen = new Set()
+  const out = []
+  for (const p of preferencias || []) {
+    const id = p?.equipe_servico_id ? String(p.equipe_servico_id) : ''
+    if (!id || seen.has(id)) continue
+    seen.add(id)
+    out.push({
+      equipe_servico_id: id,
+      ordem: p.ordem ? Number(p.ordem) : out.length + 1,
+    })
+  }
+  return out
+}
+
+/**
+ * Equipes disponíveis para o select da linha `rowIndex`
+ * (exclui equipes já escolhidas em outras linhas; mantém a seleção atual da linha).
+ * @param {Array<{id: string, nome?: string}>} equipes
+ * @param {Array<{equipe_servico_id?: string}>} preferencias
+ * @param {number} rowIndex
+ */
+export function equipesDisponiveisParaPreferencia(equipes, preferencias, rowIndex) {
+  const currentId = String(preferencias?.[rowIndex]?.equipe_servico_id || '')
+  const selectedElsewhere = new Set(
+    (preferencias || [])
+      .map((p, i) => (i === rowIndex ? '' : String(p?.equipe_servico_id || '')))
+      .filter(Boolean),
+  )
+  return (equipes || []).filter((eq) => {
+    const id = String(eq.id)
+    if (currentId && id === currentId) return true
+    return !selectedElsewhere.has(id)
+  })
+}
