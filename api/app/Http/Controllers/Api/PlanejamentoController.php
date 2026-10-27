@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\PlanejamentoDisponibilidadeRequest;
 use App\Http\Requests\StorePlanejamentoAnualRequest;
 use App\Http\Requests\StorePlanejamentoEventoPublicoRequest;
+use App\Http\Requests\UpdatePlanejamentoEventoPublicoRequest;
 use App\Http\Requests\StorePlanejamentoEventoRequest;
 use App\Http\Requests\TransitionPlanejamentoStatusRequest;
 use App\Http\Requests\UpdatePlanejamentoAnualRequest;
@@ -249,13 +250,32 @@ class PlanejamentoController extends Controller
             ->setStatusCode(201);
     }
 
+    public function updateEventoPublico(
+        UpdatePlanejamentoEventoPublicoRequest $request,
+        string $token,
+        string $eventoId,
+    ): PlanejamentoEventoResource {
+        $link = $this->planejamento->findTokenByPlain($token);
+        $result = $this->planejamento->updateEventoPublico($link, $eventoId, $request->validated());
+
+        return (new PlanejamentoEventoResource($result['evento']))
+            ->withConflitos($result['conflitos']);
+    }
+
+    public function destroyEventoPublico(string $token, string $eventoId): Response
+    {
+        $link = $this->planejamento->findTokenByPlain($token);
+        $this->planejamento->deleteEventoPublico($link, $eventoId);
+
+        return response()->noContent();
+    }
+
     public function disponibilidadePublica(PlanejamentoDisponibilidadeRequest $request, string $token): JsonResponse
     {
         $link = $this->planejamento->findTokenByPlain($token);
-        $params = $request->safe()->except('ignorar_evento_id');
 
         return response()->json([
-            'data' => $this->planejamento->disponibilidadePublica($link, $params),
+            'data' => $this->planejamento->disponibilidadePublica($link, $request->validated()),
         ]);
     }
 }

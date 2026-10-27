@@ -103,6 +103,10 @@ Route::middleware([
             ->middleware('throttle:60,1');
         Route::post('{token}/eventos', [PlanejamentoController::class, 'storeEventoPublico'])
             ->middleware('throttle:30,1');
+        Route::patch('{token}/eventos/{eventoId}', [PlanejamentoController::class, 'updateEventoPublico'])
+            ->middleware('throttle:30,1');
+        Route::delete('{token}/eventos/{eventoId}', [PlanejamentoController::class, 'destroyEventoPublico'])
+            ->middleware('throttle:30,1');
     });
 
     // Foto: URL assinada + ?tenant= (img não envia X-Tenant/Bearer). Spec SPEC-006 / ADR-0002.

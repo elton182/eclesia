@@ -6256,6 +6256,59 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PlanejamentoErroCapacidade'
+  /public/planejamento/{token}/eventos/{eventoId}:
+    patch:
+      summary: Atualizar proposta via link (coleta, ou revisão com ajuste_solicitado)
+      description: Só eventos da pastoral do token. Em revisão, apenas `ajuste_solicitado` (volta para `proposta`).
+      parameters:
+        - {name: token, in: path, required: true, schema: {type: string}}
+        - {name: eventoId, in: path, required: true, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [titulo, data_inicio]
+              description: Exige `local_texto` ou ao menos um espaço em `recursos`.
+              properties:
+                titulo: {type: string}
+                data_inicio: {type: string, format: date}
+                data_fim: {type: string, format: date, nullable: true}
+                hora_inicio: {type: string, nullable: true}
+                hora_fim: {type: string, nullable: true}
+                local_texto: {type: string, nullable: true}
+                observacoes: {type: string, nullable: true}
+                recursos:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/PlanejamentoRecursoInput'
+      responses:
+        '200':
+          description: OK (pode incluir conflitos[])
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PlanejamentoEvento'
+        '404': {description: Evento inexistente ou de outra pastoral}
+        '422':
+          description: Coleta/revisão fechada, validação ou capacidade excedida
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlanejamentoErroCapacidade'
+    delete:
+      summary: Remover proposta via link (coleta, ou revisão com ajuste_solicitado)
+      parameters:
+        - {name: token, in: path, required: true, schema: {type: string}}
+        - {name: eventoId, in: path, required: true, schema: {type: string}}
+      responses:
+        '204': {description: No Content}
+        '404': {description: Evento inexistente ou de outra pastoral}
+        '422': {description: Ano fechado / sem permissão de editar neste status}
   /public/planejamento/{token}/disponibilidade:
     get:
       summary: Disponibilidade de espaços/recursos no intervalo (link da pastoral)
@@ -6265,6 +6318,7 @@ paths:
         - {name: data_fim, in: query, required: false, schema: {type: string, format: date}}
         - {name: hora_inicio, in: query, required: false, schema: {type: string, example: '19:00'}}
         - {name: hora_fim, in: query, required: false, schema: {type: string}}
+        - {name: ignorar_evento_id, in: query, required: false, schema: {type: string}, description: Evento em edição (não conta como ocupação)}
       responses:
         '200':
           description: OK

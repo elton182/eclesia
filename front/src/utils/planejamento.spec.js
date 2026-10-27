@@ -19,6 +19,7 @@ import {
   contarEventosComConflito,
   canCriarEventoPlanejamento,
   canEditarEventoPlanejamento,
+  canEditarEventoPlanejamentoPublico,
   canAlterarStatusSolicitacao,
   formatConflitosAlert,
   labelEventoPlanejamentoPreview,
@@ -172,6 +173,17 @@ describe('planejamento', () => {
     )
     assert.equal(canEditarEventoPlanejamento('fechado', ev, { canGerir: true }), false)
     assert.equal(canEditarEventoPlanejamento('coleta', ev, { canGerir: true }), true)
+  })
+
+  it('canEditarEventoPlanejamentoPublico segue coleta e ajuste', () => {
+    const ev = { status_solicitacao: 'proposta' }
+    assert.equal(canEditarEventoPlanejamentoPublico('coleta', ev), true)
+    assert.equal(canEditarEventoPlanejamentoPublico('revisao', ev), false)
+    assert.equal(
+      canEditarEventoPlanejamentoPublico('revisao', { status_solicitacao: 'ajuste_solicitado' }),
+      true,
+    )
+    assert.equal(canEditarEventoPlanejamentoPublico('fechado', ev), false)
   })
 
   it('canAlterarStatusSolicitacao só gestor em status abertos', () => {
