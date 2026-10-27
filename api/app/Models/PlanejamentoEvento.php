@@ -47,7 +47,6 @@ class PlanejamentoEvento extends Model
         'hora_inicio',
         'hora_fim',
         'participantes_media',
-        'recorrencia_texto',
         'observacoes',
         'local_texto',
         'status_solicitacao',

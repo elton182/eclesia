@@ -403,9 +403,6 @@ components:
         participantes_media:
           type: integer
           nullable: true
-        recorrencia_texto:
-          type: string
-          nullable: true
         observacoes:
           type: string
           nullable: true
@@ -5880,7 +5877,6 @@ paths:
                 hora_inicio: {type: string, nullable: true, example: '19:30'}
                 hora_fim: {type: string, nullable: true}
                 participantes_media: {type: integer, nullable: true}
-                recorrencia_texto: {type: string, nullable: true}
                 observacoes: {type: string, nullable: true}
                 local_texto: {type: string, nullable: true}
                 local_ids:
@@ -5953,7 +5949,6 @@ paths:
                 hora_inicio: {type: string, nullable: true}
                 hora_fim: {type: string, nullable: true}
                 participantes_media: {type: integer, nullable: true}
-                recorrencia_texto: {type: string, nullable: true}
                 observacoes: {type: string, nullable: true}
                 local_texto: {type: string, nullable: true}
                 local_ids:
