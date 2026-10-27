@@ -780,6 +780,9 @@ components:
             $ref: '#/components/schemas/EccCasalAtividade'
         preferencias:
           type: array
+          description: >
+            Preferências de equipe de serviço. Cada equipe_servico_id deve ser único
+            na lista (422 se repetido).
           items:
             $ref: '#/components/schemas/EccCasalPreferencia'
     EccCasalEtapa:
@@ -832,6 +835,7 @@ components:
           description: ULID (somente resposta)
         equipe_servico_id:
           type: string
+          description: Deve ser único entre as preferências do mesmo casal no payload
         equipe_servico_nome:
           type: string
           nullable: true

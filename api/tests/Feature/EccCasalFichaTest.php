@@ -210,6 +210,50 @@ class EccCasalFichaTest extends TestCase
         ])->assertStatus(422);
     }
 
+    public function test_validation_rejects_duplicate_preferencia_equipe_servico(): void
+    {
+        $equipes = $this->tenantJson('GET', '/api/v1/ecc/equipes-servico')->json('data');
+        $cozinha = collect($equipes)->firstWhere('slug', 'cozinha');
+
+        $response = $this->tenantJson('POST', '/api/v1/ecc/casais', [
+            'nome' => 'Dup',
+            'nome_conjuge' => 'Pref',
+            'preferencias' => [
+                ['equipe_servico_id' => $cozinha['id'], 'ordem' => 1],
+                ['equipe_servico_id' => $cozinha['id'], 'ordem' => 6],
+            ],
+        ]);
+
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors(['preferencias.1.equipe_servico_id']);
+    }
+
+    public function test_update_rejects_duplicate_preferencia_equipe_servico(): void
+    {
+        $equipes = $this->tenantJson('GET', '/api/v1/ecc/equipes-servico')->json('data');
+        $cozinha = collect($equipes)->firstWhere('slug', 'cozinha');
+        $sala = collect($equipes)->firstWhere('slug', 'sala');
+
+        $casal = $this->tenantJson('POST', '/api/v1/ecc/casais', [
+            'nome' => 'Update',
+            'nome_conjuge' => 'Dup',
+            'preferencias' => [
+                ['equipe_servico_id' => $sala['id'], 'ordem' => 1],
+            ],
+        ])->assertCreated()->json('data');
+
+        $this->tenantJson('PUT', '/api/v1/ecc/casais/'.$casal['id'], [
+            'nome' => 'Update',
+            'nome_conjuge' => 'Dup',
+            'preferencias' => [
+                ['equipe_servico_id' => $cozinha['id'], 'ordem' => 1],
+                ['equipe_servico_id' => $sala['id'], 'ordem' => 2],
+                ['equipe_servico_id' => $cozinha['id'], 'ordem' => 6],
+            ],
+        ])->assertStatus(422)
+            ->assertJsonValidationErrors(['preferencias.2.equipe_servico_id']);
+    }
+
     public function test_show_returns_structured_etapas(): void
     {
         $casal = $this->tenantJson('POST', '/api/v1/ecc/casais', [

@@ -365,12 +365,18 @@ class EccCasalService
 
         if (array_key_exists('preferencias', $data)) {
             $casal->preferencias()->delete();
+            $seenEquipeIds = [];
             foreach ($data['preferencias'] ?? [] as $row) {
-                if (! is_array($row)) {
+                if (! is_array($row) || ! isset($row['equipe_servico_id']) || $row['equipe_servico_id'] === '') {
                     continue;
                 }
+                $equipeId = (string) $row['equipe_servico_id'];
+                if (isset($seenEquipeIds[$equipeId])) {
+                    continue;
+                }
+                $seenEquipeIds[$equipeId] = true;
                 $casal->preferencias()->create([
-                    'ecc_equipe_servico_id' => $row['equipe_servico_id'],
+                    'ecc_equipe_servico_id' => $equipeId,
                     'ordem' => isset($row['ordem']) ? (int) $row['ordem'] : null,
                 ]);
             }

@@ -97,6 +97,7 @@ class StoreEccCasalRequest extends FormRequest
             'preferencias.*.equipe_servico_id' => [
                 'required',
                 'string',
+                'distinct',
                 Rule::exists('ecc_equipes_servico', 'id')->where('igreja_id', $igrejaId),
             ],
             'preferencias.*.ordem' => ['nullable', 'integer', 'min:1', 'max:999'],
