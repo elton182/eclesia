@@ -5,6 +5,7 @@ import {
   assessCameraAccess,
   CAMERA_PERMISSION_HELP,
 } from '@/utils/mediaPermissions'
+import { trackDiagnostic } from '@/utils/clientDiagnostics'
 
 /**
  * Bloqueia “Tirar foto” com aviso quando a câmera do SO está negada.
@@ -41,12 +42,14 @@ export function useMediaPermissionGuard() {
    */
   function guardCameraClick(event) {
     if (!cameraDenied.value) {
+      trackDiagnostic('foto.camera.click', { blocked: false })
       schedulePermissionRefresh()
       return
     }
 
     event.preventDefault()
     event.stopPropagation()
+    trackDiagnostic('foto.camera.click', { blocked: true, reason: 'permission_denied' })
     void innovAlert({
       title: 'Câmera bloqueada',
       message: CAMERA_PERMISSION_HELP,
@@ -58,6 +61,7 @@ export function useMediaPermissionGuard() {
    * @param {Event} [_event]
    */
   function guardGalleryClick(_event) {
+    trackDiagnostic('foto.gallery.click', { camera_denied: cameraDenied.value })
     if (cameraDenied.value && !galleryTipShown) {
       galleryTipShown = true
       innovToast(

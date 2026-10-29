@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Http\Controllers\Api\AppBrandingController;
 use App\Http\Controllers\Api\AuditLogController;
+use App\Http\Controllers\Api\ClientDiagnosticController;
 use App\Http\Controllers\Api\CalendarioController;
 use App\Http\Controllers\Api\AuthWebController;
 use App\Http\Controllers\Api\EccCasalController;
@@ -153,6 +154,9 @@ Route::middleware([
     Route::get('roles', [RolePermissionController::class, 'roles']);
     Route::get('permissions', [RolePermissionController::class, 'permissions']);
     Route::get('audit-logs', [AuditLogController::class, 'index']);
+    Route::get('client-diagnostics', [ClientDiagnosticController::class, 'index']);
+    Route::post('client-diagnostics', [ClientDiagnosticController::class, 'store']);
+    Route::get('client-diagnostics/{id}', [ClientDiagnosticController::class, 'show']);
     Route::apiResource('igrejas', IgrejaController::class);
 
     Route::post('users/{user}/roles', [UserController::class, 'assignRole']);

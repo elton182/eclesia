@@ -33,6 +33,49 @@ components:
       name: X-Igreja
       description: ULID da igreja atual (opcional; sem header usa a primeira acessível)
   schemas:
+    ClientDiagnostic:
+      type: object
+      description: Pacote de diagnóstico enviado pelo app (SPEC-031)
+      properties:
+        id:
+          type: string
+          description: ULID
+        motivo:
+          type: string
+          enum: [foto, geral, pwa, outro]
+        nota:
+          type: string
+          nullable: true
+        meta:
+          type: object
+          additionalProperties: true
+        events:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        events_count:
+          type: integer
+        ip_address:
+          type: string
+          nullable: true
+        user_agent:
+          type: string
+          nullable: true
+        user:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+            username:
+              type: string
+              nullable: true
+        created_at:
+          type: string
+          format: date-time
     AuditLog:
       type: object
       properties:
@@ -2249,6 +2292,130 @@ paths:
       responses:
         '200':
           description: Papel removido
+  /client-diagnostics:
+    get:
+      summary: Listar diagnósticos enviados pelo app
+      description: |
+        SPEC-031. Requer `auditoria.view`.
+      security:
+        - tenantHeader: []
+        - bearerAuth: []
+      parameters:
+        - name: motivo
+          in: query
+          schema:
+            type: string
+            enum: [foto, geral, pwa, outro]
+        - name: q
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            maximum: 100
+      responses:
+        '200':
+          description: Lista paginada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ClientDiagnostic'
+        '401':
+          description: Não autenticado
+        '403':
+          description: Sem permissão
+    post:
+      summary: Enviar diagnóstico da sessão do app
+      description: |
+        SPEC-031. Qualquer usuário autenticado do tenant. Coleta voluntária (botão no perfil).
+      security:
+        - tenantHeader: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [meta, events]
+              properties:
+                motivo:
+                  type: string
+                  enum: [foto, geral, pwa, outro]
+                nota:
+                  type: string
+                  maxLength: 500
+                  nullable: true
+                meta:
+                  type: object
+                  additionalProperties: true
+                events:
+                  type: array
+                  maxItems: 100
+                  items:
+                    type: object
+                    required: [t, type]
+                    properties:
+                      t:
+                        type: integer
+                      type:
+                        type: string
+                      data:
+                        type: object
+                        additionalProperties: true
+      responses:
+        '201':
+          description: Diagnóstico gravado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ClientDiagnostic'
+        '401':
+          description: Não autenticado
+        '422':
+          description: Validação
+  /client-diagnostics/{id}:
+    get:
+      summary: Detalhe de um diagnóstico
+      description: SPEC-031. Requer `auditoria.view`.
+      security:
+        - tenantHeader: []
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: ULID
+      responses:
+        '200':
+          description: Detalhe
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ClientDiagnostic'
+        '403':
+          description: Sem permissão
+        '404':
+          description: Não encontrado
   /audit-logs:
     get:
       summary: Listar trilha de auditoria do tenant

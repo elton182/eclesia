@@ -77,6 +77,7 @@ const tenantItems = computed(() => {
   }
   if (can('telas.auditoria') || (authAdmin.isAuthenticated && !authTenant.isAuthenticated)) {
     items.push({ label: 'Auditoria', icon: faClipboardList, path: '/auditoria' })
+    items.push({ label: 'Diagnósticos', icon: faClipboardList, path: '/diagnosticos' })
   }
   if (canManageBranding.value) {
     items.push({ label: 'Marca', icon: faPalette, path: '/configuracoes/marca' })
