@@ -164,7 +164,7 @@ export async function openFilePicker(input) {
 
 /**
  * Garante que o markup do seletor de arquivo não usa display:none (classe `hidden`).
- * Aceita `file-input-native`, `file-input-hit` ou `sr-only`.
+ * Aceita `file-input-native`, `file-input-hit`, `file-input-fallback` ou `sr-only`.
  * @param {string} vueSfcSource
  * @returns {boolean}
  */
@@ -172,7 +172,12 @@ export function fileInputsAvoidDisplayNone(vueSfcSource) {
   const source = String(vueSfcSource || '')
   const fileInputBlocks = source.match(/<input\b[^>]*\btype=["']file["'][^>]*>/gi) || []
   if (fileInputBlocks.length === 0) return false
-  const allowed = new Set([FILE_INPUT_NATIVE_CLASS, 'file-input-hit', 'sr-only'])
+  const allowed = new Set([
+    FILE_INPUT_NATIVE_CLASS,
+    'file-input-hit',
+    'file-input-fallback',
+    'sr-only',
+  ])
   return fileInputBlocks.every((tag) => {
     const classMatch = tag.match(/\bclass=["']([^"']*)["']/i)
     const classes = (classMatch?.[1] ?? '').split(/\s+/).filter(Boolean)
