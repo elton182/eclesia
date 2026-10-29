@@ -15,6 +15,7 @@ import { useIgrejaStore } from '@/stores/igreja'
 import { useBrandingStore } from '@/stores/branding'
 import { igrejaTipoLabel } from '@/utils/igrejaContext'
 import PwaInstallNavButton from '@/components/base/PwaInstallNavButton.vue'
+import UserMenuAppActions from '@/components/base/UserMenuAppActions.vue'
 import fallbackLogo from '@/assets/logo-icon.png'
 
 library.add(faBars, faSignOutAlt, faChevronDown)
@@ -157,6 +158,7 @@ const logout = async () => {
           v-if="userMenuOpen"
           class="absolute right-0 mt-2 w-48 card py-2 z-50"
         >
+          <UserMenuAppActions />
           <button
             type="button"
             class="top-navbar__menu-item w-full text-left px-4 py-2 text-sm flex items-center gap-2"

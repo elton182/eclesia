@@ -6,6 +6,13 @@ import vueDevTools from 'vite-plugin-vue-devtools'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 import { siteHtmlPrerenderPlugin } from './vite.site-html-plugin.js'
+import { buildAppVersion } from './src/utils/buildAppVersion.js'
+
+const frontRoot = fileURLToPath(new URL('.', import.meta.url))
+const appVersion = buildAppVersion({ cwd: frontRoot })
+const appVersionDefine = {
+  __ECLESIA_APP_VERSION__: JSON.stringify(appVersion),
+}
 
 const pwaPlugin = VitePWA({
   registerType: 'autoUpdate',
@@ -87,6 +94,7 @@ export default defineConfig(() => {
   if (isLibrary) {
     // Configuração para build de biblioteca
     return {
+      define: appVersionDefine,
       plugins: [
         vue(),
         tailwindcss(),
@@ -130,6 +138,7 @@ export default defineConfig(() => {
 
   // Configuração padrão para desenvolvimento / SPA
   return {
+    define: appVersionDefine,
     plugins: [
       vue(),
       vueDevTools(),

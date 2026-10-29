@@ -1,6 +1,10 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { PWA_UPDATE_CHECK_MS, watchServiceWorkerUpdates } from './pwaUpdate.js'
+import {
+  hardResetAppCache,
+  PWA_UPDATE_CHECK_MS,
+  watchServiceWorkerUpdates,
+} from './pwaUpdate.js'
 
 describe('pwaUpdate', () => {
   it('não agenda nada sem registration', () => {
@@ -44,5 +48,45 @@ describe('pwaUpdate', () => {
 
     cleanup()
     assert.equal(PWA_UPDATE_CHECK_MS, 5 * 60 * 1000)
+  })
+
+  it('hardResetAppCache desregistra SW, limpa caches e recarrega', async () => {
+    let reloadCount = 0
+    const unregistered = []
+    const deleted = []
+
+    const result = await hardResetAppCache({
+      swContainer: {
+        getRegistrations: async () => [
+          {
+            unregister: async () => {
+              unregistered.push('a')
+              return true
+            },
+          },
+          {
+            unregister: async () => {
+              unregistered.push('b')
+              return true
+            },
+          },
+        ],
+      },
+      cachesApi: {
+        keys: async () => ['workbox-precache', 'eclesia-fonts'],
+        delete: async (key) => {
+          deleted.push(key)
+          return true
+        },
+      },
+      reload: () => {
+        reloadCount += 1
+      },
+    })
+
+    assert.deepEqual(unregistered, ['a', 'b'])
+    assert.deepEqual(deleted, ['workbox-precache', 'eclesia-fonts'])
+    assert.equal(reloadCount, 1)
+    assert.deepEqual(result, { unregistered: 2, cachesCleared: 2 })
   })
 })
