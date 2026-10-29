@@ -8,18 +8,23 @@ import {
 import { trackDiagnostic } from '@/utils/clientDiagnostics'
 
 /**
- * Bloqueia “Tirar foto” com aviso quando a câmera do SO está negada.
- * O preventDefault precisa ser síncrono (cache) — await antes disso deixa o picker abrir.
- * Na galeria, só mostra uma dica se a câmera já estiver negada.
+ * Bloqueia “Tirar foto” com aviso quando a Permissions API reporta denied.
+ *
+ * Em Android/PWA a API frequentemente fica em `prompt` mesmo após o usuário
+ * negar o diálogo do capture — aí o clique passa (blocked:false) e o SO
+ * engole o picker. O fallback + onSilentFail cobrem esse caso.
  */
 export function useMediaPermissionGuard() {
   const cameraDenied = ref(false)
+  /** @type {import('vue').Ref<string>} */
+  const cameraPermission = ref('unknown')
   let galleryTipShown = false
   let refreshTimer = 0
 
   async function refreshCameraPermission() {
     const result = await assessCameraAccess({ probeIfUnknown: false })
     cameraDenied.value = result.blocked
+    cameraPermission.value = result.state
     return result
   }
 
@@ -42,14 +47,21 @@ export function useMediaPermissionGuard() {
    */
   function guardCameraClick(event) {
     if (!cameraDenied.value) {
-      trackDiagnostic('foto.camera.click', { blocked: false })
+      trackDiagnostic('foto.camera.click', {
+        blocked: false,
+        permission: cameraPermission.value,
+      })
       schedulePermissionRefresh()
       return
     }
 
     event.preventDefault()
     event.stopPropagation()
-    trackDiagnostic('foto.camera.click', { blocked: true, reason: 'permission_denied' })
+    trackDiagnostic('foto.camera.click', {
+      blocked: true,
+      reason: 'permission_denied',
+      permission: cameraPermission.value,
+    })
     void innovAlert({
       title: 'Câmera bloqueada',
       message: CAMERA_PERMISSION_HELP,
@@ -61,7 +73,10 @@ export function useMediaPermissionGuard() {
    * @param {Event} [_event]
    */
   function guardGalleryClick(_event) {
-    trackDiagnostic('foto.gallery.click', { camera_denied: cameraDenied.value })
+    trackDiagnostic('foto.gallery.click', {
+      camera_denied: cameraDenied.value,
+      permission: cameraPermission.value,
+    })
     if (cameraDenied.value && !galleryTipShown) {
       galleryTipShown = true
       innovToast(
@@ -91,6 +106,7 @@ export function useMediaPermissionGuard() {
 
   return {
     cameraDenied,
+    cameraPermission,
     refreshCameraPermission,
     guardCameraClick,
     guardGalleryClick,

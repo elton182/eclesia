@@ -2,11 +2,15 @@
 import { computed, ref, watch } from 'vue'
 import api from '@/services/api'
 import { innovToast } from '@/plugins/toast'
-import { innovConfirm } from '@/plugins/dialog'
+import { innovAlert, innovConfirm } from '@/plugins/dialog'
 import { useMediaPermissionGuard } from '@/composables/useMediaPermissionGuard'
 import { useFilePickerFallback } from '@/composables/useFilePickerFallback'
 import FilePickerFallback from '@/components/ecc/FilePickerFallback.vue'
 import { trackDiagnostic } from '@/utils/clientDiagnostics'
+import {
+  CAMERA_PERMISSION_HELP,
+  GALLERY_PERMISSION_HELP,
+} from '@/utils/mediaPermissions'
 import {
   deletePessoaFoto,
   fileFromInputEvent,
@@ -29,23 +33,44 @@ const emit = defineEmits(['update:fotoUrl', 'update:pendingFile'])
 const busy = ref(false)
 const localPreview = ref(null)
 const { guardCameraClick, guardGalleryClick } = useMediaPermissionGuard()
+let silentCameraAlertShown = false
+
 const {
   showFallback,
   revealFallback,
   onPrimaryPickerInteract,
   onFilePicked,
-} = useFilePickerFallback({ source: 'foto' })
+} = useFilePickerFallback({
+  source: 'foto',
+  onSilentFail: ({ kind }) => {
+    trackDiagnostic('foto.picker.silent_fail', { kind })
+    if (kind === 'camera') {
+      if (silentCameraAlertShown) return
+      silentCameraAlertShown = true
+      void innovAlert({
+        title: 'Câmera não abriu',
+        message:
+          'O aparelho não liberou a câmera (às vezes a permissão aparece como “perguntar” mesmo após negar).\n\n'
+          + 'Use “Escolher arquivo” abaixo ou a Galeria, ou ative a câmera nos ajustes:\n\n'
+          + CAMERA_PERMISSION_HELP,
+        confirmText: 'Entendi',
+      })
+      return
+    }
+    innovToast('info', 'Galeria', GALLERY_PERMISSION_HELP.split('\n')[0])
+  },
+})
 
 const previewUrl = computed(() => localPreview.value || props.fotoUrl || null)
 
 function onGalleryClick(event) {
   guardGalleryClick(event)
-  onPrimaryPickerInteract()
+  onPrimaryPickerInteract('gallery')
 }
 
 function onCameraClick(event) {
   guardCameraClick(event)
-  if (!event.defaultPrevented) onPrimaryPickerInteract()
+  if (!event.defaultPrevented) onPrimaryPickerInteract('camera')
 }
 
 const hitClass =

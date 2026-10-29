@@ -68,6 +68,11 @@ export async function collectDiagnosticMeta() {
     app_version: APP_VERSION,
     standalone: isRunningStandalone(),
     camera_permission: cameraPermission,
+    // Android/Chrome: `prompt` não garante que o capture funcione após negar.
+    camera_permission_note:
+      cameraPermission === 'prompt'
+        ? 'prompt_unreliable_on_android_capture'
+        : null,
     href: win?.location?.pathname || '',
     online: typeof nav?.onLine === 'boolean' ? nav.onLine : true,
     platform: String(nav?.userAgent || '').slice(0, 120),

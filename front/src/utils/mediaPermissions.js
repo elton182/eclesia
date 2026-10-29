@@ -58,6 +58,9 @@ export async function assessCameraAccess(opts = {}) {
   if (state === 'denied') {
     return { state, blocked: true, help: CAMERA_PERMISSION_HELP }
   }
+  // `prompt` NÃO significa “pode usar”: no Android/Chrome o estado muitas vezes
+  // permanece prompt após negar o diálogo do <input capture>, e o picker some
+  // em silêncio. Não bloqueamos aqui — o caller detecta falha sem `change`.
   if (state === 'granted' || state === 'prompt') {
     return { state, blocked: false, help: CAMERA_PERMISSION_HELP }
   }
