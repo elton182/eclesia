@@ -298,6 +298,12 @@ class EccPerguntasTest extends TestCase
         $this->assertStringContainsString('Carlos Piloto', (string) $respondido['casal_piloto']);
 
         Sanctum::actingAs($this->liderAlpha);
+        $resumoComResposta = $this->tenantJson('GET', '/api/v1/ecc/perguntas/resumo')
+            ->assertOk()
+            ->json('data');
+        $this->assertSame(0, $resumoComResposta['pendentes']);
+        $this->assertSame(1, $resumoComResposta['com_resposta_nova']);
+
         $detailLider = $this->tenantJson('GET', "/api/v1/ecc/perguntas/{$perguntaId}")
             ->assertOk()
             ->json('data');
@@ -307,12 +313,13 @@ class EccPerguntasTest extends TestCase
         $this->assertSame('Obrigado, confirmado na agenda.', $meu['resposta_responsavel']);
         $this->assertNotEmpty($meu['enviado_em']);
         $this->assertNotEmpty($meu['respondido_em']);
+        $this->assertNotEmpty($meu['resposta_vista_em']);
 
-        $resumoDepois = $this->tenantJson('GET', '/api/v1/ecc/perguntas/resumo')
+        $resumoAposVer = $this->tenantJson('GET', '/api/v1/ecc/perguntas/resumo')
             ->assertOk()
             ->json('data');
-        $this->assertSame(0, $resumoDepois['pendentes']);
-        $this->assertSame(1, $resumoDepois['com_resposta_nova']);
+        $this->assertSame(0, $resumoAposVer['pendentes']);
+        $this->assertSame(0, $resumoAposVer['com_resposta_nova']);
     }
 
     public function test_nao_autenticado_recebe_401(): void

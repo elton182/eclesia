@@ -100,7 +100,10 @@ class EccPerguntaService
                 );
                 if ($envio === null) {
                     $pendentes++;
-                } elseif ($envio->status === EccPerguntaEnvio::STATUS_RESPONDIDO) {
+                } elseif (
+                    $envio->status === EccPerguntaEnvio::STATUS_RESPONDIDO
+                    && $envio->resposta_vista_em === null
+                ) {
                     $comResposta++;
                 }
             }
@@ -110,6 +113,25 @@ class EccPerguntaService
             'pendentes' => $pendentes,
             'com_resposta_nova' => $comResposta,
         ];
+    }
+
+    /**
+     * Marca a resposta do responsável como vista pelo líder (some do badge).
+     *
+     * @param  list<string>  $equipeIds
+     */
+    public function marcarRespostasVistas(EccPergunta $pergunta, User $user, array $equipeIds): void
+    {
+        if ($equipeIds === []) {
+            return;
+        }
+
+        EccPerguntaEnvio::query()
+            ->where('pergunta_id', $pergunta->id)
+            ->whereIn('equipe_id', $equipeIds)
+            ->where('status', EccPerguntaEnvio::STATUS_RESPONDIDO)
+            ->whereNull('resposta_vista_em')
+            ->update(['resposta_vista_em' => now()]);
     }
 
     public function find(string $id): EccPergunta
@@ -332,6 +354,8 @@ class EccPerguntaService
             'status' => EccPerguntaEnvio::STATUS_RESPONDIDO,
             'respondido_em' => now(),
             'respondido_por_user_id' => $actor->id,
+            // Nova resposta volta a contar no badge até o líder abrir de novo.
+            'resposta_vista_em' => null,
         ]);
 
         return $envio->fresh(['equipe', 'pergunta', 'respondidoPor']) ?? $envio;
@@ -424,6 +448,7 @@ class EccPerguntaService
             'resposta_responsavel' => $envio->resposta_responsavel,
             'respondido_em' => $envio->respondido_em?->toIso8601String(),
             'respondido_por_nome' => (string) ($envio->respondidoPor?->name ?? ''),
+            'resposta_vista_em' => $envio->resposta_vista_em?->toIso8601String(),
         ];
     }
 
