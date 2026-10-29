@@ -75,6 +75,7 @@ A tabela `pastorais` já existe para o site público (SPEC-005 / ADR-0003) e evo
 - Ligação / publicação automática no calendário oficial (SPEC-012) ou em `evento_agenda`.
 - Bloqueio hard de conflito na gravação (por `calendario_locais`; para espaços/recursos ver SPEC-019).
 - ~~Link público sem login~~ — adicionado depois: token por pastoral (`/planejamento/anuais/{id}/pastorais/{id}/token` + `/public/planejamento/{token}`).
+  Emenda: o link público permite **criar, editar e remover** propostas da pastoral do token em `coleta`; em `revisao`, editar/remover só se `ajuste_solicitado`.
 - Recorrência (texto livre ou RRULE); cada ocorrência é um evento separado.
 - App nativo; importação automática da planilha Google (pode ser seed/manual depois).
 - Sub-hierarquia comunidade/capela (ADR-0002).

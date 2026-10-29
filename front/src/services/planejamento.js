@@ -112,3 +112,39 @@ export async function listPastoralTokens(anualId) {
 export async function revokePastoralToken(anualId, pastoralId) {
   await api.delete(`/planejamento/anuais/${anualId}/pastorais/${pastoralId}/token`)
 }
+
+/**
+ * Link público (sem login) — SPEC-018.
+ * @param {Record<string, string>} headers
+ */
+export async function getPublicoMeta(token, headers) {
+  const { data } = await api.get(`/public/planejamento/${token}`, { headers })
+  return unwrapItem(data)
+}
+
+/** @param {Record<string, string>} headers */
+export async function listEventosPublicos(token, headers) {
+  const { data } = await api.get(`/public/planejamento/${token}/eventos`, { headers })
+  return unwrapList(data)
+}
+
+/** @param {Record<string, string>} headers */
+export async function createEventoPublico(token, payload, headers) {
+  const { data } = await api.post(`/public/planejamento/${token}/eventos`, payload, { headers })
+  return withConflitos(data)
+}
+
+/** @param {Record<string, string>} headers */
+export async function updateEventoPublico(token, eventoId, payload, headers) {
+  const { data } = await api.patch(
+    `/public/planejamento/${token}/eventos/${eventoId}`,
+    payload,
+    { headers },
+  )
+  return withConflitos(data)
+}
+
+/** @param {Record<string, string>} headers */
+export async function deleteEventoPublico(token, eventoId, headers) {
+  await api.delete(`/public/planejamento/${token}/eventos/${eventoId}`, { headers })
+}

@@ -348,6 +348,15 @@ export function canEditarEventoPlanejamento(anoStatus, evento, perms = {}) {
 }
 
 /**
+ * Link público da pastoral: editar/remover em coleta; em revisão só ajuste_solicitado.
+ * @param {string} anoStatus
+ * @param {{ status_solicitacao?: string }|null|undefined} evento
+ */
+export function canEditarEventoPlanejamentoPublico(anoStatus, evento) {
+  return canEditarEventoPlanejamento(anoStatus, evento, { canPropor: true })
+}
+
+/**
  * Gestor pode alterar status_solicitacao.
  * @param {string} anoStatus
  * @param {{ canGerir?: boolean }} perms

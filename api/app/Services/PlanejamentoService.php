@@ -247,9 +247,13 @@ class PlanejamentoService
      * @param  array<string, mixed>  $data
      * @return array{evento: PlanejamentoEvento, conflitos: list<array<string, mixed>>}
      */
-    public function updateEvento(PlanejamentoEvento $evento, array $data): array
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array{evento: PlanejamentoEvento, conflitos: list<array<string, mixed>>}
+     */
+    public function updateEvento(PlanejamentoEvento $evento, array $data, bool $publico = false): array
     {
-        $isGestor = $this->access->canGerir();
+        $isGestor = ! $publico && $this->access->canGerir();
 
         if (isset($data['pastoral_id'])) {
             $this->assertPastoralDaIgreja($data['pastoral_id']);
@@ -294,7 +298,7 @@ class PlanejamentoService
                 $evento->motivo_ajuste = $data['motivo_ajuste'];
             }
         } else {
-            // Coordenador reenvia após ajuste → volta para proposta
+            // Coordenador / link público reenvia após ajuste → volta para proposta
             if ($evento->status_solicitacao === PlanejamentoEvento::STATUS_AJUSTE_SOLICITADO) {
                 $evento->status_solicitacao = PlanejamentoEvento::STATUS_PROPOSTA;
                 $evento->motivo_ajuste = null;
@@ -307,13 +311,14 @@ class PlanejamentoService
         $deveValidar = $evento->status_solicitacao !== PlanejamentoEvento::STATUS_RECUSADO
             && ($recursosAlterados || $intervaloAlterado || $saiuDeRecusado);
 
-        DB::transaction(function () use ($evento, $data, $pedido, $recursosAlterados, $deveValidar) {
+        DB::transaction(function () use ($evento, $data, $pedido, $recursosAlterados, $deveValidar, $publico) {
             if ($deveValidar) {
                 $this->recursos->assertCapacidade(
                     $evento->planejamento_anual_id,
                     PlanejamentoIntervalo::deEvento($evento),
                     $pedido,
                     $evento->id,
+                    $publico,
                 );
             }
 
@@ -698,10 +703,7 @@ class PlanejamentoService
      */
     public function createEventoPublico(PlanejamentoPastoralToken $token, array $data): array
     {
-        $anual = $token->planejamento;
-        if ($anual === null) {
-            $anual = PlanejamentoAnual::query()->findOrFail($token->planejamento_anual_id);
-        }
+        $anual = $this->anualDoToken($token);
 
         if ($anual->status !== PlanejamentoAnual::STATUS_COLETA) {
             throw ValidationException::withMessages([
@@ -709,8 +711,7 @@ class PlanejamentoService
             ]);
         }
 
-        $igreja = Igreja::query()->findOrFail($anual->igreja_id);
-        $this->igrejaContext->set($igreja);
+        $this->igrejaContext->set(Igreja::query()->findOrFail($anual->igreja_id));
 
         return $this->createEvento($anual, [
             ...$data,
@@ -721,13 +722,51 @@ class PlanejamentoService
     }
 
     /**
-     * @param  array{data_inicio: string, data_fim?: ?string, hora_inicio?: ?string, hora_fim?: ?string}  $params
+     * @param  array<string, mixed>  $data
+     * @return array{evento: PlanejamentoEvento, conflitos: list<array<string, mixed>>}
+     */
+    public function updateEventoPublico(PlanejamentoPastoralToken $token, string $eventoId, array $data): array
+    {
+        $anual = $this->anualDoToken($token);
+        $this->igrejaContext->set(Igreja::query()->findOrFail($anual->igreja_id));
+
+        $evento = $this->eventoDoToken($token, $eventoId);
+        $this->assertPodeMutarEventoPublico($anual, $evento);
+
+        unset($data['pastoral_id'], $data['status_solicitacao'], $data['motivo_ajuste']);
+
+        return $this->updateEvento($evento, [
+            ...$data,
+            'local_ids' => $data['local_ids'] ?? [],
+        ], true);
+    }
+
+    public function deleteEventoPublico(PlanejamentoPastoralToken $token, string $eventoId): void
+    {
+        $anual = $this->anualDoToken($token);
+        $this->igrejaContext->set(Igreja::query()->findOrFail($anual->igreja_id));
+
+        $evento = $this->eventoDoToken($token, $eventoId);
+        $this->assertPodeMutarEventoPublico($anual, $evento);
+        $this->deleteEvento($evento);
+    }
+
+    /**
+     * @param  array{data_inicio: string, data_fim?: ?string, hora_inicio?: ?string, hora_fim?: ?string, ignorar_evento_id?: ?string}  $params
      * @return list<array<string, mixed>>
      */
     public function disponibilidadePublica(PlanejamentoPastoralToken $token, array $params): array
     {
-        $anual = $token->planejamento ?? PlanejamentoAnual::query()->findOrFail($token->planejamento_anual_id);
+        $anual = $this->anualDoToken($token);
         $this->igrejaContext->set(Igreja::query()->findOrFail($anual->igreja_id));
+
+        $ignorar = $params['ignorar_evento_id'] ?? null;
+        if (is_string($ignorar) && $ignorar !== '') {
+            // Só ignora se o evento pertencer à pastoral do token (evita vazar capacidade alheia)
+            $this->eventoDoToken($token, $ignorar);
+        } else {
+            $ignorar = null;
+        }
 
         return $this->recursos->disponibilidade(
             $anual->id,
@@ -737,6 +776,51 @@ class PlanejamentoService
                 $params['hora_inicio'] ?? null,
                 $params['hora_fim'] ?? null,
             ),
+            $ignorar,
         );
+    }
+
+    private function anualDoToken(PlanejamentoPastoralToken $token): PlanejamentoAnual
+    {
+        $anual = $token->planejamento;
+        if ($anual === null) {
+            $anual = PlanejamentoAnual::query()->findOrFail($token->planejamento_anual_id);
+        }
+
+        return $anual;
+    }
+
+    private function eventoDoToken(PlanejamentoPastoralToken $token, string $eventoId): PlanejamentoEvento
+    {
+        $evento = PlanejamentoEvento::query()
+            ->with(['locais', 'recursos', 'pastoral', 'planejamentoAnual'])
+            ->whereKey($eventoId)
+            ->where('planejamento_anual_id', $token->planejamento_anual_id)
+            ->where('pastoral_id', $token->pastoral_id)
+            ->first();
+
+        if ($evento === null) {
+            abort(404);
+        }
+
+        return $evento;
+    }
+
+    private function assertPodeMutarEventoPublico(PlanejamentoAnual $anual, PlanejamentoEvento $evento): void
+    {
+        if ($anual->status === PlanejamentoAnual::STATUS_COLETA) {
+            return;
+        }
+
+        if (
+            $anual->status === PlanejamentoAnual::STATUS_REVISAO
+            && $evento->status_solicitacao === PlanejamentoEvento::STATUS_AJUSTE_SOLICITADO
+        ) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'status' => ['Não é possível alterar esta proposta neste momento.'],
+        ]);
     }
 }

@@ -1,10 +1,10 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import api from '@/services/api'
 import { useTenantStore } from '@/stores/tenant'
-import { MES_NOMES, gradeMesCalendario } from '@/utils/calendario'
+import { MES_NOMES, formatHoraCalendario, gradeMesCalendario } from '@/utils/calendario'
 import {
+  canEditarEventoPlanejamentoPublico,
   groupEventosByDay,
   labelEventoPlanejamentoPreview,
   labelStatusPlanejamento,
@@ -12,6 +12,7 @@ import {
   styleStatusSolicitacao,
 } from '@/utils/planejamento'
 import { innovToast } from '@/plugins/toast'
+import { innovConfirm } from '@/plugins/dialog'
 import {
   buildRecursosPayload,
   disponibilidadeParams,
@@ -19,9 +20,17 @@ import {
   formatConflitosRecursos,
   isErroCapacidade,
   labelRecursosEvento,
+  selecaoFromEvento,
   selecaoTemEspaco,
 } from '@/utils/planejamentoRecursos'
 import { getDisponibilidadePublica } from '@/services/planejamentoRecursos'
+import {
+  createEventoPublico,
+  deleteEventoPublico,
+  getPublicoMeta,
+  listEventosPublicos,
+  updateEventoPublico,
+} from '@/services/planejamento'
 import PlanejamentoRecursosPicker from '@/components/planejamento/PlanejamentoRecursosPicker.vue'
 import DateInput from '@/components/form/DateInput.vue'
 import { brToIso, isoToBr } from '@/utils/dateBr'
@@ -41,6 +50,7 @@ const saving = ref(false)
 const mesView = ref(new Date().getMonth() + 1)
 const diaSelecionado = ref('')
 const showDayModal = ref(false)
+const editingEvento = ref(null)
 
 const emptyForm = () => ({
   titulo: '',
@@ -63,11 +73,26 @@ const headers = computed(() => ({
 }))
 
 const podePropor = computed(() => meta.value?.status === 'coleta')
+const podeMutarForm = computed(() => {
+  if (editingEvento.value) {
+    return canEditarEventoPlanejamentoPublico(meta.value?.status, editingEvento.value)
+  }
+  return podePropor.value
+})
+const formTitulo = computed(() => (editingEvento.value ? 'Editar proposta' : 'Nova proposta'))
+const submitLabel = computed(() => {
+  if (saving.value) return editingEvento.value ? 'Salvando…' : 'Enviando…'
+  return editingEvento.value ? 'Salvar alterações' : 'Enviar proposta'
+})
+
 const dispParams = computed(() =>
-  disponibilidadeParams({
-    ...form.value,
-    data_inicio: brToIso(form.value.data_inicio) || '',
-  }),
+  disponibilidadeParams(
+    {
+      ...form.value,
+      data_inicio: brToIso(form.value.data_inicio) || '',
+    },
+    editingEvento.value?.id,
+  ),
 )
 const temEspacos = computed(() => disponibilidade.value.some((d) => d.tipo === 'espaco'))
 const todayIso = new Date().toISOString().slice(0, 10)
@@ -80,6 +105,10 @@ const totalMes = computed(() => {
   const pad = String(mesView.value).padStart(2, '0')
   return eventos.value.filter((e) => String(e.data_inicio || '').slice(5, 7) === pad).length
 })
+
+function podeEditar(ev) {
+  return canEditarEventoPlanejamentoPublico(meta.value?.status, ev)
+}
 
 function prevMes() {
   if (mesView.value > 1) mesView.value -= 1
@@ -98,18 +127,44 @@ function formatDiaLongo(iso) {
   })
 }
 
+function resetFormForDay(iso) {
+  editingEvento.value = null
+  form.value = { ...emptyForm(), data_inicio: isoToBr(iso) }
+  selecaoRecursos.value = emptySelecaoRecursos()
+  capacidadeErro.value = ''
+}
+
 function openDay(iso) {
   if (!iso) return
   diaSelecionado.value = iso
-  form.value = { ...emptyForm(), data_inicio: isoToBr(iso) }
-  selecaoRecursos.value = emptySelecaoRecursos()
+  resetFormForDay(iso)
+  showDayModal.value = true
+}
+
+function openEdit(ev) {
+  if (!podeEditar(ev)) return
+  editingEvento.value = ev
+  diaSelecionado.value = String(ev.data_inicio || '').slice(0, 10)
+  form.value = {
+    titulo: ev.titulo || '',
+    data_inicio: isoToBr((ev.data_inicio || '').slice(0, 10)),
+    hora_inicio: formatHoraCalendario(ev.hora_inicio) || '',
+    hora_fim: formatHoraCalendario(ev.hora_fim) || '',
+    local_texto: ev.local_texto || '',
+    observacoes: ev.observacoes || '',
+  }
+  selecaoRecursos.value = selecaoFromEvento(ev)
   capacidadeErro.value = ''
   showDayModal.value = true
 }
 
+function cancelEdit() {
+  resetFormForDay(diaSelecionado.value)
+}
+
 async function carregarDisponibilidade() {
   const params = dispParams.value
-  if (!showDayModal.value || !podePropor.value || !params) {
+  if (!showDayModal.value || !podeMutarForm.value || !params) {
     disponibilidade.value = []
     return
   }
@@ -126,7 +181,7 @@ async function carregarDisponibilidade() {
 }
 
 watch(
-  () => [showDayModal.value, JSON.stringify(dispParams.value)],
+  () => [showDayModal.value, JSON.stringify(dispParams.value), editingEvento.value?.id],
   () => {
     clearTimeout(dispTimer)
     dispTimer = setTimeout(carregarDisponibilidade, 250)
@@ -135,6 +190,7 @@ watch(
 
 function closeDayModal() {
   showDayModal.value = false
+  editingEvento.value = null
 }
 
 async function load() {
@@ -145,11 +201,11 @@ async function load() {
   }
   try {
     const [m, e] = await Promise.all([
-      api.get(`/public/planejamento/${token.value}`, { headers: headers.value }),
-      api.get(`/public/planejamento/${token.value}/eventos`, { headers: headers.value }),
+      getPublicoMeta(token.value, headers.value),
+      listEventosPublicos(token.value, headers.value),
     ])
-    meta.value = m.data.data || m.data
-    eventos.value = e.data.data || e.data || []
+    meta.value = m
+    eventos.value = e
     if (meta.value?.ano && meta.value.ano !== new Date().getFullYear()) {
       mesView.value = 1
     }
@@ -163,36 +219,43 @@ async function load() {
   }
 }
 
-async function criar() {
+function buildPayload() {
+  const dataInicio = brToIso(form.value.data_inicio)
+  return {
+    titulo: form.value.titulo.trim(),
+    data_inicio: dataInicio,
+    hora_inicio: form.value.hora_inicio || null,
+    hora_fim: form.value.hora_fim || null,
+    local_texto: form.value.local_texto.trim() || null,
+    observacoes: form.value.observacoes || null,
+    recursos: buildRecursosPayload(selecaoRecursos.value),
+  }
+}
+
+async function salvar() {
   if (!form.value.local_texto.trim() && !selecaoTemEspaco(selecaoRecursos.value)) {
     innovToast('error', 'Planejamento', 'Escolha um espaço ou informe o local')
     return
   }
-  const dataInicio = brToIso(form.value.data_inicio)
-  if (!dataInicio) {
+  const payload = buildPayload()
+  if (!payload.data_inicio) {
     innovToast('error', 'Planejamento', 'Informe a data no formato dd/mm/aaaa')
     return
   }
   capacidadeErro.value = ''
   saving.value = true
   try {
-    await api.post(
-      `/public/planejamento/${token.value}/eventos`,
-      {
-        titulo: form.value.titulo,
-        data_inicio: dataInicio,
-        hora_inicio: form.value.hora_inicio || null,
-        hora_fim: form.value.hora_fim || null,
-        local_texto: form.value.local_texto.trim() || null,
-        observacoes: form.value.observacoes || null,
-        recursos: buildRecursosPayload(selecaoRecursos.value),
-      },
-      { headers: headers.value },
-    )
-    innovToast('success', 'Planejamento', 'Proposta enviada')
-    form.value = { ...emptyForm(), data_inicio: isoToBr(diaSelecionado.value) }
-    selecaoRecursos.value = emptySelecaoRecursos()
+    if (editingEvento.value?.id) {
+      await updateEventoPublico(token.value, editingEvento.value.id, payload, headers.value)
+      innovToast('success', 'Planejamento', 'Proposta atualizada')
+    } else {
+      await createEventoPublico(token.value, payload, headers.value)
+      innovToast('success', 'Planejamento', 'Proposta enviada')
+    }
+    const dia = brToIso(form.value.data_inicio) || diaSelecionado.value
     await load()
+    diaSelecionado.value = dia
+    resetFormForDay(dia)
   } catch (err) {
     if (isErroCapacidade(err)) {
       capacidadeErro.value = formatConflitosRecursos(err.response.data)
@@ -203,10 +266,39 @@ async function criar() {
     const msg =
       err.response?.data?.message ||
       err.response?.data?.errors?.status?.[0] ||
-      'Não foi possível enviar'
+      'Não foi possível salvar'
     innovToast('error', 'Planejamento', msg)
   } finally {
     saving.value = false
+  }
+}
+
+async function remover(ev) {
+  if (!podeEditar(ev)) return
+  const ok = await innovConfirm({
+    title: 'Remover proposta',
+    message: `Remover “${ev.titulo}”? Esta ação não pode ser desfeita.`,
+    confirmText: 'Remover',
+    danger: true,
+  })
+  if (!ok) return
+  try {
+    await deleteEventoPublico(token.value, ev.id, headers.value)
+    innovToast('success', 'Planejamento', 'Proposta removida')
+    if (editingEvento.value?.id === ev.id) {
+      resetFormForDay(diaSelecionado.value)
+    }
+    await load()
+    if (showDayModal.value && diaSelecionado.value) {
+      const still = (byDay.value.get(diaSelecionado.value) || []).length
+      if (!still && !podePropor.value) closeDayModal()
+    }
+  } catch (err) {
+    innovToast(
+      'error',
+      'Planejamento',
+      err.response?.data?.message || err.response?.data?.errors?.status?.[0] || 'Falha ao remover',
+    )
   }
 }
 
@@ -235,7 +327,10 @@ onMounted(load)
           class="card p-4 mb-4 text-sm"
           style="color: var(--color-muted)"
         >
-          A coleta não está aberta neste momento — você pode consultar suas propostas, mas não enviar novas.
+          A coleta não está aberta — você pode consultar as propostas
+          <template v-if="meta?.status === 'revisao'">
+            e ajustar as que pedirem correção
+          </template>.
         </p>
 
         <section class="card p-4 md:p-5 mb-6" data-testid="planejamento-publico-calendario">
@@ -263,7 +358,11 @@ onMounted(load)
             </button>
           </div>
           <p class="text-[12px] text-center mb-3" style="color: var(--color-muted)">
-            {{ podePropor ? 'Clique em um dia para propor um evento' : 'Clique em um dia para ver detalhes' }}
+            {{
+              podePropor
+                ? 'Clique em um dia para propor ou editar'
+                : 'Clique em um dia para ver detalhes'
+            }}
             · {{ totalMes }} proposta(s) neste mês
           </p>
 
@@ -335,10 +434,14 @@ onMounted(load)
             <li
               v-for="ev in eventos"
               :key="ev.id"
-              class="card p-4 flex flex-wrap items-center justify-between gap-2 cursor-pointer"
-              @click="openDay(String(ev.data_inicio || '').slice(0, 10))"
+              class="card p-4 flex flex-wrap items-center justify-between gap-2"
+              data-testid="planejamento-publico-lista-item"
             >
-              <div class="min-w-0">
+              <button
+                type="button"
+                class="min-w-0 text-left flex-1 bg-transparent border-0 p-0 cursor-pointer"
+                @click="podeEditar(ev) ? openEdit(ev) : openDay(String(ev.data_inicio || '').slice(0, 10))"
+              >
                 <div class="font-medium text-sm" style="color: var(--color-ink)">{{ ev.titulo }}</div>
                 <div class="text-xs mt-1" style="color: var(--color-muted)">
                   {{ String(ev.data_inicio || '').slice(0, 10) }}
@@ -346,16 +449,37 @@ onMounted(load)
                   <template v-if="labelRecursosEvento(ev)"> · {{ labelRecursosEvento(ev) }}</template>
                   <template v-if="ev.local_texto"> · {{ ev.local_texto }}</template>
                 </div>
+              </button>
+              <div class="flex items-center gap-2 flex-wrap">
+                <span
+                  class="text-[11px] font-medium px-2 py-0.5 rounded-full"
+                  :style="{
+                    background: styleStatusSolicitacao(ev.status_solicitacao).bg,
+                    color: styleStatusSolicitacao(ev.status_solicitacao).fg,
+                  }"
+                >
+                  {{ labelStatusSolicitacao(ev.status_solicitacao) }}
+                </span>
+                <button
+                  v-if="podeEditar(ev)"
+                  type="button"
+                  class="btn btn-ghost text-xs"
+                  data-testid="planejamento-publico-editar"
+                  @click="openEdit(ev)"
+                >
+                  Editar
+                </button>
+                <button
+                  v-if="podeEditar(ev)"
+                  type="button"
+                  class="btn btn-ghost text-xs"
+                  style="color: var(--color-danger)"
+                  data-testid="planejamento-publico-remover"
+                  @click="remover(ev)"
+                >
+                  Remover
+                </button>
               </div>
-              <span
-                class="text-[11px] font-medium px-2 py-0.5 rounded-full"
-                :style="{
-                  background: styleStatusSolicitacao(ev.status_solicitacao).bg,
-                  color: styleStatusSolicitacao(ev.status_solicitacao).fg,
-                }"
-              >
-                {{ labelStatusSolicitacao(ev.status_solicitacao) }}
-              </span>
             </li>
           </ul>
           <p v-if="!eventos.length" class="text-sm" style="color: var(--color-muted)">
@@ -386,7 +510,7 @@ onMounted(load)
           <button type="button" class="btn btn-ghost text-xs" @click="closeDayModal">Fechar</button>
         </div>
 
-        <ul v-if="diaEventos.length" class="list-none p-0 m-0 space-y-2 mb-4">
+        <ul v-if="diaEventos.length && !editingEvento" class="list-none p-0 m-0 space-y-2 mb-4">
           <li
             v-for="ev in diaEventos"
             :key="ev.id"
@@ -410,16 +534,45 @@ onMounted(load)
             <p v-if="ev.motivo_ajuste" class="text-[12px] mt-1" style="color: var(--color-muted)">
               Ajuste pedido: {{ ev.motivo_ajuste }}
             </p>
+            <div v-if="podeEditar(ev)" class="flex gap-2 mt-2">
+              <button
+                type="button"
+                class="btn btn-ghost text-xs"
+                data-testid="planejamento-publico-editar-dia"
+                @click="openEdit(ev)"
+              >
+                Editar
+              </button>
+              <button
+                type="button"
+                class="btn btn-ghost text-xs"
+                style="color: var(--color-danger)"
+                data-testid="planejamento-publico-remover-dia"
+                @click="remover(ev)"
+              >
+                Remover
+              </button>
+            </div>
           </li>
         </ul>
 
         <form
-          v-if="podePropor"
+          v-if="podeMutarForm"
           class="space-y-3"
           data-testid="planejamento-publico-form"
-          @submit.prevent="criar"
+          @submit.prevent="salvar"
         >
-          <h4 class="font-serif text-[16px]" style="color: var(--color-ink)">Nova proposta</h4>
+          <div class="flex items-center justify-between gap-2">
+            <h4 class="font-serif text-[16px]" style="color: var(--color-ink)">{{ formTitulo }}</h4>
+            <button
+              v-if="editingEvento"
+              type="button"
+              class="btn btn-ghost text-xs"
+              @click="cancelEdit"
+            >
+              Nova proposta
+            </button>
+          </div>
           <div>
             <label class="fld" for="pub-titulo">Título</label>
             <input id="pub-titulo" v-model="form.titulo" class="input" required />
@@ -486,7 +639,7 @@ onMounted(load)
             <textarea id="pub-obs" v-model="form.observacoes" class="input" rows="2" />
           </div>
           <button type="submit" class="btn btn-primary w-full" :disabled="saving">
-            {{ saving ? 'Enviando…' : 'Enviar proposta' }}
+            {{ submitLabel }}
           </button>
         </form>
         <p v-else-if="!diaEventos.length" class="text-[13px]" style="color: var(--color-muted)">
