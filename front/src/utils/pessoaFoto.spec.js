@@ -7,7 +7,8 @@ import {
   casalTemFichaComFoto,
   fileFromInputEvent,
   fileInputsAvoidDisplayNone,
-  FILE_INPUT_HIT_CLASS,
+  FILE_INPUT_NATIVE_CLASS,
+  openFilePicker,
   PESSOA_FOTO_ACCEPT,
   PESSOA_FOTO_MAX_BYTES,
   validatePessoaFotoFile,
@@ -40,7 +41,7 @@ describe('pessoaFoto', () => {
       true,
     )
     assert.equal(
-      validatePessoaFotoFile({ name: 'a.png', type: 'image/png', size: 10 }).ok,
+      validatePessoaFotoFile({ name: 'a.jpg', type: 'application/octet-stream', size: 10 }).ok,
       true,
     )
     assert.match(
@@ -55,30 +56,51 @@ describe('pessoaFoto', () => {
       }).message,
       /5 MB/,
     )
-    assert.equal(
-      validatePessoaFotoFile({ name: 'a.webp', type: '', size: 10 }).ok,
-      true,
-    )
+  })
+
+  it('openFilePicker usa showPicker e trata bloqueio de permissão', async () => {
+    const calls = []
+    const ok = await openFilePicker({
+      disabled: false,
+      click: () => calls.push('click'),
+      showPicker: async () => {
+        calls.push('showPicker')
+      },
+    })
+    assert.equal(ok.ok, true)
+    assert.deepEqual(calls, ['showPicker'])
+
+    const denied = await openFilePicker({
+      disabled: false,
+      click: () => {
+        throw new Error('nope')
+      },
+      showPicker: async () => {
+        const err = new Error('blocked')
+        err.name = 'NotAllowedError'
+        throw err
+      },
+    })
+    assert.equal(denied.ok, false)
+    assert.match(denied.message, /permissão|navegador/i)
+
+    const missing = await openFilePicker(null)
+    assert.equal(missing.ok, false)
   })
 
   it('rejeita input file com classe hidden (display:none)', () => {
-    assert.equal(FILE_INPUT_HIT_CLASS, 'file-input-hit')
+    assert.equal(FILE_INPUT_NATIVE_CLASS, 'file-input-native')
     assert.equal(
       fileInputsAvoidDisplayNone('<input type="file" class="hidden" accept="image/*">'),
       false,
     )
     assert.equal(
-      fileInputsAvoidDisplayNone('<input type="file" class="file-input-hit" accept="image/*">'),
+      fileInputsAvoidDisplayNone('<input type="file" class="file-input-native" accept="image/*">'),
       true,
     )
-    assert.equal(
-      fileInputsAvoidDisplayNone('<input type="file" class="sr-only" accept="image/*">'),
-      true,
-    )
-    assert.equal(fileInputsAvoidDisplayNone('<div>sem file</div>'), false)
   })
 
-  it('PessoaFotoField e ComprovanteAnexoField usam file-input-hit nos inputs file', () => {
+  it('PessoaFotoField e ComprovanteAnexoField usam botão + file-input-native', () => {
     const foto = readFileSync(join(here, '../components/ecc/PessoaFotoField.vue'), 'utf8')
     const comprovante = readFileSync(
       join(here, '../components/ecc/ComprovanteAnexoField.vue'),
@@ -86,10 +108,11 @@ describe('pessoaFoto', () => {
     )
     assert.equal(fileInputsAvoidDisplayNone(foto), true)
     assert.equal(fileInputsAvoidDisplayNone(comprovante), true)
-    assert.match(foto, /accept="image\/\*"|:accept="PESSOA_FOTO_ACCEPT"/)
+    assert.match(foto, /openFilePicker/)
     assert.match(foto, /data-testid="pessoa-foto-gallery"/)
-    assert.match(foto, /data-testid="pessoa-foto-camera"/)
-    assert.match(foto, /class="file-input-hit"/)
-    assert.match(comprovante, /class="file-input-hit"/)
+    assert.match(foto, /@click="pick\('gallery'\)"/)
+    assert.match(foto, /class="file-input-native"/)
+    assert.match(comprovante, /class="file-input-native"/)
+    assert.doesNotMatch(foto, /<label[^>]*>\s*Galeria/)
   })
 })

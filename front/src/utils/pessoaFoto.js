@@ -41,13 +41,16 @@ export const PESSOA_FOTO_ACCEPT = 'image/*'
 export const PESSOA_FOTO_MAX_BYTES = 5 * 1024 * 1024
 
 /**
- * Classe do input file que cobre o label (toque direto no input).
- * Preferível a `sr-only`/`hidden` em WebViews e PWA mobile.
+ * Classe do input file acionado via botão (click/showPicker).
+ * Não usar `hidden` (display:none) — Android ignora o picker.
  */
-export const FILE_INPUT_HIT_CLASS = 'file-input-hit'
+export const FILE_INPUT_NATIVE_CLASS = 'file-input-native'
 
-/** @deprecated Preferir FILE_INPUT_HIT_CLASS — mantido para compat de testes. */
-export const FILE_INPUT_VISUALLY_HIDDEN_CLASS = FILE_INPUT_HIT_CLASS
+/** @deprecated Preferir FILE_INPUT_NATIVE_CLASS. */
+export const FILE_INPUT_HIT_CLASS = FILE_INPUT_NATIVE_CLASS
+
+/** @deprecated Preferir FILE_INPUT_NATIVE_CLASS. */
+export const FILE_INPUT_VISUALLY_HIDDEN_CLASS = FILE_INPUT_NATIVE_CLASS
 
 /**
  * Aceita imagem do input (galeria ou câmera).
@@ -94,8 +97,10 @@ export function validatePessoaFotoFile(file) {
   const ext = fileExtension(file.name)
   const mimeOk = mime && PESSOA_FOTO_ALLOWED_MIME.includes(mime)
   const extOk = PESSOA_FOTO_ALLOWED_EXT.includes(ext)
+  // Android/câmera às vezes manda octet-stream ou type vazio com extensão .jpg
+  const genericBinary = mime === 'application/octet-stream' || mime === 'binary/octet-stream'
 
-  if (mimeOk || (!mime && extOk)) {
+  if (mimeOk || (extOk && (!mime || genericBinary))) {
     return { ok: true }
   }
 
@@ -110,8 +115,56 @@ export function validatePessoaFotoFile(file) {
 }
 
 /**
+ * Abre o seletor de arquivo/câmera a partir de um gesto do usuário.
+ * Preferê showPicker() (feedback de erro) e cai para click().
+ *
+ * @param {HTMLInputElement | null | undefined} input
+ * @returns {Promise<{ ok: true } | { ok: false, message: string }>}
+ */
+export async function openFilePicker(input) {
+  if (!input || typeof input.click !== 'function') {
+    return {
+      ok: false,
+      message: 'Seletor de arquivo indisponível. Use “Atualizar app” no menu do perfil e tente de novo.',
+    }
+  }
+
+  if (input.disabled) {
+    return { ok: false, message: 'Aguarde o envio da foto atual terminar.' }
+  }
+
+  try {
+    if (typeof input.showPicker === 'function') {
+      await input.showPicker()
+    } else {
+      input.click()
+    }
+    return { ok: true }
+  } catch (err) {
+    const name = err && typeof err === 'object' ? String(err.name || '') : ''
+    if (name === 'NotAllowedError' || name === 'SecurityError') {
+      return {
+        ok: false,
+        message:
+          'O navegador bloqueou a galeria/câmera. Libere a permissão do site (cadeado na barra de endereço) ou abra pelo Chrome/Safari (não pelo atalho antigo) e tente de novo.',
+      }
+    }
+    try {
+      input.click()
+      return { ok: true }
+    } catch {
+      return {
+        ok: false,
+        message:
+          'Não foi possível abrir galeria/câmera. Verifique a permissão do app e use “Atualizar app” no menu do perfil.',
+      }
+    }
+  }
+}
+
+/**
  * Garante que o markup do seletor de arquivo não usa display:none (classe `hidden`).
- * Aceita `file-input-hit` (overlay) ou `sr-only` (legado).
+ * Aceita `file-input-native`, `file-input-hit` ou `sr-only`.
  * @param {string} vueSfcSource
  * @returns {boolean}
  */
@@ -119,7 +172,7 @@ export function fileInputsAvoidDisplayNone(vueSfcSource) {
   const source = String(vueSfcSource || '')
   const fileInputBlocks = source.match(/<input\b[^>]*\btype=["']file["'][^>]*>/gi) || []
   if (fileInputBlocks.length === 0) return false
-  const allowed = new Set([FILE_INPUT_HIT_CLASS, 'sr-only'])
+  const allowed = new Set([FILE_INPUT_NATIVE_CLASS, 'file-input-hit', 'sr-only'])
   return fileInputBlocks.every((tag) => {
     const classMatch = tag.match(/\bclass=["']([^"']*)["']/i)
     const classes = (classMatch?.[1] ?? '').split(/\s+/).filter(Boolean)

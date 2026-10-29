@@ -141,9 +141,24 @@
   }
 
   /*
-   * Input file cobrindo o label — o toque cai no próprio <input>,
-   * mais confiável que sr-only/hidden em Android WebView e PWA.
+   * Input file acionado por botão (click/showPicker) — NÃO usar display:none
+   * nem font-size:0 (Android Chrome/PWA ignora o picker nesses casos).
    */
+  .file-input-native {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+    opacity: 1;
+    font-size: 16px;
+  }
+
+  /* Legado — overlays antigos; preferir .file-input-native + botão. */
   .file-input-hit {
     position: absolute;
     inset: 0;
@@ -151,10 +166,12 @@
     height: 100%;
     margin: 0;
     padding: 0;
-    opacity: 0;
+    opacity: 0.01;
     cursor: pointer;
-    font-size: 0;
+    font-size: 16px;
     border: 0;
+    color: transparent;
+    background: transparent;
   }
 
   .page-eyebrow {
