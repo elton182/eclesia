@@ -247,9 +247,11 @@ onMounted(async () => {
         style="color: var(--color-ink)"
         data-tour="titulo"
       >
-        <span>{{ equipeAtual?.nome || 'Minha equipe' }}</span>
-        <AppVersionBadge class="ml-2" />
+        {{ equipeAtual?.nome || 'Minha equipe' }}
       </h1>
+      <p class="mt-1 m-0" data-testid="minha-equipe-app-version">
+        <AppVersionBadge />
+      </p>
       <p class="mt-2 text-[14px] leading-relaxed" style="color: var(--color-muted)">
         Revise e atualize os dados dos casais da sua equipe.
       </p>
