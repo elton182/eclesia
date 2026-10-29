@@ -18,6 +18,7 @@ import { homePathForUser, isSomenteLiderEquipe } from '../utils/userRoles'
 import TenantsView from '../views/TenantsView.vue'
 import UsersView from '../views/UsersView.vue'
 import AuditoriaView from '../views/AuditoriaView.vue'
+import DiagnosticosView from '../views/DiagnosticosView.vue'
 import IgrejasView from '../views/IgrejasView.vue'
 import EccCasaisView from '../views/EccCasaisView.vue'
 import EccEquipesView from '../views/EccEquipesView.vue'
@@ -199,6 +200,11 @@ const router = createRouter({
           path: 'auditoria',
           name: 'auditoria',
           component: AuditoriaView,
+        },
+        {
+          path: 'diagnosticos',
+          name: 'diagnosticos',
+          component: DiagnosticosView,
         },
         {
           path: 'configuracoes/marca',

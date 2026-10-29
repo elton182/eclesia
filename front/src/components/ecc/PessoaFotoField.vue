@@ -4,6 +4,7 @@ import api from '@/services/api'
 import { innovToast } from '@/plugins/toast'
 import { innovConfirm } from '@/plugins/dialog'
 import { useMediaPermissionGuard } from '@/composables/useMediaPermissionGuard'
+import { trackDiagnostic } from '@/utils/clientDiagnostics'
 import {
   deletePessoaFoto,
   fileFromInputEvent,
@@ -54,10 +55,20 @@ watch(
 
 async function onFile(event) {
   const file = fileFromInputEvent(event)
-  if (!file) return
+  if (!file) {
+    trackDiagnostic('foto.file.empty')
+    return
+  }
+
+  trackDiagnostic('foto.file.selected', {
+    mime: file.type || '',
+    size: Number(file.size) || 0,
+    ext: String(file.name || '').split('.').pop() || '',
+  })
 
   const check = validatePessoaFotoFile(file)
   if (!check.ok) {
+    trackDiagnostic('foto.file.rejected', { message: check.message })
     innovToast('error', 'Foto', check.message)
     return
   }
@@ -65,6 +76,7 @@ async function onFile(event) {
   if (!props.pessoaId) {
     emit('update:pendingFile', file)
     localPreview.value = URL.createObjectURL(file)
+    trackDiagnostic('foto.file.pending')
     return
   }
 
@@ -74,8 +86,12 @@ async function onFile(event) {
     emit('update:fotoUrl', pessoa.foto_url || null)
     emit('update:pendingFile', null)
     localPreview.value = null
+    trackDiagnostic('foto.upload.ok')
     innovToast('success', 'OK', 'Foto salva')
   } catch (e) {
+    trackDiagnostic('foto.upload.fail', {
+      status: e.response?.status || 0,
+    })
     innovToast('error', 'Erro', e.response?.data?.message || 'Falha ao enviar foto')
   } finally {
     busy.value = false

@@ -621,6 +621,16 @@ function go(path) {
               Auditoria
             </button>
             <button
+              v-if="showAuditoria"
+              type="button"
+              class="text-left text-[13.5px] bg-transparent border-0 p-0 cursor-pointer"
+              style="color: color-mix(in srgb, var(--color-on-primary) 80%, transparent)"
+              data-testid="launcher-link-diagnosticos"
+              @click="go('/diagnosticos')"
+            >
+              Diagnósticos
+            </button>
+            <button
               v-if="showSimularLider"
               type="button"
               class="text-left text-[13.5px] bg-transparent border-0 p-0 cursor-pointer"
@@ -817,6 +827,16 @@ function go(path) {
           @click="go('/auditoria')"
         >
           Auditoria →
+        </button>
+        <button
+          v-if="showAuditoria"
+          type="button"
+          class="text-left text-[13px] py-2"
+          style="color: var(--color-primary-hover)"
+          data-testid="launcher-link-diagnosticos-mobile"
+          @click="go('/diagnosticos')"
+        >
+          Diagnósticos →
         </button>
         <button
           v-if="showSimularLider"
