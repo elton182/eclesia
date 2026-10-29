@@ -10,11 +10,18 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // Em produção a create antiga usou foreignId (bigint) → igrejas.id (ulid)
+        // e falhou no FK (errno 150), deixando a tabela parcial. Evita recriar.
+        if (Schema::hasTable('client_diagnostics')) {
+            return;
+        }
+
         Schema::create('client_diagnostics', function (Blueprint $table): void {
             $table->id();
             $table->ulid('ulid')->unique();
             $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
-            $table->foreignId('igreja_id')->nullable()->constrained('igrejas')->nullOnDelete();
+            // ULID sem FK: igrejas.id é ulid (não bigint). Relação só no app.
+            $table->ulid('igreja_id')->nullable()->index();
             $table->string('motivo', 40)->default('geral');
             $table->text('nota')->nullable();
             $table->json('meta');
