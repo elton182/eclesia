@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import api from '@/services/api'
 import { innovToast } from '@/plugins/toast'
 import { innovConfirm } from '@/plugins/dialog'
+import { useMediaPermissionGuard } from '@/composables/useMediaPermissionGuard'
 import {
   deletePessoaFoto,
   fileFromInputEvent,
@@ -24,6 +25,7 @@ const emit = defineEmits(['update:fotoUrl', 'update:pendingFile'])
 
 const busy = ref(false)
 const localPreview = ref(null)
+const { guardCameraClick, guardGalleryClick } = useMediaPermissionGuard()
 
 const previewUrl = computed(() => localPreview.value || props.fotoUrl || null)
 
@@ -134,9 +136,8 @@ async function removeFoto() {
       <div v-if="editable" class="flex flex-col gap-1.5">
         <div class="flex flex-wrap gap-2 items-center">
           <!--
-            PWA Android (app instalado): click()/showPicker() em botão falha em
-            silêncio. O dedo precisa tocar o próprio input file.
-            span+overlay (file-input-hit), sem button e sem click programático.
+            PWA Android: toque no próprio input file.
+            Se a câmera estiver negada no SO, guardCameraClick avisa em vez do silêncio.
           -->
           <span
             :class="[hitClass, { 'opacity-50 pointer-events-none': busy }]"
@@ -150,6 +151,7 @@ async function removeFoto() {
               class="file-input-hit"
               :disabled="busy"
               data-testid="pessoa-foto-input-gallery"
+              @click="guardGalleryClick"
               @change="onFile"
             >
           </span>
@@ -166,6 +168,7 @@ async function removeFoto() {
               class="file-input-hit"
               :disabled="busy"
               data-testid="pessoa-foto-input-camera"
+              @click="guardCameraClick"
               @change="onFile"
             >
           </span>

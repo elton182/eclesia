@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { fileFromInputEvent } from '@/utils/pessoaFoto'
+import { useMediaPermissionGuard } from '@/composables/useMediaPermissionGuard'
 import {
   COMPROVANTE_ACCEPT_ARQUIVO,
   labelComprovanteSelecionado,
@@ -20,6 +21,8 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue'])
 
+const { guardCameraClick, guardGalleryClick } = useMediaPermissionGuard()
+
 const nomeArquivo = computed(() => props.modelValue?.name || '')
 const textoAjuda = computed(() => labelComprovanteSelecionado(props.modelValue))
 
@@ -38,7 +41,6 @@ function limpar() {
   <div data-testid="comprovante-anexo">
     <span class="fld">Comprovante</span>
     <div class="flex flex-wrap gap-2 items-center">
-      <!-- Toque direto no input — necessário em PWA Android instalada. -->
       <span
         class="btn btn-ghost relative overflow-hidden cursor-pointer"
         :class="{ 'opacity-50 pointer-events-none': disabled }"
@@ -52,6 +54,7 @@ function limpar() {
           class="file-input-hit"
           :disabled="disabled"
           :data-testid="`${id}-input-arquivo`"
+          @click="guardGalleryClick"
           @change="onPick"
         >
       </span>
@@ -69,6 +72,7 @@ function limpar() {
           class="file-input-hit"
           :disabled="disabled"
           :data-testid="`${id}-input-camera`"
+          @click="guardCameraClick"
           @change="onPick"
         >
       </span>
