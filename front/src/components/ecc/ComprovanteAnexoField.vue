@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref } from 'vue'
-import { fileFromInputEvent } from '@/utils/pessoaFoto'
+import { fileFromInputEvent, openFilePicker } from '@/utils/pessoaFoto'
+import { innovToast } from '@/plugins/toast'
 import {
   COMPROVANTE_ACCEPT_ARQUIVO,
   labelComprovanteSelecionado,
@@ -21,6 +22,7 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue'])
 
 const arquivoInput = ref(null)
+const cameraInput = ref(null)
 
 const nomeArquivo = computed(() => props.modelValue?.name || '')
 const textoAjuda = computed(() => labelComprovanteSelecionado(props.modelValue))
@@ -35,50 +37,42 @@ function limpar() {
   emit('update:modelValue', null)
 }
 
-function abrirArquivo() {
+async function pick(kind) {
   if (props.disabled) return
-  arquivoInput.value?.click()
+  const input = kind === 'camera' ? cameraInput.value : arquivoInput.value
+  const result = await openFilePicker(input)
+  if (!result.ok) {
+    innovToast('error', 'Comprovante', result.message)
+  }
+}
+
+async function abrirArquivo() {
+  await pick('arquivo')
 }
 </script>
 
 <template>
   <div data-testid="comprovante-anexo">
-    <label class="fld" :for="`${id}-input-arquivo`">Comprovante</label>
+    <span class="fld">Comprovante</span>
     <div class="flex flex-wrap gap-2 items-center">
-      <label
-        class="btn btn-ghost cursor-pointer relative overflow-hidden"
-        :class="{ 'opacity-50 pointer-events-none': disabled }"
+      <button
+        type="button"
+        class="btn btn-ghost"
+        :disabled="disabled"
         :data-testid="`${id}-arquivo`"
+        @click="pick('arquivo')"
       >
-        <span>Arquivo</span>
-        <input
-          :id="`${id}-input-arquivo`"
-          ref="arquivoInput"
-          type="file"
-          :accept="acceptArquivo"
-          class="file-input-hit"
-          :disabled="disabled"
-          :data-testid="`${id}-input-arquivo`"
-          @change="onPick"
-        >
-      </label>
-      <label
-        class="btn btn-ghost cursor-pointer relative overflow-hidden"
-        :class="{ 'opacity-50 pointer-events-none': disabled }"
+        Arquivo
+      </button>
+      <button
+        type="button"
+        class="btn btn-ghost"
+        :disabled="disabled"
         :data-testid="`${id}-camera`"
+        @click="pick('camera')"
       >
-        <span>Tirar foto</span>
-        <input
-          :id="`${id}-input-camera`"
-          type="file"
-          accept="image/*"
-          capture="environment"
-          class="file-input-hit"
-          :disabled="disabled"
-          :data-testid="`${id}-input-camera`"
-          @change="onPick"
-        >
-      </label>
+        Tirar foto
+      </button>
       <button
         v-if="nomeArquivo"
         type="button"
@@ -109,6 +103,32 @@ function abrirArquivo() {
       :required="required"
       :data-testid="`${id}-required`"
       @focus="abrirArquivo"
+    >
+
+    <input
+      :id="`${id}-input-arquivo`"
+      ref="arquivoInput"
+      type="file"
+      :accept="acceptArquivo"
+      class="file-input-native"
+      tabindex="-1"
+      aria-hidden="true"
+      :disabled="disabled"
+      :data-testid="`${id}-input-arquivo`"
+      @change="onPick"
+    >
+    <input
+      :id="`${id}-input-camera`"
+      ref="cameraInput"
+      type="file"
+      accept="image/*"
+      capture="environment"
+      class="file-input-native"
+      tabindex="-1"
+      aria-hidden="true"
+      :disabled="disabled"
+      :data-testid="`${id}-input-camera`"
+      @change="onPick"
     >
   </div>
 </template>
