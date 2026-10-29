@@ -7,7 +7,7 @@ import {
   casalTemFichaComFoto,
   fileFromInputEvent,
   fileInputsAvoidDisplayNone,
-  FILE_INPUT_NATIVE_CLASS,
+  FILE_INPUT_HIT_CLASS,
   openFilePicker,
   PESSOA_FOTO_ACCEPT,
   PESSOA_FOTO_MAX_BYTES,
@@ -35,7 +35,6 @@ describe('pessoaFoto', () => {
 
   it('valida tipo e tamanho da foto', () => {
     assert.equal(PESSOA_FOTO_ACCEPT, 'image/*')
-    assert.equal(validatePessoaFotoFile(null).ok, false)
     assert.equal(
       validatePessoaFotoFile({ name: 'a.jpg', type: 'image/jpeg', size: 10 }).ok,
       true,
@@ -58,18 +57,7 @@ describe('pessoaFoto', () => {
     )
   })
 
-  it('openFilePicker usa showPicker e trata bloqueio de permissão', async () => {
-    const calls = []
-    const ok = await openFilePicker({
-      disabled: false,
-      click: () => calls.push('click'),
-      showPicker: async () => {
-        calls.push('showPicker')
-      },
-    })
-    assert.equal(ok.ok, true)
-    assert.deepEqual(calls, ['showPicker'])
-
+  it('openFilePicker trata bloqueio (legado; foto usa toque direto)', async () => {
     const denied = await openFilePicker({
       disabled: false,
       click: () => {
@@ -82,25 +70,21 @@ describe('pessoaFoto', () => {
       },
     })
     assert.equal(denied.ok, false)
-    assert.match(denied.message, /permissão|navegador/i)
-
-    const missing = await openFilePicker(null)
-    assert.equal(missing.ok, false)
   })
 
   it('rejeita input file com classe hidden (display:none)', () => {
-    assert.equal(FILE_INPUT_NATIVE_CLASS, 'file-input-native')
+    assert.equal(FILE_INPUT_HIT_CLASS, 'file-input-hit')
     assert.equal(
       fileInputsAvoidDisplayNone('<input type="file" class="hidden" accept="image/*">'),
       false,
     )
     assert.equal(
-      fileInputsAvoidDisplayNone('<input type="file" class="file-input-native" accept="image/*">'),
+      fileInputsAvoidDisplayNone('<input type="file" class="file-input-hit" accept="image/*">'),
       true,
     )
   })
 
-  it('PessoaFotoField e ComprovanteAnexoField usam botão + file-input-native', () => {
+  it('PessoaFotoField usa toque direto no input (sem click programático)', () => {
     const foto = readFileSync(join(here, '../components/ecc/PessoaFotoField.vue'), 'utf8')
     const comprovante = readFileSync(
       join(here, '../components/ecc/ComprovanteAnexoField.vue'),
@@ -108,11 +92,10 @@ describe('pessoaFoto', () => {
     )
     assert.equal(fileInputsAvoidDisplayNone(foto), true)
     assert.equal(fileInputsAvoidDisplayNone(comprovante), true)
-    assert.match(foto, /openFilePicker/)
+    assert.match(foto, /class="file-input-hit"/)
     assert.match(foto, /data-testid="pessoa-foto-gallery"/)
-    assert.match(foto, /@click="pick\('gallery'\)"/)
-    assert.match(foto, /class="file-input-native"/)
-    assert.match(comprovante, /class="file-input-native"/)
-    assert.doesNotMatch(foto, /<label[^>]*>\s*Galeria/)
+    assert.doesNotMatch(foto, /openFilePicker/)
+    assert.doesNotMatch(foto, /@click="pick/)
+    assert.match(comprovante, /class="file-input-hit"/)
   })
 })

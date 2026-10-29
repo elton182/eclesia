@@ -9,8 +9,8 @@ defineProps({
 
 <template>
   <span
-    class="inline-flex items-center font-sans font-medium tracking-normal normal-case align-middle"
-    style="color: var(--color-muted); font-size: 0.55em; letter-spacing: 0.02em"
+    class="inline-flex items-center font-sans font-normal tracking-normal normal-case align-middle whitespace-nowrap"
+    style="color: var(--color-muted); font-size: 12px; letter-spacing: 0.02em"
     :title="`Versão do app: ${APP_VERSION}`"
     data-testid="app-version-badge"
   >

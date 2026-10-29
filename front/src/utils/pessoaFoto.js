@@ -41,16 +41,16 @@ export const PESSOA_FOTO_ACCEPT = 'image/*'
 export const PESSOA_FOTO_MAX_BYTES = 5 * 1024 * 1024
 
 /**
- * Classe do input file acionado via botão (click/showPicker).
- * Não usar `hidden` (display:none) — Android ignora o picker.
+ * Classe do input file cobrindo o controle — toque real no <input>.
+ * Necessário em PWA Android instalada (click/showPicker falham em silêncio).
  */
+export const FILE_INPUT_HIT_CLASS = 'file-input-hit'
+
+/** @deprecated Preferir FILE_INPUT_HIT_CLASS (toque direto). */
 export const FILE_INPUT_NATIVE_CLASS = 'file-input-native'
 
-/** @deprecated Preferir FILE_INPUT_NATIVE_CLASS. */
-export const FILE_INPUT_HIT_CLASS = FILE_INPUT_NATIVE_CLASS
-
-/** @deprecated Preferir FILE_INPUT_NATIVE_CLASS. */
-export const FILE_INPUT_VISUALLY_HIDDEN_CLASS = FILE_INPUT_NATIVE_CLASS
+/** @deprecated Preferir FILE_INPUT_HIT_CLASS. */
+export const FILE_INPUT_VISUALLY_HIDDEN_CLASS = FILE_INPUT_HIT_CLASS
 
 /**
  * Aceita imagem do input (galeria ou câmera).

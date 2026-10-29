@@ -3,10 +3,10 @@ import { computed, ref, watch } from 'vue'
 import api from '@/services/api'
 import { innovToast } from '@/plugins/toast'
 import { innovConfirm } from '@/plugins/dialog'
+import { useMediaPermissionGuard } from '@/composables/useMediaPermissionGuard'
 import {
   deletePessoaFoto,
   fileFromInputEvent,
-  openFilePicker,
   PESSOA_FOTO_ACCEPT,
   uploadPessoaFoto,
   validatePessoaFotoFile,
@@ -25,14 +25,13 @@ const emit = defineEmits(['update:fotoUrl', 'update:pendingFile'])
 
 const busy = ref(false)
 const localPreview = ref(null)
-const galleryInput = ref(null)
-const cameraInput = ref(null)
+const { guardCameraClick, guardGalleryClick } = useMediaPermissionGuard()
 
 const previewUrl = computed(() => localPreview.value || props.fotoUrl || null)
 
-const btnClass =
-  'text-[12.5px] font-medium px-2.5 py-1.5 rounded-lg cursor-pointer inline-flex items-center'
-const btnStyle = 'border: 1px solid rgba(42,20,24,0.18); background: #FFFDFA; color: #2A1418'
+const hitClass =
+  'relative inline-flex items-center overflow-hidden text-[12.5px] font-medium px-2.5 py-1.5 rounded-lg cursor-pointer'
+const hitStyle = 'border: 1px solid rgba(42,20,24,0.18); background: #FFFDFA; color: #2A1418'
 
 watch(
   () => props.fotoUrl,
@@ -52,15 +51,6 @@ watch(
     }
   },
 )
-
-async function pick(kind) {
-  if (busy.value) return
-  const input = kind === 'camera' ? cameraInput.value : galleryInput.value
-  const result = await openFilePicker(input)
-  if (!result.ok) {
-    innovToast('error', 'Foto', result.message)
-  }
-}
 
 async function onFile(event) {
   const file = fileFromInputEvent(event)
@@ -146,30 +136,42 @@ async function removeFoto() {
       <div v-if="editable" class="flex flex-col gap-1.5">
         <div class="flex flex-wrap gap-2 items-center">
           <!--
-            Botão separado + input fora do botão: no Android, botão dentro de
-            <label> engole o clique e o picker não abre. showPicker/click no
-            gesto do usuário + input não-display:none.
+            PWA Android: toque no próprio input file.
+            Se a câmera estiver negada no SO, guardCameraClick avisa em vez do silêncio.
           -->
-          <button
-            type="button"
-            :class="btnClass"
-            :style="btnStyle"
-            :disabled="busy"
+          <span
+            :class="[hitClass, { 'opacity-50 pointer-events-none': busy }]"
+            :style="hitStyle"
             data-testid="pessoa-foto-gallery"
-            @click="pick('gallery')"
           >
-            Galeria
-          </button>
-          <button
-            type="button"
-            :class="btnClass"
-            :style="btnStyle"
-            :disabled="busy"
+            <span class="pointer-events-none select-none">Galeria</span>
+            <input
+              type="file"
+              :accept="PESSOA_FOTO_ACCEPT"
+              class="file-input-hit"
+              :disabled="busy"
+              data-testid="pessoa-foto-input-gallery"
+              @click="guardGalleryClick"
+              @change="onFile"
+            >
+          </span>
+          <span
+            :class="[hitClass, { 'opacity-50 pointer-events-none': busy }]"
+            :style="hitStyle"
             data-testid="pessoa-foto-camera"
-            @click="pick('camera')"
           >
-            Tirar foto
-          </button>
+            <span class="pointer-events-none select-none">Tirar foto</span>
+            <input
+              type="file"
+              :accept="PESSOA_FOTO_ACCEPT"
+              capture="user"
+              class="file-input-hit"
+              :disabled="busy"
+              data-testid="pessoa-foto-input-camera"
+              @click="guardCameraClick"
+              @change="onFile"
+            >
+          </span>
           <button
             v-if="previewUrl"
             type="button"
@@ -188,29 +190,5 @@ async function removeFoto() {
         </p>
       </div>
     </div>
-
-    <input
-      ref="galleryInput"
-      type="file"
-      :accept="PESSOA_FOTO_ACCEPT"
-      class="file-input-native"
-      tabindex="-1"
-      aria-hidden="true"
-      :disabled="busy"
-      data-testid="pessoa-foto-input-gallery"
-      @change="onFile"
-    >
-    <input
-      ref="cameraInput"
-      type="file"
-      :accept="PESSOA_FOTO_ACCEPT"
-      capture="user"
-      class="file-input-native"
-      tabindex="-1"
-      aria-hidden="true"
-      :disabled="busy"
-      data-testid="pessoa-foto-input-camera"
-      @change="onFile"
-    >
   </div>
 </template>
