@@ -21,6 +21,12 @@ export async function deletePessoaFoto(api, pessoaId) {
 }
 
 /**
+ * Classe CSS para esconder input[type=file] sem `display:none`.
+ * Em Android/iOS, `hidden` (display:none) impede o seletor ao acionar via label/click.
+ */
+export const FILE_INPUT_VISUALLY_HIDDEN_CLASS = 'sr-only'
+
+/**
  * Aceita imagem do input (galeria ou câmera).
  * @param {Event} event
  * @returns {File|null}
@@ -30,6 +36,26 @@ export function fileFromInputEvent(event) {
   const file = input?.files?.[0] ?? null
   if (input) input.value = ''
   return file
+}
+
+/**
+ * Garante que o markup do seletor de arquivo não usa display:none (classe `hidden`).
+ * Usado em testes de regressão dos componentes de foto/anexo.
+ * @param {string} vueSfcSource
+ * @returns {boolean}
+ */
+export function fileInputsAvoidDisplayNone(vueSfcSource) {
+  const source = String(vueSfcSource || '')
+  const fileInputBlocks = source.match(/<input\b[^>]*\btype=["']file["'][^>]*>/gi) || []
+  if (fileInputBlocks.length === 0) return false
+  return fileInputBlocks.every((tag) => {
+    const classMatch = tag.match(/\bclass=["']([^"']*)["']/i)
+    const classes = classMatch?.[1] ?? ''
+    return (
+      classes.split(/\s+/).includes(FILE_INPUT_VISUALLY_HIDDEN_CLASS)
+      && !classes.split(/\s+/).includes('hidden')
+    )
+  })
 }
 
 /**
