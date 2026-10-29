@@ -98,4 +98,26 @@ describe('pessoaFoto', () => {
     assert.doesNotMatch(foto, /@click="pick/)
     assert.match(comprovante, /class="file-input-hit"/)
   })
+
+  it('foto e comprovante têm fallback de input file nativo', () => {
+    const foto = readFileSync(join(here, '../components/ecc/PessoaFotoField.vue'), 'utf8')
+    const comprovante = readFileSync(
+      join(here, '../components/ecc/ComprovanteAnexoField.vue'),
+      'utf8',
+    )
+    const fallback = readFileSync(
+      join(here, '../components/ecc/FilePickerFallback.vue'),
+      'utf8',
+    )
+    assert.match(foto, /FilePickerFallback/)
+    assert.match(foto, /useFilePickerFallback/)
+    assert.match(foto, /pessoa-foto-fallback/)
+    assert.match(comprovante, /FilePickerFallback/)
+    assert.match(comprovante, /useFilePickerFallback/)
+    assert.match(fallback, /Não abriu\? Escolher arquivo/)
+    assert.match(fallback, /class="file-input-fallback"/)
+    assert.equal(fileInputsAvoidDisplayNone(fallback), true)
+    assert.doesNotMatch(fallback, /file-input-hit/)
+    assert.doesNotMatch(fallback, /capture=/)
+  })
 })

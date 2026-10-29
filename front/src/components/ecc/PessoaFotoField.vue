@@ -4,6 +4,8 @@ import api from '@/services/api'
 import { innovToast } from '@/plugins/toast'
 import { innovConfirm } from '@/plugins/dialog'
 import { useMediaPermissionGuard } from '@/composables/useMediaPermissionGuard'
+import { useFilePickerFallback } from '@/composables/useFilePickerFallback'
+import FilePickerFallback from '@/components/ecc/FilePickerFallback.vue'
 import { trackDiagnostic } from '@/utils/clientDiagnostics'
 import {
   deletePessoaFoto,
@@ -27,8 +29,24 @@ const emit = defineEmits(['update:fotoUrl', 'update:pendingFile'])
 const busy = ref(false)
 const localPreview = ref(null)
 const { guardCameraClick, guardGalleryClick } = useMediaPermissionGuard()
+const {
+  showFallback,
+  revealFallback,
+  onPrimaryPickerInteract,
+  onFilePicked,
+} = useFilePickerFallback({ source: 'foto' })
 
 const previewUrl = computed(() => localPreview.value || props.fotoUrl || null)
+
+function onGalleryClick(event) {
+  guardGalleryClick(event)
+  onPrimaryPickerInteract()
+}
+
+function onCameraClick(event) {
+  guardCameraClick(event)
+  if (!event.defaultPrevented) onPrimaryPickerInteract()
+}
 
 const hitClass =
   'relative inline-flex items-center overflow-hidden text-[12.5px] font-medium px-2.5 py-1.5 rounded-lg cursor-pointer'
@@ -60,6 +78,7 @@ async function onFile(event) {
     return
   }
 
+  onFilePicked()
   trackDiagnostic('foto.file.selected', {
     mime: file.type || '',
     size: Number(file.size) || 0,
@@ -167,7 +186,7 @@ async function removeFoto() {
               class="file-input-hit"
               :disabled="busy"
               data-testid="pessoa-foto-input-gallery"
-              @click="guardGalleryClick"
+              @click="onGalleryClick"
               @change="onFile"
             >
           </span>
@@ -184,7 +203,7 @@ async function removeFoto() {
               class="file-input-hit"
               :disabled="busy"
               data-testid="pessoa-foto-input-camera"
-              @click="guardCameraClick"
+              @click="onCameraClick"
               @change="onFile"
             >
           </span>
@@ -200,6 +219,15 @@ async function removeFoto() {
             Remover
           </button>
         </div>
+        <FilePickerFallback
+          class="mt-1"
+          :accept="PESSOA_FOTO_ACCEPT"
+          :disabled="busy"
+          :show="showFallback"
+          test-id-prefix="pessoa-foto-fallback"
+          @reveal="revealFallback('manual')"
+          @change="onFile"
+        />
         <p class="text-[11px] m-0" style="color: rgba(42,20,24,0.5)">
           JPG, PNG ou WebP · até 5&nbsp;MB
           <span v-if="!pessoaId"> · enviada ao salvar o casal</span>

@@ -2,6 +2,8 @@
 import { computed } from 'vue'
 import { fileFromInputEvent } from '@/utils/pessoaFoto'
 import { useMediaPermissionGuard } from '@/composables/useMediaPermissionGuard'
+import { useFilePickerFallback } from '@/composables/useFilePickerFallback'
+import FilePickerFallback from '@/components/ecc/FilePickerFallback.vue'
 import {
   COMPROVANTE_ACCEPT_ARQUIVO,
   labelComprovanteSelecionado,
@@ -22,12 +24,29 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue'])
 
 const { guardCameraClick, guardGalleryClick } = useMediaPermissionGuard()
+const {
+  showFallback,
+  revealFallback,
+  onPrimaryPickerInteract,
+  onFilePicked,
+} = useFilePickerFallback({ source: 'comprovante' })
 
 const nomeArquivo = computed(() => props.modelValue?.name || '')
 const textoAjuda = computed(() => labelComprovanteSelecionado(props.modelValue))
 
+function onArquivoClick(event) {
+  guardGalleryClick(event)
+  onPrimaryPickerInteract()
+}
+
+function onCameraClick(event) {
+  guardCameraClick(event)
+  if (!event.defaultPrevented) onPrimaryPickerInteract()
+}
+
 function onPick(event) {
   const file = fileFromInputEvent(event)
+  if (file) onFilePicked()
   emit('update:modelValue', file)
 }
 
@@ -54,7 +73,7 @@ function limpar() {
           class="file-input-hit"
           :disabled="disabled"
           :data-testid="`${id}-input-arquivo`"
-          @click="guardGalleryClick"
+          @click="onArquivoClick"
           @change="onPick"
         >
       </span>
@@ -72,7 +91,7 @@ function limpar() {
           class="file-input-hit"
           :disabled="disabled"
           :data-testid="`${id}-input-camera`"
-          @click="guardCameraClick"
+          @click="onCameraClick"
           @change="onPick"
         >
       </span>
@@ -87,6 +106,15 @@ function limpar() {
         Remover
       </button>
     </div>
+    <FilePickerFallback
+      class="mt-1.5"
+      :accept="acceptArquivo"
+      :disabled="disabled"
+      :show="showFallback"
+      :test-id-prefix="`${id}-fallback`"
+      @reveal="revealFallback('manual')"
+      @change="onPick"
+    />
     <p
       class="mt-1.5 text-[12.5px] m-0"
       style="color: var(--color-muted)"
