@@ -133,9 +133,13 @@ class User extends Authenticatable
         return trim($slug, '-');
     }
 
-    public static function isSyntheticEmail(?string $email): bool
+    public static function isSyntheticEmail(mixed $email): bool
     {
-        if ($email === null || $email === '') {
+        // Decriptografia LGPD / casts podem devolver false em edge cases.
+        if ($email === null || $email === false || $email === '') {
+            return false;
+        }
+        if (! is_string($email)) {
             return false;
         }
 
@@ -158,7 +162,15 @@ class User extends Authenticatable
      */
     public function publicEmail(): ?string
     {
-        return static::isSyntheticEmail($this->email) ? null : $this->email;
+        $email = $this->email;
+        if ($email === null || $email === false || $email === '') {
+            return null;
+        }
+        if (! is_string($email)) {
+            return null;
+        }
+
+        return static::isSyntheticEmail($email) ? null : $email;
     }
 
     /**
