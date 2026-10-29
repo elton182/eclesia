@@ -16,6 +16,7 @@ import {
 } from '@/utils/eccFinanceiroDepositos'
 import LiderEquipeTour from '@/components/ecc/LiderEquipeTour.vue'
 import ComprovanteAnexoField from '@/components/ecc/ComprovanteAnexoField.vue'
+import AppVersionBadge from '@/components/base/AppVersionBadge.vue'
 import {
   beginLiderTour,
   liderEquipeTourSteps,
@@ -246,7 +247,8 @@ onMounted(async () => {
         style="color: var(--color-ink)"
         data-tour="titulo"
       >
-        {{ equipeAtual?.nome || 'Minha equipe' }}
+        <span>{{ equipeAtual?.nome || 'Minha equipe' }}</span>
+        <AppVersionBadge class="ml-2" />
       </h1>
       <p class="mt-2 text-[14px] leading-relaxed" style="color: var(--color-muted)">
         Revise e atualize os dados dos casais da sua equipe.

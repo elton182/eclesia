@@ -16,6 +16,7 @@ import {
 } from '@/utils/userRoles'
 import api from '@/services/api'
 import PwaInstallNavButton from '@/components/base/PwaInstallNavButton.vue'
+import UserMenuAppActions from '@/components/base/UserMenuAppActions.vue'
 import SimularLiderModal from '@/components/SimularLiderModal.vue'
 
 const router = useRouter()
@@ -266,6 +267,7 @@ function go(path) {
           class="absolute right-0 top-10 rounded-lg py-2 min-w-[160px] z-20 shadow-lg"
           style="background: var(--color-surface); border: 1px solid var(--color-line)"
         >
+          <UserMenuAppActions />
           <button
             type="button"
             class="w-full text-left px-4 py-2 text-[13px]"

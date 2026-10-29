@@ -45,38 +45,35 @@ function abrirArquivo() {
   <div data-testid="comprovante-anexo">
     <label class="fld" :for="`${id}-input-arquivo`">Comprovante</label>
     <div class="flex flex-wrap gap-2 items-center">
-      <!--
-        label + sr-only: evita display:none, que em mobile impede o seletor de arquivo.
-      -->
       <label
-        class="btn btn-ghost cursor-pointer"
+        class="btn btn-ghost cursor-pointer relative overflow-hidden"
         :class="{ 'opacity-50 pointer-events-none': disabled }"
         :data-testid="`${id}-arquivo`"
       >
-        Arquivo
+        <span>Arquivo</span>
         <input
           :id="`${id}-input-arquivo`"
           ref="arquivoInput"
           type="file"
           :accept="acceptArquivo"
-          class="sr-only"
+          class="file-input-hit"
           :disabled="disabled"
           :data-testid="`${id}-input-arquivo`"
           @change="onPick"
         >
       </label>
       <label
-        class="btn btn-ghost cursor-pointer"
+        class="btn btn-ghost cursor-pointer relative overflow-hidden"
         :class="{ 'opacity-50 pointer-events-none': disabled }"
         :data-testid="`${id}-camera`"
       >
-        Tirar foto
+        <span>Tirar foto</span>
         <input
           :id="`${id}-input-camera`"
           type="file"
           accept="image/*"
           capture="environment"
-          class="sr-only"
+          class="file-input-hit"
           :disabled="disabled"
           :data-testid="`${id}-input-camera`"
           @change="onPick"

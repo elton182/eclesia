@@ -22,6 +22,7 @@ import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import { faBars } from '@fortawesome/free-solid-svg-icons'
 import { library } from '@fortawesome/fontawesome-svg-core'
 import PwaInstallNavButton from '@/components/base/PwaInstallNavButton.vue'
+import UserMenuAppActions from '@/components/base/UserMenuAppActions.vue'
 import ViewAsLiderBanner from '@/components/ViewAsLiderBanner.vue'
 import LiderBottomNav from '@/components/ecc/LiderBottomNav.vue'
 import { asideNavClasses } from '@/utils/mobileNav'
@@ -589,6 +590,7 @@ onUnmounted(() => {
             style="background: var(--color-surface); border: 1px solid var(--color-line)"
             data-testid="module-user-menu-dropdown"
           >
+            <UserMenuAppActions />
             <button
               type="button"
               class="w-full text-left px-4 py-2 text-[13px]"
