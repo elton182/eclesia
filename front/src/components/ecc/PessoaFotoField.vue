@@ -21,8 +21,6 @@ const props = defineProps({
 const emit = defineEmits(['update:fotoUrl', 'update:pendingFile'])
 
 const busy = ref(false)
-const galleryInput = ref(null)
-const cameraInput = ref(null)
 const localPreview = ref(null)
 
 const previewUrl = computed(() => localPreview.value || props.fotoUrl || null)
@@ -122,27 +120,44 @@ async function removeFoto() {
       </div>
 
       <div v-if="editable" class="flex flex-col gap-1.5">
-        <div class="flex flex-wrap gap-2">
-          <button
-            type="button"
-            class="text-[12.5px] font-medium px-2.5 py-1.5 rounded-lg cursor-pointer"
+        <div class="flex flex-wrap gap-2 items-center">
+          <!--
+            label + sr-only (não display:none): em Android/iOS o picker não abre
+            com input.hidden acionado via button.click().
+          -->
+          <label
+            class="text-[12.5px] font-medium px-2.5 py-1.5 rounded-lg cursor-pointer inline-flex items-center"
             style="border: 1px solid rgba(42,20,24,0.18); background: #FFFDFA; color: #2A1418"
-            :disabled="busy"
+            :class="{ 'opacity-50 pointer-events-none': busy }"
             data-testid="pessoa-foto-gallery"
-            @click="galleryInput?.click()"
           >
             Galeria
-          </button>
-          <button
-            type="button"
-            class="text-[12.5px] font-medium px-2.5 py-1.5 rounded-lg cursor-pointer"
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              class="sr-only"
+              :disabled="busy"
+              data-testid="pessoa-foto-input-gallery"
+              @change="onFile"
+            >
+          </label>
+          <label
+            class="text-[12.5px] font-medium px-2.5 py-1.5 rounded-lg cursor-pointer inline-flex items-center"
             style="border: 1px solid rgba(42,20,24,0.18); background: #FFFDFA; color: #2A1418"
-            :disabled="busy"
+            :class="{ 'opacity-50 pointer-events-none': busy }"
             data-testid="pessoa-foto-camera"
-            @click="cameraInput?.click()"
           >
             Tirar foto
-          </button>
+            <input
+              type="file"
+              accept="image/*"
+              capture="user"
+              class="sr-only"
+              :disabled="busy"
+              data-testid="pessoa-foto-input-camera"
+              @change="onFile"
+            >
+          </label>
           <button
             v-if="previewUrl"
             type="button"
@@ -161,23 +176,5 @@ async function removeFoto() {
         </p>
       </div>
     </div>
-
-    <input
-      ref="galleryInput"
-      type="file"
-      accept="image/jpeg,image/png,image/webp"
-      class="hidden"
-      data-testid="pessoa-foto-input-gallery"
-      @change="onFile"
-    >
-    <input
-      ref="cameraInput"
-      type="file"
-      accept="image/*"
-      capture="user"
-      class="hidden"
-      data-testid="pessoa-foto-input-camera"
-      @change="onFile"
-    >
   </div>
 </template>

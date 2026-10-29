@@ -21,7 +21,6 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue'])
 
 const arquivoInput = ref(null)
-const cameraInput = ref(null)
 
 const nomeArquivo = computed(() => props.modelValue?.name || '')
 const textoAjuda = computed(() => labelComprovanteSelecionado(props.modelValue))
@@ -35,30 +34,54 @@ function limpar() {
   if (props.disabled) return
   emit('update:modelValue', null)
 }
+
+function abrirArquivo() {
+  if (props.disabled) return
+  arquivoInput.value?.click()
+}
 </script>
 
 <template>
   <div data-testid="comprovante-anexo">
-    <label class="fld" :for="id">Comprovante</label>
-    <div class="flex flex-wrap gap-2">
-      <button
-        type="button"
-        class="btn btn-ghost"
-        :disabled="disabled"
+    <label class="fld" :for="`${id}-input-arquivo`">Comprovante</label>
+    <div class="flex flex-wrap gap-2 items-center">
+      <!--
+        label + sr-only: evita display:none, que em mobile impede o seletor de arquivo.
+      -->
+      <label
+        class="btn btn-ghost cursor-pointer"
+        :class="{ 'opacity-50 pointer-events-none': disabled }"
         :data-testid="`${id}-arquivo`"
-        @click="arquivoInput?.click()"
       >
         Arquivo
-      </button>
-      <button
-        type="button"
-        class="btn btn-ghost"
-        :disabled="disabled"
+        <input
+          :id="`${id}-input-arquivo`"
+          ref="arquivoInput"
+          type="file"
+          :accept="acceptArquivo"
+          class="sr-only"
+          :disabled="disabled"
+          :data-testid="`${id}-input-arquivo`"
+          @change="onPick"
+        >
+      </label>
+      <label
+        class="btn btn-ghost cursor-pointer"
+        :class="{ 'opacity-50 pointer-events-none': disabled }"
         :data-testid="`${id}-camera`"
-        @click="cameraInput?.click()"
       >
         Tirar foto
-      </button>
+        <input
+          :id="`${id}-input-camera`"
+          type="file"
+          accept="image/*"
+          capture="environment"
+          class="sr-only"
+          :disabled="disabled"
+          :data-testid="`${id}-input-camera`"
+          @change="onPick"
+        >
+      </label>
       <button
         v-if="nomeArquivo"
         type="button"
@@ -88,27 +111,7 @@ function limpar() {
       :value="nomeArquivo"
       :required="required"
       :data-testid="`${id}-required`"
-      @focus="arquivoInput?.click()"
-    >
-
-    <input
-      ref="arquivoInput"
-      type="file"
-      :accept="acceptArquivo"
-      class="hidden"
-      :disabled="disabled"
-      :data-testid="`${id}-input-arquivo`"
-      @change="onPick"
-    >
-    <input
-      ref="cameraInput"
-      type="file"
-      accept="image/*"
-      capture="environment"
-      class="hidden"
-      :disabled="disabled"
-      :data-testid="`${id}-input-camera`"
-      @change="onPick"
+      @focus="abrirArquivo"
     >
   </div>
 </template>
