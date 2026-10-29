@@ -6,7 +6,9 @@ import { innovConfirm } from '@/plugins/dialog'
 import {
   deletePessoaFoto,
   fileFromInputEvent,
+  PESSOA_FOTO_ACCEPT,
   uploadPessoaFoto,
+  validatePessoaFotoFile,
 } from '@/utils/pessoaFoto'
 
 const props = defineProps({
@@ -47,6 +49,12 @@ watch(
 async function onFile(event) {
   const file = fileFromInputEvent(event)
   if (!file) return
+
+  const check = validatePessoaFotoFile(file)
+  if (!check.ok) {
+    innovToast('error', 'Foto', check.message)
+    return
+  }
 
   if (!props.pessoaId) {
     emit('update:pendingFile', file)
@@ -122,37 +130,38 @@ async function removeFoto() {
       <div v-if="editable" class="flex flex-col gap-1.5">
         <div class="flex flex-wrap gap-2 items-center">
           <!--
-            label + sr-only (não display:none): em Android/iOS o picker não abre
-            com input.hidden acionado via button.click().
+            Label relative + input.file-input-hit: o toque cai no próprio input
+            (não em button.click nem sr-only 1×1). accept=image/* evita picker
+            vazio em Androids com lista MIME restrita.
           -->
           <label
-            class="text-[12.5px] font-medium px-2.5 py-1.5 rounded-lg cursor-pointer inline-flex items-center"
+            class="relative overflow-hidden text-[12.5px] font-medium px-2.5 py-1.5 rounded-lg cursor-pointer inline-flex items-center"
             style="border: 1px solid rgba(42,20,24,0.18); background: #FFFDFA; color: #2A1418"
             :class="{ 'opacity-50 pointer-events-none': busy }"
             data-testid="pessoa-foto-gallery"
           >
-            Galeria
+            <span>Galeria</span>
             <input
               type="file"
-              accept="image/jpeg,image/png,image/webp"
-              class="sr-only"
+              :accept="PESSOA_FOTO_ACCEPT"
+              class="file-input-hit"
               :disabled="busy"
               data-testid="pessoa-foto-input-gallery"
               @change="onFile"
             >
           </label>
           <label
-            class="text-[12.5px] font-medium px-2.5 py-1.5 rounded-lg cursor-pointer inline-flex items-center"
+            class="relative overflow-hidden text-[12.5px] font-medium px-2.5 py-1.5 rounded-lg cursor-pointer inline-flex items-center"
             style="border: 1px solid rgba(42,20,24,0.18); background: #FFFDFA; color: #2A1418"
             :class="{ 'opacity-50 pointer-events-none': busy }"
             data-testid="pessoa-foto-camera"
           >
-            Tirar foto
+            <span>Tirar foto</span>
             <input
               type="file"
-              accept="image/*"
+              :accept="PESSOA_FOTO_ACCEPT"
               capture="user"
-              class="sr-only"
+              class="file-input-hit"
               :disabled="busy"
               data-testid="pessoa-foto-input-camera"
               @change="onFile"
