@@ -14,8 +14,10 @@ describe('useFilePickerFallback', () => {
 
   it('revela em standalone e após timeout sem change', () => {
     assert.match(src, /isRunningStandalone/)
-    assert.match(src, /reason = 'no_change'|revealFallback\('no_change'\)/)
+    assert.match(src, /revealFallback\('no_change'\)/)
     assert.match(src, /revealFallback\('standalone'\)/)
     assert.match(src, /fallback\.reveal/)
+    assert.match(src, /onSilentFail/)
+    assert.match(src, /fallback\.silent/)
   })
 })

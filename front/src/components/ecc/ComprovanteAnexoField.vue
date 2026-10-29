@@ -1,9 +1,16 @@
 <script setup>
 import { computed } from 'vue'
 import { fileFromInputEvent } from '@/utils/pessoaFoto'
+import { innovAlert } from '@/plugins/dialog'
+import { innovToast } from '@/plugins/toast'
 import { useMediaPermissionGuard } from '@/composables/useMediaPermissionGuard'
 import { useFilePickerFallback } from '@/composables/useFilePickerFallback'
 import FilePickerFallback from '@/components/ecc/FilePickerFallback.vue'
+import { trackDiagnostic } from '@/utils/clientDiagnostics'
+import {
+  CAMERA_PERMISSION_HELP,
+  GALLERY_PERMISSION_HELP,
+} from '@/utils/mediaPermissions'
 import {
   COMPROVANTE_ACCEPT_ARQUIVO,
   labelComprovanteSelecionado,
@@ -24,24 +31,43 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue'])
 
 const { guardCameraClick, guardGalleryClick } = useMediaPermissionGuard()
+let silentCameraAlertShown = false
 const {
   showFallback,
   revealFallback,
   onPrimaryPickerInteract,
   onFilePicked,
-} = useFilePickerFallback({ source: 'comprovante' })
+} = useFilePickerFallback({
+  source: 'comprovante',
+  onSilentFail: ({ kind }) => {
+    trackDiagnostic('comprovante.picker.silent_fail', { kind })
+    if (kind === 'camera') {
+      if (silentCameraAlertShown) return
+      silentCameraAlertShown = true
+      void innovAlert({
+        title: 'Câmera não abriu',
+        message:
+          'O aparelho não liberou a câmera. Use “Escolher arquivo” abaixo ou ative a câmera nos ajustes.\n\n'
+          + CAMERA_PERMISSION_HELP,
+        confirmText: 'Entendi',
+      })
+      return
+    }
+    innovToast('info', 'Arquivo', GALLERY_PERMISSION_HELP.split('\n')[0])
+  },
+})
 
 const nomeArquivo = computed(() => props.modelValue?.name || '')
 const textoAjuda = computed(() => labelComprovanteSelecionado(props.modelValue))
 
 function onArquivoClick(event) {
   guardGalleryClick(event)
-  onPrimaryPickerInteract()
+  onPrimaryPickerInteract('gallery')
 }
 
 function onCameraClick(event) {
   guardCameraClick(event)
-  if (!event.defaultPrevented) onPrimaryPickerInteract()
+  if (!event.defaultPrevented) onPrimaryPickerInteract('camera')
 }
 
 function onPick(event) {
