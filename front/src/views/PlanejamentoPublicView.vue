@@ -4,11 +4,16 @@ import { useRoute } from 'vue-router'
 import { useTenantStore } from '@/stores/tenant'
 import { MES_NOMES, formatHoraCalendario, gradeMesCalendario } from '@/utils/calendario'
 import {
+  buildPublicEventoPayload,
+  buildPublicEventosParams,
   canEditarEventoPlanejamentoPublico,
   groupEventosByDay,
+  isModoGenerico,
   labelEventoPlanejamentoPreview,
   labelStatusPlanejamento,
   labelStatusSolicitacao,
+  normalizePastoralNomeInput,
+  podeCarregarEventosPublicos,
   styleStatusSolicitacao,
 } from '@/utils/planejamento'
 import { innovToast } from '@/plugins/toast'
@@ -51,6 +56,8 @@ const mesView = ref(new Date().getMonth() + 1)
 const diaSelecionado = ref('')
 const showDayModal = ref(false)
 const editingEvento = ref(null)
+const pastoralNome = ref('')
+const pastoralNomeConfirmado = ref('')
 
 const emptyForm = () => ({
   titulo: '',
@@ -72,7 +79,19 @@ const headers = computed(() => ({
   'X-Tenant': tenant.value || tenantStore.slug || '',
 }))
 
-const podePropor = computed(() => meta.value?.status === 'coleta')
+const modoGenerico = computed(() => isModoGenerico(meta.value))
+const pastoralPronta = computed(() =>
+  podeCarregarEventosPublicos(meta.value, pastoralNomeConfirmado.value),
+)
+const tituloPastoral = computed(() => {
+  if (modoGenerico.value) {
+    return normalizePastoralNomeInput(pastoralNomeConfirmado.value) || 'Informe a pastoral'
+  }
+  return meta.value?.pastoral_nome || 'Pastoral'
+})
+const podePropor = computed(
+  () => meta.value?.status === 'coleta' && pastoralPronta.value,
+)
 const podeMutarForm = computed(() => {
   if (editingEvento.value) {
     return canEditarEventoPlanejamentoPublico(meta.value?.status, editingEvento.value)
@@ -85,15 +104,19 @@ const submitLabel = computed(() => {
   return editingEvento.value ? 'Salvar alterações' : 'Enviar proposta'
 })
 
-const dispParams = computed(() =>
-  disponibilidadeParams(
+const dispParams = computed(() => {
+  const base = disponibilidadeParams(
     {
       ...form.value,
       data_inicio: brToIso(form.value.data_inicio) || '',
     },
     editingEvento.value?.id,
-  ),
-)
+  )
+  if (!base) return null
+  if (!modoGenerico.value) return base
+  const nome = normalizePastoralNomeInput(pastoralNomeConfirmado.value)
+  return nome ? { ...base, pastoral_nome: nome } : base
+})
 const temEspacos = computed(() => disponibilidade.value.some((d) => d.tipo === 'espaco'))
 const todayIso = new Date().toISOString().slice(0, 10)
 
@@ -136,6 +159,10 @@ function resetFormForDay(iso) {
 
 function openDay(iso) {
   if (!iso) return
+  if (modoGenerico.value && !pastoralPronta.value) {
+    innovToast('error', 'Pastoral', 'Informe o nome da pastoral para continuar')
+    return
+  }
   diaSelecionado.value = iso
   resetFormForDay(iso)
   showDayModal.value = true
@@ -160,6 +187,17 @@ function openEdit(ev) {
 
 function cancelEdit() {
   resetFormForDay(diaSelecionado.value)
+}
+
+function confirmarPastoralNome() {
+  const nome = normalizePastoralNomeInput(pastoralNome.value)
+  if (nome.length < 2) {
+    innovToast('error', 'Pastoral', 'Informe o nome da pastoral (mín. 2 caracteres)')
+    return
+  }
+  pastoralNome.value = nome
+  pastoralNomeConfirmado.value = nome
+  carregarEventos()
 }
 
 async function carregarDisponibilidade() {
@@ -193,6 +231,24 @@ function closeDayModal() {
   editingEvento.value = null
 }
 
+async function carregarEventos() {
+  if (!meta.value || !podeCarregarEventosPublicos(meta.value, pastoralNomeConfirmado.value)) {
+    eventos.value = []
+    return
+  }
+  try {
+    const params = buildPublicEventosParams(meta.value, pastoralNomeConfirmado.value)
+    eventos.value = await listEventosPublicos(token.value, headers.value, params)
+  } catch (err) {
+    eventos.value = []
+    const msg =
+      err.response?.data?.errors?.pastoral_nome?.[0] ||
+      err.response?.data?.message ||
+      'Não foi possível carregar os eventos'
+    innovToast('error', 'Planejamento', msg)
+  }
+}
+
 async function load() {
   loading.value = true
   error.value = ''
@@ -200,14 +256,17 @@ async function load() {
     tenantStore.select({ slug: tenant.value, name: tenantStore.name || '' })
   }
   try {
-    const [m, e] = await Promise.all([
-      getPublicoMeta(token.value, headers.value),
-      listEventosPublicos(token.value, headers.value),
-    ])
-    meta.value = m
-    eventos.value = e
+    meta.value = await getPublicoMeta(token.value, headers.value)
     if (meta.value?.ano && meta.value.ano !== new Date().getFullYear()) {
       mesView.value = 1
+    }
+    if (!isModoGenerico(meta.value)) {
+      pastoralNomeConfirmado.value = meta.value?.pastoral_nome || ''
+      await carregarEventos()
+    } else if (pastoralPronta.value) {
+      await carregarEventos()
+    } else {
+      eventos.value = []
     }
   } catch (err) {
     error.value =
@@ -221,18 +280,26 @@ async function load() {
 
 function buildPayload() {
   const dataInicio = brToIso(form.value.data_inicio)
-  return {
-    titulo: form.value.titulo.trim(),
-    data_inicio: dataInicio,
-    hora_inicio: form.value.hora_inicio || null,
-    hora_fim: form.value.hora_fim || null,
-    local_texto: form.value.local_texto.trim() || null,
-    observacoes: form.value.observacoes || null,
-    recursos: buildRecursosPayload(selecaoRecursos.value),
-  }
+  return buildPublicEventoPayload(
+    {
+      titulo: form.value.titulo.trim(),
+      data_inicio: dataInicio,
+      hora_inicio: form.value.hora_inicio || null,
+      hora_fim: form.value.hora_fim || null,
+      local_texto: form.value.local_texto.trim() || null,
+      observacoes: form.value.observacoes || null,
+      recursos: buildRecursosPayload(selecaoRecursos.value),
+    },
+    meta.value,
+    pastoralNomeConfirmado.value,
+  )
 }
 
 async function salvar() {
+  if (modoGenerico.value && !pastoralPronta.value) {
+    innovToast('error', 'Pastoral', 'Informe o nome da pastoral para continuar')
+    return
+  }
   if (!form.value.local_texto.trim() && !selecaoTemEspaco(selecaoRecursos.value)) {
     innovToast('error', 'Planejamento', 'Escolha um espaço ou informe o local')
     return
@@ -253,7 +320,7 @@ async function salvar() {
       innovToast('success', 'Planejamento', 'Proposta enviada')
     }
     const dia = brToIso(form.value.data_inicio) || diaSelecionado.value
-    await load()
+    await carregarEventos()
     diaSelecionado.value = dia
     resetFormForDay(dia)
   } catch (err) {
@@ -266,6 +333,7 @@ async function salvar() {
     const msg =
       err.response?.data?.message ||
       err.response?.data?.errors?.status?.[0] ||
+      err.response?.data?.errors?.pastoral_nome?.[0] ||
       'Não foi possível salvar'
     innovToast('error', 'Planejamento', msg)
   } finally {
@@ -283,12 +351,13 @@ async function remover(ev) {
   })
   if (!ok) return
   try {
-    await deleteEventoPublico(token.value, ev.id, headers.value)
+    const params = buildPublicEventosParams(meta.value, pastoralNomeConfirmado.value)
+    await deleteEventoPublico(token.value, ev.id, headers.value, params)
     innovToast('success', 'Planejamento', 'Proposta removida')
     if (editingEvento.value?.id === ev.id) {
       resetFormForDay(diaSelecionado.value)
     }
-    await load()
+    await carregarEventos()
     if (showDayModal.value && diaSelecionado.value) {
       const still = (byDay.value.get(diaSelecionado.value) || []).length
       if (!still && !podePropor.value) closeDayModal()
@@ -310,10 +379,11 @@ onMounted(load)
     <div class="max-w-4xl mx-auto">
       <p class="page-eyebrow">Planejamento Anual</p>
       <h1 class="font-serif text-[28px] font-normal mb-1" style="color: var(--color-ink)">
-        {{ meta?.pastoral_nome || 'Pastoral' }}
+        {{ tituloPastoral }}
       </h1>
       <p v-if="meta" class="text-sm mb-6" style="color: var(--color-muted)">
         Ano {{ meta.ano }} · {{ labelStatusPlanejamento(meta.status) }}
+        <template v-if="modoGenerico"> · Link genérico</template>
       </p>
 
       <p v-if="loading" class="text-sm" style="color: var(--color-muted)">Carregando…</p>
@@ -322,8 +392,45 @@ onMounted(load)
       </p>
 
       <template v-else>
+        <section
+          v-if="modoGenerico"
+          class="card p-4 md:p-5 mb-6"
+          data-testid="planejamento-publico-pastoral-gate"
+        >
+          <label
+            class="block text-[12px] font-medium mb-2"
+            style="color: var(--color-muted)"
+            for="planejamento-publico-pastoral-nome"
+          >
+            Nome da Pastoral
+          </label>
+          <div class="flex flex-col sm:flex-row gap-2">
+            <input
+              id="planejamento-publico-pastoral-nome"
+              v-model="pastoralNome"
+              type="text"
+              class="input flex-1"
+              maxlength="120"
+              placeholder="Ex.: Pastoral da Liturgia"
+              data-testid="planejamento-publico-pastoral-nome"
+              @keydown.enter.prevent="confirmarPastoralNome"
+            >
+            <button
+              type="button"
+              class="btn btn-accent"
+              data-testid="planejamento-publico-confirmar-pastoral"
+              @click="confirmarPastoralNome"
+            >
+              Continuar
+            </button>
+          </div>
+          <p class="text-[12px] mt-2" style="color: var(--color-muted)">
+            Informe o nome da pastoral para ver e propor eventos. Se ainda não existir, será criada ao enviar a primeira proposta.
+          </p>
+        </section>
+
         <p
-          v-if="!podePropor"
+          v-if="meta.status !== 'coleta'"
           class="card p-4 mb-4 text-sm"
           style="color: var(--color-muted)"
         >
@@ -331,6 +438,14 @@ onMounted(load)
           <template v-if="meta?.status === 'revisao'">
             e ajustar as que pedirem correção
           </template>.
+        </p>
+        <p
+          v-else-if="modoGenerico && !pastoralPronta"
+          class="card p-4 mb-4 text-sm"
+          style="color: var(--color-muted)"
+          data-testid="planejamento-publico-aguardando-pastoral"
+        >
+          Informe o nome da pastoral acima para liberar o calendário.
         </p>
 
         <section class="card p-4 md:p-5 mb-6" data-testid="planejamento-publico-calendario">

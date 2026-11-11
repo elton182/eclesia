@@ -6317,6 +6317,69 @@ paths:
         '401': {description: Não autenticado}
         '403': {description: Sem permissão}
         '422': {description: Parâmetros inválidos}
+  /planejamento/anuais/{id}/token-generico:
+    get:
+      summary: Obter link público genérico do ano (SPEC-032)
+      description: |
+        Somente `planejamento.gerir`. Um token por ano; se ativo, devolve o plain cifrado.
+      security: [{bearerAuth: [], tenantHeader: [], igrejaHeader: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      responses:
+        '200':
+          description: OK (data null se ainda não gerado)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    oneOf:
+                      - type: 'null'
+                      - type: object
+                        properties:
+                          id: {type: string}
+                          planejamento_anual_id: {type: string}
+                          token: {type: string, nullable: true}
+                          token_preview: {type: string}
+                          expires_at: {type: string, format: date-time, nullable: true}
+                          revogado_em: {type: string, format: date-time, nullable: true}
+                          ativo: {type: boolean}
+        '401': {description: Não autenticado}
+        '403': {description: Sem permissão}
+    post:
+      summary: Gerar ou rotacionar link público genérico do ano
+      security: [{bearerAuth: [], tenantHeader: [], igrejaHeader: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      id: {type: string}
+                      planejamento_anual_id: {type: string}
+                      token: {type: string}
+                      token_preview: {type: string}
+                      ativo: {type: boolean}
+                  token: {type: string, description: Token em claro (atalho)}
+        '401': {description: Não autenticado}
+        '403': {description: Sem permissão}
+    delete:
+      summary: Revogar link genérico do ano
+      security: [{bearerAuth: [], tenantHeader: [], igrejaHeader: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      responses:
+        '204': {description: No Content}
+        '401': {description: Não autenticado}
+        '403': {description: Sem permissão}
   /planejamento/anuais/{id}/pastorais/tokens:
     get:
       summary: Listar links públicos das pastorais no ano
@@ -6383,19 +6446,42 @@ paths:
         '204': {description: No Content}
   /public/planejamento/{token}:
     get:
-      summary: Dados públicos do link da pastoral
+      summary: Dados públicos do link (pastoral ou genérico — SPEC-032)
       parameters:
         - {name: token, in: path, required: true, schema: {type: string}}
       responses:
-        '200': {description: OK}
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    required: [ano, status, modo]
+                    properties:
+                      ano: {type: integer}
+                      status: {type: string}
+                      modo:
+                        type: string
+                        enum: [pastoral, generico]
+                      pastoral_id: {type: string, nullable: true}
+                      pastoral_nome: {type: string, nullable: true}
         '422': {description: Token inválido}
   /public/planejamento/{token}/eventos:
     get:
-      summary: Listar eventos da pastoral do token (sem outras pastorais)
+      summary: Listar eventos (pastoral do token, ou genérico filtrado por pastoral_nome)
       parameters:
         - {name: token, in: path, required: true, schema: {type: string}}
+        - name: pastoral_nome
+          in: query
+          required: false
+          description: Obrigatório quando o token é genérico (SPEC-032).
+          schema: {type: string, minLength: 2, maxLength: 120}
       responses:
         '200': {description: OK}
+        '422': {description: Token inválido ou pastoral_nome ausente no modo genérico}
     post:
       summary: Criar proposta via link (ano em coleta)
       parameters:
@@ -6407,7 +6493,9 @@ paths:
             schema:
               type: object
               required: [titulo, data_inicio]
-              description: Exige `local_texto` ou ao menos um espaço em `recursos`.
+              description: |
+                Exige `local_texto` ou ao menos um espaço em `recursos`.
+                Em modo genérico, `pastoral_nome` é obrigatório; a pastoral é criada se não existir.
               properties:
                 titulo: {type: string}
                 data_inicio: {type: string, format: date}
@@ -6416,12 +6504,31 @@ paths:
                 hora_fim: {type: string, nullable: true}
                 local_texto: {type: string, nullable: true}
                 observacoes: {type: string, nullable: true}
+                pastoral_nome:
+                  type: string
+                  minLength: 2
+                  maxLength: 120
+                  description: Obrigatório no link genérico (SPEC-032).
                 recursos:
                   type: array
                   items:
                     $ref: '#/components/schemas/PlanejamentoRecursoInput'
       responses:
-        '201': {description: Created}
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                  pastoral_criada:
+                    type: boolean
+                    description: True se a pastoral foi criada neste POST (só modo genérico).
+                  conflitos:
+                    type: array
+                    items: {type: object}
         '422':
           description: Coleta fechada, validação ou capacidade excedida (sem dados de outras pastorais)
           content:
@@ -6483,7 +6590,7 @@ paths:
         '422': {description: Ano fechado / sem permissão de editar neste status}
   /public/planejamento/{token}/disponibilidade:
     get:
-      summary: Disponibilidade de espaços/recursos no intervalo (link da pastoral)
+      summary: Disponibilidade de espaços/recursos no intervalo (link pastoral ou genérico)
       parameters:
         - {name: token, in: path, required: true, schema: {type: string}}
         - {name: data_inicio, in: query, required: true, schema: {type: string, format: date}}

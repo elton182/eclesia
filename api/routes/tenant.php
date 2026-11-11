@@ -333,6 +333,9 @@ Route::middleware([
     Route::get('planejamento/anuais/{id}/pastorais/tokens', [PlanejamentoController::class, 'indexPastoralTokens']);
     Route::post('planejamento/anuais/{id}/pastorais/{pastoralId}/token', [PlanejamentoController::class, 'storePastoralToken']);
     Route::delete('planejamento/anuais/{id}/pastorais/{pastoralId}/token', [PlanejamentoController::class, 'destroyPastoralToken']);
+    Route::get('planejamento/anuais/{id}/token-generico', [PlanejamentoController::class, 'showAnualToken']);
+    Route::post('planejamento/anuais/{id}/token-generico', [PlanejamentoController::class, 'storeAnualToken']);
+    Route::delete('planejamento/anuais/{id}/token-generico', [PlanejamentoController::class, 'destroyAnualToken']);
 
     Route::post('pessoas/{id}/foto', [PessoaFotoController::class, 'store']);
     Route::delete('pessoas/{id}/foto', [PessoaFotoController::class, 'destroy']);

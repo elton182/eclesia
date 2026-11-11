@@ -114,7 +114,30 @@ export async function revokePastoralToken(anualId, pastoralId) {
 }
 
 /**
- * Link público (sem login) — SPEC-018.
+ * @returns {Promise<{ token: string, data: Record<string, unknown>|null }>}
+ */
+export async function createAnualToken(anualId) {
+  const { data } = await api.post(`/planejamento/anuais/${anualId}/token-generico`)
+  return {
+    token: data.token || data.data?.token || '',
+    data: unwrapItem(data),
+  }
+}
+
+/**
+ * @returns {Promise<Record<string, unknown>|null>}
+ */
+export async function getAnualToken(anualId) {
+  const { data } = await api.get(`/planejamento/anuais/${anualId}/token-generico`)
+  return unwrapItem(data)
+}
+
+export async function revokeAnualToken(anualId) {
+  await api.delete(`/planejamento/anuais/${anualId}/token-generico`)
+}
+
+/**
+ * Link público (sem login) — SPEC-018 / SPEC-032.
  * @param {Record<string, string>} headers
  */
 export async function getPublicoMeta(token, headers) {
@@ -122,9 +145,12 @@ export async function getPublicoMeta(token, headers) {
   return unwrapItem(data)
 }
 
-/** @param {Record<string, string>} headers */
-export async function listEventosPublicos(token, headers) {
-  const { data } = await api.get(`/public/planejamento/${token}/eventos`, { headers })
+/**
+ * @param {Record<string, string>} headers
+ * @param {Record<string, string>} [params]
+ */
+export async function listEventosPublicos(token, headers, params = {}) {
+  const { data } = await api.get(`/public/planejamento/${token}/eventos`, { headers, params })
   return unwrapList(data)
 }
 
@@ -144,7 +170,10 @@ export async function updateEventoPublico(token, eventoId, payload, headers) {
   return withConflitos(data)
 }
 
-/** @param {Record<string, string>} headers */
-export async function deleteEventoPublico(token, eventoId, headers) {
-  await api.delete(`/public/planejamento/${token}/eventos/${eventoId}`, { headers })
+/**
+ * @param {Record<string, string>} headers
+ * @param {Record<string, string>} [params]
+ */
+export async function deleteEventoPublico(token, eventoId, headers, params = {}) {
+  await api.delete(`/public/planejamento/${token}/eventos/${eventoId}`, { headers, params })
 }

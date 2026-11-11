@@ -33,6 +33,12 @@ import {
   minutosDoDia,
   layoutEventoGradeSemana,
   particionarEventosGradeSemana,
+  isModoGenerico,
+  normalizePastoralNomeInput,
+  podeCarregarEventosPublicos,
+  buildPublicEventosParams,
+  buildPublicEventoPayload,
+  plainTokenFromAnualToken,
 } from './planejamento.js'
 
 describe('planejamento', () => {
@@ -260,5 +266,28 @@ describe('planejamento', () => {
     ])
     assert.equal(parts.comHora.length, 1)
     assert.equal(parts.semHora.length, 1)
+  })
+
+  it('link genérico: gate e payloads (SPEC-032)', () => {
+    assert.equal(isModoGenerico({ modo: 'generico' }), true)
+    assert.equal(isModoGenerico({ modo: 'pastoral' }), false)
+    assert.equal(normalizePastoralNomeInput('  Liturgia  '), 'Liturgia')
+    assert.equal(podeCarregarEventosPublicos({ modo: 'pastoral' }, ''), true)
+    assert.equal(podeCarregarEventosPublicos({ modo: 'generico' }, 'A'), false)
+    assert.equal(podeCarregarEventosPublicos({ modo: 'generico' }, 'Liturgia'), true)
+    assert.deepEqual(buildPublicEventosParams({ modo: 'pastoral' }, 'X'), {})
+    assert.deepEqual(buildPublicEventosParams({ modo: 'generico' }, '  Liturgia '), {
+      pastoral_nome: 'Liturgia',
+    })
+    assert.deepEqual(
+      buildPublicEventoPayload({ titulo: 'T' }, { modo: 'generico' }, ' Nova '),
+      { titulo: 'T', pastoral_nome: 'Nova' },
+    )
+    assert.deepEqual(buildPublicEventoPayload({ titulo: 'T' }, { modo: 'pastoral' }, 'X'), {
+      titulo: 'T',
+    })
+    assert.equal(plainTokenFromAnualToken({ token: 'abc', ativo: true }), 'abc')
+    assert.equal(plainTokenFromAnualToken({ token: 'abc', ativo: false }), '')
+    assert.equal(plainTokenFromAnualToken(null), '')
   })
 })

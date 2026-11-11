@@ -565,3 +565,69 @@ export function particionarEventosGradeSemana(eventos) {
   }
   return { comHora, semHora }
 }
+
+/**
+ * Link público genérico (SPEC-032)?
+ * @param {{ modo?: string }|null|undefined} meta
+ * @returns {boolean}
+ */
+export function isModoGenerico(meta) {
+  return meta?.modo === 'generico'
+}
+
+/**
+ * Nome da pastoral pronto para envio (trim; min 2 chars).
+ * @param {string|null|undefined} nome
+ * @returns {string}
+ */
+export function normalizePastoralNomeInput(nome) {
+  return String(nome || '').trim()
+}
+
+/**
+ * Gate do calendário genérico: precisa de nome válido.
+ * @param {{ modo?: string }|null|undefined} meta
+ * @param {string|null|undefined} pastoralNome
+ * @returns {boolean}
+ */
+export function podeCarregarEventosPublicos(meta, pastoralNome) {
+  if (!isModoGenerico(meta)) return true
+  return normalizePastoralNomeInput(pastoralNome).length >= 2
+}
+
+/**
+ * Query params para GET .../eventos no link público.
+ * @param {{ modo?: string }|null|undefined} meta
+ * @param {string|null|undefined} pastoralNome
+ * @returns {Record<string, string>}
+ */
+export function buildPublicEventosParams(meta, pastoralNome) {
+  if (!isModoGenerico(meta)) return {}
+  const nome = normalizePastoralNomeInput(pastoralNome)
+  return nome ? { pastoral_nome: nome } : {}
+}
+
+/**
+ * Body de POST/PATCH .../eventos no link público (injeta pastoral_nome no modo genérico).
+ * @param {Record<string, unknown>} payload
+ * @param {{ modo?: string }|null|undefined} meta
+ * @param {string|null|undefined} pastoralNome
+ * @returns {Record<string, unknown>}
+ */
+export function buildPublicEventoPayload(payload, meta, pastoralNome) {
+  const body = { ...(payload || {}) }
+  if (isModoGenerico(meta)) {
+    body.pastoral_nome = normalizePastoralNomeInput(pastoralNome)
+  }
+  return body
+}
+
+/**
+ * Extrai token em claro do GET/POST token-generico.
+ * @param {Record<string, unknown>|null|undefined} data
+ * @returns {string}
+ */
+export function plainTokenFromAnualToken(data) {
+  if (!data || data.ativo === false) return ''
+  return typeof data.token === 'string' ? data.token : ''
+}
