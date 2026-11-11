@@ -481,7 +481,8 @@ class PlanejamentoAnualTest extends TestCase
             ->getJson('/api/v1/public/planejamento/'.$plain)
             ->assertOk()
             ->assertJsonPath('data.pastoral_id', $pastoralId)
-            ->assertJsonPath('data.status', 'coleta');
+            ->assertJsonPath('data.status', 'coleta')
+            ->assertJsonPath('data.modo', 'pastoral');
 
         $this->withHeader('X-Tenant', 'demo-planejamento')
             ->postJson('/api/v1/public/planejamento/'.$plain.'/eventos', [
@@ -676,5 +677,143 @@ class PlanejamentoAnualTest extends TestCase
                 'local_texto' => 'Salão',
             ])
             ->assertStatus(422);
+    }
+
+    public function test_token_generico_gestor_gera_consulta_revoga(): void
+    {
+        $base = $this->seedBase();
+        $anualId = $base['anual']['id'];
+
+        Sanctum::actingAs($this->admin);
+
+        $this->tenantJson('GET', '/api/v1/planejamento/anuais/'.$anualId.'/token-generico')
+            ->assertOk()
+            ->assertJsonPath('data', null);
+
+        $created = $this->tenantJson('POST', '/api/v1/planejamento/anuais/'.$anualId.'/token-generico')
+            ->assertCreated()
+            ->json();
+
+        $plain = $created['token'] ?? $created['data']['token'] ?? null;
+        $this->assertNotEmpty($plain);
+        $this->assertTrue($created['data']['ativo'] ?? false);
+
+        $this->tenantJson('GET', '/api/v1/planejamento/anuais/'.$anualId.'/token-generico')
+            ->assertOk()
+            ->assertJsonPath('data.token', $plain)
+            ->assertJsonPath('data.ativo', true);
+
+        $this->tenantJson('DELETE', '/api/v1/planejamento/anuais/'.$anualId.'/token-generico')
+            ->assertNoContent();
+
+        $this->tenantJson('GET', '/api/v1/planejamento/anuais/'.$anualId.'/token-generico')
+            ->assertOk()
+            ->assertJsonPath('data.ativo', false)
+            ->assertJsonPath('data.token', null);
+
+        $this->actingAsRole('coordenador-pastoral', 'coord-gen@test.local');
+        $this->tenantJson('POST', '/api/v1/planejamento/anuais/'.$anualId.'/token-generico')
+            ->assertForbidden();
+    }
+
+    public function test_link_publico_generico_coleta_e_cria_pastoral(): void
+    {
+        $base = $this->seedBase();
+        $anualId = $base['anual']['id'];
+        $pastoralAId = $base['pastoral']['id'];
+
+        Sanctum::actingAs($this->admin);
+        $this->tenantJson('POST', '/api/v1/planejamento/anuais/'.$anualId.'/status', [
+            'status' => 'coleta',
+        ])->assertOk();
+
+        $this->tenantJson('POST', '/api/v1/planejamento/anuais/'.$anualId.'/eventos', [
+            'pastoral_id' => $pastoralAId,
+            'titulo' => 'Só da A',
+            'data_inicio' => '2026-05-01',
+            'local_texto' => 'Salão',
+        ])->assertCreated();
+
+        $plain = $this->tenantJson('POST', '/api/v1/planejamento/anuais/'.$anualId.'/token-generico')
+            ->assertCreated()
+            ->json('token');
+        $this->assertNotEmpty($plain);
+
+        Auth::forgetGuards();
+        $this->app['auth']->forgetGuards();
+
+        $this->withHeader('X-Tenant', 'demo-planejamento')
+            ->getJson('/api/v1/public/planejamento/'.$plain)
+            ->assertOk()
+            ->assertJsonPath('data.modo', 'generico')
+            ->assertJsonPath('data.status', 'coleta')
+            ->assertJsonPath('data.pastoral_id', null);
+
+        $this->withHeader('X-Tenant', 'demo-planejamento')
+            ->getJson('/api/v1/public/planejamento/'.$plain.'/eventos')
+            ->assertStatus(422);
+
+        $listaVazia = $this->withHeader('X-Tenant', 'demo-planejamento')
+            ->getJson('/api/v1/public/planejamento/'.$plain.'/eventos?pastoral_nome='.urlencode('Nova Pastoral'))
+            ->assertOk()
+            ->json('data');
+        $this->assertCount(0, $listaVazia);
+
+        tenancy()->initialize($this->tenant);
+        $countBefore = \App\Models\Pastoral::query()->count();
+        tenancy()->end();
+
+        $created = $this->withHeader('X-Tenant', 'demo-planejamento')
+            ->postJson('/api/v1/public/planejamento/'.$plain.'/eventos', [
+                'pastoral_nome' => 'Nova Pastoral',
+                'titulo' => 'Via genérico',
+                'data_inicio' => '2026-05-10',
+                'hora_inicio' => '20:00',
+                'local_texto' => 'Capela',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.titulo', 'Via genérico')
+            ->assertJsonPath('data.status_solicitacao', 'proposta')
+            ->assertJsonPath('pastoral_criada', true)
+            ->json();
+
+        $novaPastoralId = $created['data']['pastoral_id'] ?? null;
+        $this->assertNotEmpty($novaPastoralId);
+        $this->assertNotSame($pastoralAId, $novaPastoralId);
+
+        tenancy()->initialize($this->tenant);
+        $this->assertSame($countBefore + 1, \App\Models\Pastoral::query()->count());
+        $nova = \App\Models\Pastoral::query()->findOrFail($novaPastoralId);
+        $this->assertSame('Nova Pastoral', $nova->nome);
+        $this->assertTrue($nova->ativa);
+        $this->assertFalse($nova->publicado_no_site);
+        tenancy()->end();
+
+        $this->withHeader('X-Tenant', 'demo-planejamento')
+            ->postJson('/api/v1/public/planejamento/'.$plain.'/eventos', [
+                'pastoral_nome' => 'nova pastoral',
+                'titulo' => 'Segundo evento',
+                'data_inicio' => '2026-05-11',
+                'local_texto' => 'Capela',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('pastoral_criada', false)
+            ->assertJsonPath('data.pastoral_id', $novaPastoralId);
+
+        $lista = $this->withHeader('X-Tenant', 'demo-planejamento')
+            ->getJson('/api/v1/public/planejamento/'.$plain.'/eventos?pastoral_nome='.urlencode('NOVA PASTORAL'))
+            ->assertOk()
+            ->json('data');
+        $this->assertCount(2, $lista);
+        foreach ($lista as $ev) {
+            $this->assertSame($novaPastoralId, $ev['pastoral_id']);
+        }
+
+        $listaA = $this->withHeader('X-Tenant', 'demo-planejamento')
+            ->getJson('/api/v1/public/planejamento/'.$plain.'/eventos?pastoral_nome='.urlencode('Pastoral A'))
+            ->assertOk()
+            ->json('data');
+        $this->assertCount(1, $listaA);
+        $this->assertSame('Só da A', $listaA[0]['titulo']);
     }
 }

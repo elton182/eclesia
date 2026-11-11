@@ -5,13 +5,16 @@ import api from '@/services/api'
 import { createPastoral, listPastorais } from '@/services/pastorais'
 import {
   changeAnualStatus,
+  createAnualToken,
   createEvento,
   createPastoralToken,
   deleteEvento,
   downloadAnualPdf,
   getAnual,
+  getAnualToken,
   listEventos,
   listPastoralTokens,
+  revokeAnualToken,
   revokePastoralToken,
   updateEvento,
 } from '@/services/planejamento'
@@ -50,6 +53,7 @@ import {
   mapPastoralLinks,
   particionarEventosGradeSemana,
   pastoralIdsDoUsuario,
+  plainTokenFromAnualToken,
   proximosStatusPlanejamento,
   styleStatusSolicitacao,
   togglePastoralVisivel,
@@ -108,7 +112,10 @@ const showForm = ref(false)
 const conflitoAlert = ref('')
 /** @type {import('vue').Ref<Record<string, string>>} */
 const pastoralLinks = ref({})
+/** @type {import('vue').Ref<string>} */
+const genericoLink = ref('')
 const tokenBusy = ref('')
+const genericoBusy = ref(false)
 const recursosCatalogo = ref([])
 const filtroEspaco = ref('')
 const selecaoRecursos = ref(emptySelecaoRecursos())
@@ -488,6 +495,62 @@ async function carregarLinksPastorais() {
   }
 }
 
+async function carregarLinkGenerico() {
+  if (!canGerir.value || !anual.value) return
+  try {
+    genericoLink.value = plainTokenFromAnualToken(await getAnualToken(anual.value.id))
+  } catch {
+    genericoLink.value = ''
+  }
+}
+
+async function gerarLinkGenerico() {
+  if (!canGerir.value || !anual.value) return
+  genericoBusy.value = true
+  try {
+    const { token } = await createAnualToken(anual.value.id)
+    genericoLink.value = token
+    const url = publicLinkFor(token)
+    try {
+      await navigator.clipboard.writeText(url)
+      innovToast('success', 'Link genérico', 'Gerado e copiado')
+    } catch {
+      innovToast('success', 'Link genérico', 'Link gerado — copie abaixo')
+    }
+  } catch (e) {
+    innovToast('error', 'Link genérico', e.response?.data?.message || 'Falha ao gerar link')
+  } finally {
+    genericoBusy.value = false
+  }
+}
+
+async function copiarLinkGenerico() {
+  const url = publicLinkFor(genericoLink.value)
+  if (!url) return
+  await navigator.clipboard.writeText(url)
+  innovToast('success', 'Link genérico', 'Copiado')
+}
+
+async function revogarLinkGenerico() {
+  if (!canGerir.value || !anual.value) return
+  const ok = await innovConfirm({
+    title: 'Revogar link genérico?',
+    message: 'Quem tiver o link atual não poderá mais usá-lo.',
+    confirmText: 'Revogar',
+  })
+  if (!ok) return
+  genericoBusy.value = true
+  try {
+    await revokeAnualToken(anual.value.id)
+    genericoLink.value = ''
+    innovToast('success', 'Link genérico', 'Link revogado')
+  } catch (e) {
+    innovToast('error', 'Link genérico', e.response?.data?.message || 'Falha ao revogar')
+  } finally {
+    genericoBusy.value = false
+  }
+}
+
 async function revogarLinkPastoral(pastoral) {
   if (!canGerir.value || !anual.value) return
   const ok = await innovConfirm({
@@ -582,7 +645,9 @@ async function load({ silent = false } = {}) {
     if (a.eventos && Array.isArray(a.eventos) && !evs.length) {
       eventos.value = a.eventos
     }
-    if (!silent) await carregarLinksPastorais()
+    if (!silent) {
+      await Promise.all([carregarLinksPastorais(), carregarLinkGenerico()])
+    }
   } catch (e) {
     innovToast('error', 'Planejamento', e.response?.data?.message || 'Falha ao carregar')
     if (!silent) router.push('/planejamento')
@@ -1326,6 +1391,69 @@ onMounted(load)
 
         </div>
       </div>
+
+      <section
+        v-if="canGerir"
+        class="card p-4 md:p-5"
+        data-testid="planejamento-link-generico"
+      >
+        <h2 class="font-serif text-[18px] font-medium mb-1" style="color: var(--color-ink)">
+          Link genérico
+        </h2>
+        <p class="text-[13px] mb-4" style="color: var(--color-muted)">
+          Um único link para qualquer pastoral: quem abre informa o nome e propõe datas.
+          Se a pastoral ainda não existir, ela é criada automaticamente.
+        </p>
+        <div
+          class="rounded-lg px-3 py-3 flex flex-wrap items-start justify-between gap-3"
+          style="border: 1px solid var(--color-line)"
+        >
+          <div class="min-w-0 flex-1">
+            <code
+              v-if="genericoLink"
+              class="block text-[11px] break-all"
+              style="color: var(--color-muted)"
+              data-testid="planejamento-link-generico-url"
+            >
+              {{ publicLinkFor(genericoLink) }}
+            </code>
+            <p v-else class="text-[13px]" style="color: var(--color-muted)">
+              Nenhum link genérico ativo.
+            </p>
+          </div>
+          <div class="flex flex-wrap gap-2 shrink-0">
+            <button
+              type="button"
+              class="btn btn-accent text-xs"
+              :disabled="genericoBusy"
+              data-testid="planejamento-gerar-link-generico"
+              @click="gerarLinkGenerico"
+            >
+              {{ genericoLink ? 'Novo link' : 'Gerar link' }}
+            </button>
+            <button
+              v-if="genericoLink"
+              type="button"
+              class="btn btn-ghost text-xs"
+              data-testid="planejamento-copiar-link-generico"
+              @click="copiarLinkGenerico"
+            >
+              Copiar
+            </button>
+            <button
+              v-if="genericoLink"
+              type="button"
+              class="btn btn-ghost text-xs"
+              style="color: var(--color-danger)"
+              :disabled="genericoBusy"
+              data-testid="planejamento-revogar-link-generico"
+              @click="revogarLinkGenerico"
+            >
+              Revogar
+            </button>
+          </div>
+        </div>
+      </section>
 
       <section
         v-if="canGerir"

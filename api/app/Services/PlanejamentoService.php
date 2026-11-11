@@ -8,6 +8,7 @@ use App\Models\CalendarioLocal;
 use App\Models\Igreja;
 use App\Models\Pastoral;
 use App\Models\PlanejamentoAnual;
+use App\Models\PlanejamentoAnualToken;
 use App\Models\PlanejamentoEvento;
 use App\Models\PlanejamentoPastoralToken;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -665,33 +666,122 @@ class PlanejamentoService
             ->update(['revogado_em' => now()]);
     }
 
-    public function findTokenByPlain(string $plain): PlanejamentoPastoralToken
+    /**
+     * @return array{token: PlanejamentoAnualToken, plain: string}
+     */
+    public function createOrRotateAnualToken(PlanejamentoAnual $anual): array
     {
+        $plain = Str::random(48);
         $hash = hash('sha256', $plain);
 
-        $token = PlanejamentoPastoralToken::query()
-            ->with(['planejamento', 'pastoral'])
-            ->where('token_hash', $hash)
+        $token = PlanejamentoAnualToken::query()->updateOrCreate(
+            ['planejamento_anual_id' => $anual->id],
+            [
+                'token_hash' => $hash,
+                'token_preview' => substr($plain, 0, 8),
+                'token_encrypted' => $plain,
+                'expires_at' => null,
+                'revogado_em' => null,
+            ]
+        );
+
+        $token->refresh();
+        $token->setAttribute('plain_token', $plain);
+
+        return ['token' => $token, 'plain' => $plain];
+    }
+
+    public function getAnualToken(PlanejamentoAnual $anual): ?PlanejamentoAnualToken
+    {
+        $token = PlanejamentoAnualToken::query()
+            ->where('planejamento_anual_id', $anual->id)
             ->first();
 
-        if ($token === null || ! $token->isAtivo()) {
-            throw ValidationException::withMessages([
-                'token' => ['Link inválido, expirado ou revogado.'],
-            ]);
+        if ($token !== null && $token->isAtivo() && $token->token_encrypted !== null) {
+            $token->setAttribute('plain_token', $token->token_encrypted);
         }
 
         return $token;
     }
 
+    public function revokeAnualToken(PlanejamentoAnual $anual): void
+    {
+        PlanejamentoAnualToken::query()
+            ->where('planejamento_anual_id', $anual->id)
+            ->whereNull('revogado_em')
+            ->update(['revogado_em' => now()]);
+    }
+
+    public function findPublicLink(string $plain): PlanejamentoPublicLink
+    {
+        $hash = hash('sha256', $plain);
+
+        $pastoral = PlanejamentoPastoralToken::query()
+            ->with(['planejamento', 'pastoral'])
+            ->where('token_hash', $hash)
+            ->first();
+
+        if ($pastoral !== null && $pastoral->isAtivo()) {
+            return PlanejamentoPublicLink::fromPastoral($pastoral);
+        }
+
+        $anual = PlanejamentoAnualToken::query()
+            ->with(['planejamento'])
+            ->where('token_hash', $hash)
+            ->first();
+
+        if ($anual !== null && $anual->isAtivo()) {
+            return PlanejamentoPublicLink::fromAnual($anual);
+        }
+
+        throw ValidationException::withMessages([
+            'token' => ['Link inválido, expirado ou revogado.'],
+        ]);
+    }
+
+    /**
+     * @deprecated Use findPublicLink()
+     */
+    public function findTokenByPlain(string $plain): PlanejamentoPastoralToken
+    {
+        $link = $this->findPublicLink($plain);
+        if ($link->tokenPastoral === null) {
+            throw ValidationException::withMessages([
+                'token' => ['Link inválido, expirado ou revogado.'],
+            ]);
+        }
+
+        return $link->tokenPastoral;
+    }
+
     /**
      * @return Collection<int, PlanejamentoEvento>
      */
-    public function listEventosPublicos(PlanejamentoPastoralToken $token): Collection
+    public function listEventosPublicos(PlanejamentoPublicLink $link, ?string $pastoralNome = null): Collection
     {
-        return PlanejamentoEvento::query()
+        $query = PlanejamentoEvento::query()
             ->with(['locais', 'recursos', 'pastoral'])
-            ->where('planejamento_anual_id', $token->planejamento_anual_id)
-            ->where('pastoral_id', $token->pastoral_id)
+            ->where('planejamento_anual_id', $link->anual->id);
+
+        if ($link->isGenerico()) {
+            $nome = $this->normalizePastoralNome($pastoralNome);
+            if ($nome === null) {
+                throw ValidationException::withMessages([
+                    'pastoral_nome' => ['Informe o nome da pastoral.'],
+                ]);
+            }
+
+            $pastoral = $this->findPastoralByNome($link->anual->igreja_id, $nome);
+            if ($pastoral === null) {
+                return collect();
+            }
+
+            $query->where('pastoral_id', $pastoral->id);
+        } else {
+            $query->where('pastoral_id', $link->pastoralId);
+        }
+
+        return $query
             ->orderBy('data_inicio')
             ->orderBy('hora_inicio')
             ->get();
@@ -699,11 +789,11 @@ class PlanejamentoService
 
     /**
      * @param  array<string, mixed>  $data
-     * @return array{evento: PlanejamentoEvento, conflitos: list<array<string, mixed>>}
+     * @return array{evento: PlanejamentoEvento, conflitos: list<array<string, mixed>>, pastoral_criada: bool}
      */
-    public function createEventoPublico(PlanejamentoPastoralToken $token, array $data): array
+    public function createEventoPublico(PlanejamentoPublicLink $link, array $data): array
     {
-        $anual = $this->anualDoToken($token);
+        $anual = $link->anual;
 
         if ($anual->status !== PlanejamentoAnual::STATUS_COLETA) {
             throw ValidationException::withMessages([
@@ -713,27 +803,46 @@ class PlanejamentoService
 
         $this->igrejaContext->set(Igreja::query()->findOrFail($anual->igreja_id));
 
-        return $this->createEvento($anual, [
+        $pastoralCriada = false;
+        if ($link->isGenerico()) {
+            $nome = $this->normalizePastoralNome($data['pastoral_nome'] ?? null);
+            if ($nome === null) {
+                throw ValidationException::withMessages([
+                    'pastoral_nome' => ['Informe o nome da pastoral.'],
+                ]);
+            }
+
+            $resolved = $this->findOrCreatePastoralByNome($anual->igreja_id, $nome);
+            $pastoralId = $resolved['pastoral']->id;
+            $pastoralCriada = $resolved['criada'];
+        } else {
+            $pastoralId = $link->pastoralId;
+        }
+
+        $result = $this->createEvento($anual, [
             ...$data,
-            'pastoral_id' => $token->pastoral_id,
+            'pastoral_id' => $pastoralId,
             'local_ids' => [],
             'local_texto' => $data['local_texto'] ?? null,
         ], true);
+
+        return [...$result, 'pastoral_criada' => $pastoralCriada];
     }
 
     /**
      * @param  array<string, mixed>  $data
      * @return array{evento: PlanejamentoEvento, conflitos: list<array<string, mixed>>}
      */
-    public function updateEventoPublico(PlanejamentoPastoralToken $token, string $eventoId, array $data): array
+    public function updateEventoPublico(PlanejamentoPublicLink $link, string $eventoId, array $data): array
     {
-        $anual = $this->anualDoToken($token);
+        $anual = $link->anual;
         $this->igrejaContext->set(Igreja::query()->findOrFail($anual->igreja_id));
 
-        $evento = $this->eventoDoToken($token, $eventoId);
-        $this->assertPodeMutarEventoPublico($anual, $evento);
+        $pastoralNome = is_string($data['pastoral_nome'] ?? null) ? $data['pastoral_nome'] : null;
+        unset($data['pastoral_nome'], $data['pastoral_id'], $data['status_solicitacao'], $data['motivo_ajuste']);
 
-        unset($data['pastoral_id'], $data['status_solicitacao'], $data['motivo_ajuste']);
+        $evento = $this->eventoDoLink($link, $eventoId, $pastoralNome);
+        $this->assertPodeMutarEventoPublico($anual, $evento);
 
         return $this->updateEvento($evento, [
             ...$data,
@@ -741,29 +850,30 @@ class PlanejamentoService
         ], true);
     }
 
-    public function deleteEventoPublico(PlanejamentoPastoralToken $token, string $eventoId): void
+    public function deleteEventoPublico(PlanejamentoPublicLink $link, string $eventoId, ?string $pastoralNome = null): void
     {
-        $anual = $this->anualDoToken($token);
+        $anual = $link->anual;
         $this->igrejaContext->set(Igreja::query()->findOrFail($anual->igreja_id));
 
-        $evento = $this->eventoDoToken($token, $eventoId);
+        $evento = $this->eventoDoLink($link, $eventoId, $pastoralNome);
         $this->assertPodeMutarEventoPublico($anual, $evento);
         $this->deleteEvento($evento);
     }
 
     /**
-     * @param  array{data_inicio: string, data_fim?: ?string, hora_inicio?: ?string, hora_fim?: ?string, ignorar_evento_id?: ?string}  $params
+     * @param  array{data_inicio: string, data_fim?: ?string, hora_inicio?: ?string, hora_fim?: ?string, ignorar_evento_id?: ?string, pastoral_nome?: ?string}  $params
      * @return list<array<string, mixed>>
      */
-    public function disponibilidadePublica(PlanejamentoPastoralToken $token, array $params): array
+    public function disponibilidadePublica(PlanejamentoPublicLink $link, array $params): array
     {
-        $anual = $this->anualDoToken($token);
+        $anual = $link->anual;
         $this->igrejaContext->set(Igreja::query()->findOrFail($anual->igreja_id));
 
         $ignorar = $params['ignorar_evento_id'] ?? null;
         if (is_string($ignorar) && $ignorar !== '') {
-            // Só ignora se o evento pertencer à pastoral do token (evita vazar capacidade alheia)
-            $this->eventoDoToken($token, $ignorar);
+            // Só ignora se o evento pertencer à pastoral do link (evita vazar capacidade alheia)
+            $pastoralNome = is_string($params['pastoral_nome'] ?? null) ? $params['pastoral_nome'] : null;
+            $this->eventoDoLink($link, $ignorar, $pastoralNome);
         } else {
             $ignorar = null;
         }
@@ -780,25 +890,32 @@ class PlanejamentoService
         );
     }
 
-    private function anualDoToken(PlanejamentoPastoralToken $token): PlanejamentoAnual
+    private function eventoDoLink(PlanejamentoPublicLink $link, string $eventoId, ?string $pastoralNome = null): PlanejamentoEvento
     {
-        $anual = $token->planejamento;
-        if ($anual === null) {
-            $anual = PlanejamentoAnual::query()->findOrFail($token->planejamento_anual_id);
-        }
-
-        return $anual;
-    }
-
-    private function eventoDoToken(PlanejamentoPastoralToken $token, string $eventoId): PlanejamentoEvento
-    {
-        $evento = PlanejamentoEvento::query()
+        $query = PlanejamentoEvento::query()
             ->with(['locais', 'recursos', 'pastoral', 'planejamentoAnual'])
             ->whereKey($eventoId)
-            ->where('planejamento_anual_id', $token->planejamento_anual_id)
-            ->where('pastoral_id', $token->pastoral_id)
-            ->first();
+            ->where('planejamento_anual_id', $link->anual->id);
 
+        if ($link->isGenerico()) {
+            $nome = $this->normalizePastoralNome($pastoralNome);
+            if ($nome === null) {
+                throw ValidationException::withMessages([
+                    'pastoral_nome' => ['Informe o nome da pastoral.'],
+                ]);
+            }
+
+            $pastoral = $this->findPastoralByNome($link->anual->igreja_id, $nome);
+            if ($pastoral === null) {
+                abort(404);
+            }
+
+            $query->where('pastoral_id', $pastoral->id);
+        } else {
+            $query->where('pastoral_id', $link->pastoralId);
+        }
+
+        $evento = $query->first();
         if ($evento === null) {
             abort(404);
         }
@@ -822,5 +939,51 @@ class PlanejamentoService
         throw ValidationException::withMessages([
             'status' => ['Não é possível alterar esta proposta neste momento.'],
         ]);
+    }
+
+    public function normalizePastoralNome(?string $nome): ?string
+    {
+        if ($nome === null) {
+            return null;
+        }
+        $trimmed = trim($nome);
+        if (mb_strlen($trimmed) < 2) {
+            return null;
+        }
+
+        return $trimmed;
+    }
+
+    public function findPastoralByNome(string $igrejaId, string $nome): ?Pastoral
+    {
+        $needle = mb_strtolower($nome);
+
+        return Pastoral::query()
+            ->where('igreja_id', $igrejaId)
+            ->get()
+            ->first(fn (Pastoral $p) => mb_strtolower(trim((string) $p->nome)) === $needle);
+    }
+
+    /**
+     * @return array{pastoral: Pastoral, criada: bool}
+     */
+    public function findOrCreatePastoralByNome(string $igrejaId, string $nome): array
+    {
+        $existing = $this->findPastoralByNome($igrejaId, $nome);
+        if ($existing !== null) {
+            return ['pastoral' => $existing, 'criada' => false];
+        }
+
+        $pastoral = Pastoral::query()->create([
+            'igreja_id' => $igrejaId,
+            'nome' => $nome,
+            'descricao_publica' => null,
+            'contato_publico' => null,
+            'ordem' => 0,
+            'publicado_no_site' => false,
+            'ativa' => true,
+        ]);
+
+        return ['pastoral' => $pastoral, 'criada' => true];
     }
 }

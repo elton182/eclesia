@@ -22,6 +22,7 @@ class PlanejamentoDisponibilidadeRequest extends FormRequest
             'hora_inicio' => ['nullable', 'date_format:H:i'],
             'hora_fim' => ['nullable', 'date_format:H:i'],
             'ignorar_evento_id' => ['nullable', 'string', 'max:26'],
+            'pastoral_nome' => ['sometimes', 'nullable', 'string', 'min:2', 'max:120'],
         ];
     }
 }
