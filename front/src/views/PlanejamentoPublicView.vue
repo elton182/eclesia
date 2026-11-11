@@ -128,6 +128,7 @@ const totalMes = computed(() => {
   const pad = String(mesView.value).padStart(2, '0')
   return eventos.value.filter((e) => String(e.data_inicio || '').slice(5, 7) === pad).length
 })
+const maxChipsPorDia = 3
 
 function podeEditar(ev) {
   return canEditarEventoPlanejamentoPublico(meta.value?.status, ev)
@@ -375,16 +376,23 @@ onMounted(load)
 </script>
 
 <template>
-  <div class="min-h-screen px-4 py-8" style="background: var(--color-bg, #F7F4EF)">
-    <div class="max-w-4xl mx-auto">
-      <p class="page-eyebrow">Planejamento Anual</p>
-      <h1 class="font-serif text-[28px] font-normal mb-1" style="color: var(--color-ink)">
-        {{ tituloPastoral }}
-      </h1>
-      <p v-if="meta" class="text-sm mb-6" style="color: var(--color-muted)">
-        Ano {{ meta.ano }} · {{ labelStatusPlanejamento(meta.status) }}
-        <template v-if="modoGenerico"> · Link genérico</template>
-      </p>
+  <div
+    class="min-h-screen px-3 sm:px-4 md:px-6 lg:px-8 xl:px-10 py-4 md:py-6"
+    style="background: var(--color-bg, #F7F4EF)"
+  >
+    <div class="w-full max-w-[1600px] mx-auto">
+      <header class="mb-4 md:mb-5 flex flex-wrap items-end justify-between gap-2">
+        <div class="min-w-0">
+          <p class="page-eyebrow">Planejamento Anual</p>
+          <h1 class="font-serif text-[24px] md:text-[28px] font-normal mb-0.5" style="color: var(--color-ink)">
+            {{ tituloPastoral }}
+          </h1>
+          <p v-if="meta" class="text-sm" style="color: var(--color-muted)">
+            Ano {{ meta.ano }} · {{ labelStatusPlanejamento(meta.status) }}
+            <template v-if="modoGenerico"> · Link genérico</template>
+          </p>
+        </div>
+      </header>
 
       <p v-if="loading" class="text-sm" style="color: var(--color-muted)">Carregando…</p>
       <p v-else-if="error" class="text-sm" style="color: #8a2424" data-testid="planejamento-publico-erro">
@@ -431,7 +439,7 @@ onMounted(load)
 
         <p
           v-if="meta.status !== 'coleta'"
-          class="card p-4 mb-4 text-sm"
+          class="card p-3 md:p-4 mb-4 text-sm"
           style="color: var(--color-muted)"
         >
           A coleta não está aberta — você pode consultar as propostas
@@ -448,171 +456,185 @@ onMounted(load)
           Informe o nome da pastoral acima para liberar o calendário.
         </p>
 
-        <section class="card p-4 md:p-5 mb-6" data-testid="planejamento-publico-calendario">
-          <div class="flex items-center justify-between gap-2 mb-1">
-            <button
-              type="button"
-              class="btn btn-ghost px-3"
-              :disabled="mesView <= 1"
-              aria-label="Mês anterior"
-              @click="prevMes"
-            >
-              ‹
-            </button>
-            <h2 class="font-serif text-[18px] font-medium" style="color: var(--color-ink)">
-              {{ mesTitulo }}
-            </h2>
-            <button
-              type="button"
-              class="btn btn-ghost px-3"
-              :disabled="mesView >= 12"
-              aria-label="Próximo mês"
-              @click="nextMes"
-            >
-              ›
-            </button>
-          </div>
-          <p class="text-[12px] text-center mb-3" style="color: var(--color-muted)">
-            {{
-              podePropor
-                ? 'Clique em um dia para propor ou editar'
-                : 'Clique em um dia para ver detalhes'
-            }}
-            · {{ totalMes }} proposta(s) neste mês
-          </p>
-
-          <div class="grid grid-cols-7 gap-1 text-center text-[11px] mb-1" style="color: var(--color-muted)">
-            <div v-for="d in WEEKDAYS" :key="d">{{ d }}</div>
-          </div>
-          <div class="grid grid-cols-7 gap-1">
-            <button
-              v-for="(cell, idx) in cells"
-              :key="idx"
-              type="button"
-              class="min-h-[64px] md:min-h-[88px] rounded-lg p-1.5 text-left"
-              :disabled="!cell.inMonth"
-              :style="
-                cell.inMonth
-                  ? {
-                      background: 'var(--color-surface)',
-                      border: '1px solid var(--color-line)',
-                      color: 'var(--color-ink)',
-                      cursor: 'pointer',
-                    }
-                  : { background: 'transparent', border: 'none', cursor: 'default' }
-              "
-              :data-testid="cell.iso ? `planejamento-publico-dia-${cell.iso}` : undefined"
-              @click="cell.inMonth && openDay(cell.iso)"
-            >
-              <template v-if="cell.inMonth">
-                <div
-                  class="text-[12px] font-medium mb-0.5 w-5 h-5 grid place-items-center rounded-full"
-                  :style="
-                    cell.iso === todayIso
-                      ? { background: 'var(--color-primary)', color: 'var(--color-on-primary)' }
-                      : {}
-                  "
-                >
-                  {{ cell.dia }}
-                </div>
-                <div
-                  v-for="ev in (byDay.get(cell.iso) || []).slice(0, 2)"
-                  :key="ev.id"
-                  class="text-[10px] truncate leading-tight px-1 py-0.5 rounded mt-0.5 font-medium"
-                  :style="{
-                    background: styleStatusSolicitacao(ev.status_solicitacao).bg,
-                    color: styleStatusSolicitacao(ev.status_solicitacao).fg,
-                  }"
-                >
-                  {{ labelEventoPlanejamentoPreview(ev) }}
-                </div>
-                <div
-                  v-if="(byDay.get(cell.iso) || []).length > 2"
-                  class="text-[10px] mt-0.5"
-                  style="color: var(--color-muted)"
-                >
-                  +{{ (byDay.get(cell.iso) || []).length - 2 }}
-                </div>
-              </template>
-            </button>
-          </div>
-        </section>
-
-        <section>
-          <h2
-            class="text-[11px] font-semibold uppercase tracking-wider mb-3"
-            style="color: var(--color-accent-dark)"
+        <div
+          class="flex flex-col lg:flex-row gap-4 lg:gap-5 items-stretch lg:items-start"
+          data-testid="planejamento-publico-layout"
+        >
+          <section
+            class="card p-3 sm:p-4 md:p-5 flex-1 min-w-0 w-full"
+            data-testid="planejamento-publico-calendario"
           >
-            Todas as suas propostas
-          </h2>
-          <ul class="space-y-2 list-none p-0 m-0">
-            <li
-              v-for="ev in eventos"
-              :key="ev.id"
-              class="card p-4 flex flex-wrap items-center justify-between gap-2"
-              data-testid="planejamento-publico-lista-item"
-            >
+            <div class="flex items-center justify-between gap-2 mb-1">
               <button
                 type="button"
-                class="min-w-0 text-left flex-1 bg-transparent border-0 p-0 cursor-pointer"
-                @click="podeEditar(ev) ? openEdit(ev) : openDay(String(ev.data_inicio || '').slice(0, 10))"
+                class="btn btn-ghost px-3"
+                :disabled="mesView <= 1"
+                aria-label="Mês anterior"
+                @click="prevMes"
               >
-                <div class="font-medium text-sm" style="color: var(--color-ink)">{{ ev.titulo }}</div>
-                <div class="text-xs mt-1" style="color: var(--color-muted)">
-                  {{ String(ev.data_inicio || '').slice(0, 10) }}
-                  <template v-if="ev.hora_inicio"> · {{ String(ev.hora_inicio).slice(0, 5) }}</template>
-                  <template v-if="labelRecursosEvento(ev)"> · {{ labelRecursosEvento(ev) }}</template>
-                  <template v-if="ev.local_texto"> · {{ ev.local_texto }}</template>
-                </div>
+                ‹
               </button>
-              <div class="flex items-center gap-2 flex-wrap">
-                <span
-                  class="text-[11px] font-medium px-2 py-0.5 rounded-full"
-                  :style="{
-                    background: styleStatusSolicitacao(ev.status_solicitacao).bg,
-                    color: styleStatusSolicitacao(ev.status_solicitacao).fg,
-                  }"
+              <h2 class="font-serif text-[18px] font-medium" style="color: var(--color-ink)">
+                {{ mesTitulo }}
+              </h2>
+              <button
+                type="button"
+                class="btn btn-ghost px-3"
+                :disabled="mesView >= 12"
+                aria-label="Próximo mês"
+                @click="nextMes"
+              >
+                ›
+              </button>
+            </div>
+            <p class="text-[12px] text-center mb-3" style="color: var(--color-muted)">
+              {{
+                podePropor
+                  ? 'Clique em um dia para propor ou editar'
+                  : 'Clique em um dia para ver detalhes'
+              }}
+              · {{ totalMes }} proposta(s) neste mês
+            </p>
+
+            <div class="grid grid-cols-7 gap-1 text-center text-[11px] mb-1" style="color: var(--color-muted)">
+              <div v-for="d in WEEKDAYS" :key="d">{{ d }}</div>
+            </div>
+            <div class="grid grid-cols-7 gap-1">
+              <button
+                v-for="(cell, idx) in cells"
+                :key="idx"
+                type="button"
+                class="min-h-[64px] sm:min-h-[72px] md:min-h-[80px] lg:min-h-[88px] rounded-lg p-1 sm:p-1.5 text-left"
+                :disabled="!cell.inMonth"
+                :style="
+                  cell.inMonth
+                    ? {
+                        background: 'var(--color-surface)',
+                        border: '1px solid var(--color-line)',
+                        color: 'var(--color-ink)',
+                        cursor: 'pointer',
+                      }
+                    : { background: 'transparent', border: 'none', cursor: 'default' }
+                "
+                :data-testid="cell.iso ? `planejamento-publico-dia-${cell.iso}` : undefined"
+                @click="cell.inMonth && openDay(cell.iso)"
+              >
+                <template v-if="cell.inMonth">
+                  <div
+                    class="text-[12px] font-medium mb-0.5 w-5 h-5 grid place-items-center rounded-full"
+                    :style="
+                      cell.iso === todayIso
+                        ? { background: 'var(--color-primary)', color: 'var(--color-on-primary)' }
+                        : {}
+                    "
+                  >
+                    {{ cell.dia }}
+                  </div>
+                  <div
+                    v-for="ev in (byDay.get(cell.iso) || []).slice(0, maxChipsPorDia)"
+                    :key="ev.id"
+                    class="text-[10px] truncate leading-tight px-1 py-0.5 rounded mt-0.5 font-medium"
+                    :style="{
+                      background: styleStatusSolicitacao(ev.status_solicitacao).bg,
+                      color: styleStatusSolicitacao(ev.status_solicitacao).fg,
+                    }"
+                  >
+                    {{ labelEventoPlanejamentoPreview(ev) }}
+                  </div>
+                  <div
+                    v-if="(byDay.get(cell.iso) || []).length > maxChipsPorDia"
+                    class="text-[10px] mt-0.5"
+                    style="color: var(--color-muted)"
+                  >
+                    +{{ (byDay.get(cell.iso) || []).length - maxChipsPorDia }}
+                  </div>
+                </template>
+              </button>
+            </div>
+          </section>
+
+          <aside
+            class="w-full lg:w-[300px] xl:w-[340px] 2xl:w-[380px] shrink-0 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto"
+            data-testid="planejamento-publico-lista"
+          >
+            <section class="card p-3 sm:p-4">
+              <h2
+                class="text-[11px] font-semibold uppercase tracking-wider mb-3"
+                style="color: var(--color-accent-dark)"
+              >
+                Todas as suas propostas
+              </h2>
+              <ul class="space-y-2 list-none p-0 m-0">
+                <li
+                  v-for="ev in eventos"
+                  :key="ev.id"
+                  class="rounded-lg px-3 py-2.5 flex flex-col gap-2"
+                  style="border: 1px solid var(--color-line); background: var(--color-surface)"
+                  data-testid="planejamento-publico-lista-item"
                 >
-                  {{ labelStatusSolicitacao(ev.status_solicitacao) }}
-                </span>
-                <button
-                  v-if="podeEditar(ev)"
-                  type="button"
-                  class="btn btn-ghost text-xs"
-                  data-testid="planejamento-publico-editar"
-                  @click="openEdit(ev)"
-                >
-                  Editar
-                </button>
-                <button
-                  v-if="podeEditar(ev)"
-                  type="button"
-                  class="btn btn-ghost text-xs"
-                  style="color: var(--color-danger)"
-                  data-testid="planejamento-publico-remover"
-                  @click="remover(ev)"
-                >
-                  Remover
-                </button>
-              </div>
-            </li>
-          </ul>
-          <p v-if="!eventos.length" class="text-sm" style="color: var(--color-muted)">
-            Nenhuma proposta ainda.
-          </p>
-        </section>
+                  <button
+                    type="button"
+                    class="min-w-0 text-left w-full bg-transparent border-0 p-0 cursor-pointer"
+                    @click="podeEditar(ev) ? openEdit(ev) : openDay(String(ev.data_inicio || '').slice(0, 10))"
+                  >
+                    <div class="font-medium text-sm" style="color: var(--color-ink)">{{ ev.titulo }}</div>
+                    <div class="text-xs mt-1" style="color: var(--color-muted)">
+                      {{ String(ev.data_inicio || '').slice(0, 10) }}
+                      <template v-if="ev.hora_inicio"> · {{ String(ev.hora_inicio).slice(0, 5) }}</template>
+                      <template v-if="labelRecursosEvento(ev)"> · {{ labelRecursosEvento(ev) }}</template>
+                      <template v-if="ev.local_texto"> · {{ ev.local_texto }}</template>
+                    </div>
+                  </button>
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <span
+                      class="text-[11px] font-medium px-2 py-0.5 rounded-full"
+                      :style="{
+                        background: styleStatusSolicitacao(ev.status_solicitacao).bg,
+                        color: styleStatusSolicitacao(ev.status_solicitacao).fg,
+                      }"
+                    >
+                      {{ labelStatusSolicitacao(ev.status_solicitacao) }}
+                    </span>
+                    <button
+                      v-if="podeEditar(ev)"
+                      type="button"
+                      class="btn btn-ghost text-xs"
+                      data-testid="planejamento-publico-editar"
+                      @click="openEdit(ev)"
+                    >
+                      Editar
+                    </button>
+                    <button
+                      v-if="podeEditar(ev)"
+                      type="button"
+                      class="btn btn-ghost text-xs"
+                      style="color: var(--color-danger)"
+                      data-testid="planejamento-publico-remover"
+                      @click="remover(ev)"
+                    >
+                      Remover
+                    </button>
+                  </div>
+                </li>
+              </ul>
+              <p v-if="!eventos.length" class="text-sm" style="color: var(--color-muted)">
+                Nenhuma proposta ainda.
+              </p>
+            </section>
+          </aside>
+        </div>
       </template>
     </div>
 
     <div
       v-if="showDayModal && diaSelecionado"
-      class="fixed inset-0 z-50 flex items-end md:items-center justify-center"
+      class="fixed inset-0 z-50 flex items-end md:items-center justify-center p-0 md:p-4"
       style="background: rgba(42, 20, 24, 0.4)"
       data-testid="planejamento-publico-modal"
       @click.self="closeDayModal"
     >
       <div
-        class="w-full max-w-lg rounded-t-2xl md:rounded-2xl p-5 max-h-[90vh] overflow-y-auto"
+        class="w-full max-w-lg md:max-w-2xl rounded-t-2xl md:rounded-2xl p-5 max-h-[90vh] overflow-y-auto"
         style="background: var(--color-surface)"
       >
         <div class="flex items-start justify-between gap-3 mb-4">
