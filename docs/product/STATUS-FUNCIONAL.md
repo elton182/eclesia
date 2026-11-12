@@ -93,7 +93,7 @@ Permissões são namespaced (`users.*`, `igrejas.*`, `ecc.*`, `calendario.*`, `p
 | Seletor de igreja | No topo (`TopNavbar`); troca o contexto (`X-Igreja`) |
 | Administração no launcher | Atalhos: igrejas, usuários, marca do app, auditoria |
 
-**Cards “em breve” / stubs:** Financeiro paroquial genérico no launcher; no Site: Mídias / Domínio e SEO / Histórico; no ECC: Relatórios.
+**Cards “em breve” / stubs:** Financeiro paroquial genérico no launcher; no Site: Mídias / Domínio e SEO / Histórico.
 
 ---
 
@@ -182,7 +182,7 @@ Entrada típica: card **ECC** no launcher → rotas sob `/ecc/*`.
 
 - Escala de encontro (sugestão Preferência → Histórico → Disponíveis)
 - Equipes / fluxo de perseverança
-- Relatórios (menu stub)
+- Relatórios → Cadastros e acessos (`/ecc/relatorios/cadastros-acessos`, SPEC-033)
 - Reuniões, presença, atas, avaliação (roadmap do BRIEF)
 
 ---
@@ -291,7 +291,7 @@ Separado da marca visual do **site** (CMS).
 | Plataforma | `/admin/tenants` |
 | Shell | `/inicio` |
 | Núcleo | `/igrejas`, `/usuarios`, `/auditoria`, `/configuracoes/marca` |
-| ECC | `/ecc/minha-equipe`, `/ecc/casais`, `/ecc/casais/:id`, `/ecc/eventos`, `/ecc/eventos/:id`, `/ecc/financeiro` |
+| ECC | `/ecc/minha-equipe`, `/ecc/casais`, `/ecc/casais/:id`, `/ecc/eventos`, `/ecc/eventos/:id`, `/ecc/financeiro`, `/ecc/relatorios/cadastros-acessos` |
 | Eventos | `/eventos`, `/eventos/:id` |
 | Calendário | `/calendario`, `/calendario/:id`, `/calendario/locais`, `/calendario/tipos` |
 | Pastorais | `/pastorais`, `/pastorais/:id`, `/planejamento`, `/planejamento/:id` |
@@ -319,6 +319,7 @@ Separado da marca visual do **site** (CMS).
 | SPEC-014 Branding app | Sim |
 | SPEC-015 Ficha casal | Sim |
 | SPEC-016 ECC financeiro | Sim |
+| SPEC-033 ECC cadastros e acessos | Sim |
 | SPEC-017 Home líder | Parcial (spec draft) |
 | SPEC-018 Pastorais/planejamento | Sim |
 | SPEC-022 Visão gestor calendário | Sim |

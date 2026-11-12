@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\AuditLogController;
 use App\Http\Controllers\Api\ClientDiagnosticController;
 use App\Http\Controllers\Api\CalendarioController;
 use App\Http\Controllers\Api\AuthWebController;
+use App\Http\Controllers\Api\EccCadastrosAcessosController;
 use App\Http\Controllers\Api\EccCasalController;
 use App\Http\Controllers\Api\EccEquipeController;
 use App\Http\Controllers\Api\EccEquipeServicoController;
@@ -164,6 +165,7 @@ Route::middleware([
     Route::delete('users/{user}/roles', [UserController::class, 'removeRole']);
     Route::apiResource('users', UserController::class);
 
+    Route::get('ecc/relatorios/cadastros-acessos', [EccCadastrosAcessosController::class, 'show']);
     Route::put('ecc/equipes/{id}/casais', [EccEquipeController::class, 'syncCasais']);
     Route::post('ecc/equipes/{id}/acesso', [EccEquipeController::class, 'criarAcesso']);
     Route::put('ecc/equipes/{id}/acesso', [EccEquipeController::class, 'alterarLoginAcesso']);

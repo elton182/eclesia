@@ -26,6 +26,7 @@ import EccCasalDetailView from '../views/EccCasalDetailView.vue'
 import EccEventosView from '../views/EccEventosView.vue'
 import EccEventoDetailView from '../views/EccEventoDetailView.vue'
 import EccFinanceiroView from '../views/EccFinanceiroView.vue'
+import EccCadastrosAcessosView from '../views/EccCadastrosAcessosView.vue'
 import EventosView from '../views/EventosView.vue'
 import EventoDetailView from '../views/EventoDetailView.vue'
 import CalendarioMensaisView from '../views/CalendarioMensaisView.vue'
@@ -284,6 +285,15 @@ const router = createRouter({
           path: 'ecc/financeiro',
           name: 'ecc-financeiro',
           component: EccFinanceiroView,
+        },
+        {
+          path: 'ecc/relatorios/cadastros-acessos',
+          name: 'ecc-relatorios-cadastros-acessos',
+          component: EccCadastrosAcessosView,
+        },
+        {
+          path: 'ecc/relatorios',
+          redirect: { name: 'ecc-relatorios-cadastros-acessos' },
         },
       ],
     },

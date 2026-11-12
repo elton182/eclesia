@@ -62,6 +62,15 @@ export function userHasPermission(user, permission, opts = {}) {
   if (permission === 'telas.casais' && (roleNames.includes('cadastros-casais') || roleNames.includes('lider-equipe'))) {
     return true
   }
+  if (
+    (permission === 'telas.relatorios' || permission === 'ecc.relatorios.view') &&
+    (roleNames.includes('cadastros-casais') ||
+      roleNames.includes('cadastros-equipes') ||
+      roleNames.includes('admin-igreja') ||
+      roleNames.includes('admin-tenant'))
+  ) {
+    return true
+  }
   if (permission === 'telas.eventos' && roleNames.includes('cadastros-eventos')) {
     return true
   }
@@ -215,6 +224,18 @@ export function canSeeEccFinanceiroNav(user, opts = {}) {
     userHasPermission(user, 'telas.financeiro', opts) ||
     userHasPermission(user, 'ecc.financeiro.view', opts) ||
     userHasPermission(user, 'ecc.financeiro.manage', opts)
+  )
+}
+
+/**
+ * Nav Relatórios ECC (cadastros e acessos). SPEC-033. Líder não vê.
+ * @param {{ permissions?: string[], roles?: Array<{ name: string }> }|null|undefined} user
+ * @param {{ isSuperAdmin?: boolean }} [opts]
+ */
+export function canSeeEccRelatoriosNav(user, opts = {}) {
+  return (
+    userHasPermission(user, 'telas.relatorios', opts) ||
+    userHasPermission(user, 'ecc.relatorios.view', opts)
   )
 }
 

@@ -74,6 +74,7 @@ class RolesAndPermissionsSeeder extends Seeder
         'telas.pastorais',
         'telas.auditoria',
         'telas.financeiro',
+        'telas.relatorios',
     ];
 
     /** @var list<string> */
@@ -122,6 +123,7 @@ class RolesAndPermissionsSeeder extends Seeder
         'ecc.perguntas.view',
         'ecc.perguntas.manage',
         'ecc.interacoes.moderar',
+        'ecc.relatorios.view',
         'ecc.escala.editar',
         'pessoas.manage',
     ];
@@ -202,14 +204,18 @@ class RolesAndPermissionsSeeder extends Seeder
 
         Role::findByName('cadastros-equipes', self::GUARD)->syncPermissions([
             'telas.equipes',
+            'telas.relatorios',
             'ecc.equipes.view',
             'ecc.equipes.manage',
+            'ecc.relatorios.view',
         ]);
 
         Role::findByName('cadastros-casais', self::GUARD)->syncPermissions([
             'telas.casais',
+            'telas.relatorios',
             'ecc.casais.view',
             'ecc.casais.manage',
+            'ecc.relatorios.view',
             'pessoas.manage',
         ]);
 

@@ -69,6 +69,9 @@ class AuthWebController extends Controller
                 CookieManager::REFRESH_TOKEN_EXPIRY
             );
 
+            // Sem eventos Eloquent: evita audit "updated" a cada login (SPEC-033).
+            $user->forceFill(['last_login_at' => now()])->saveQuietly();
+
             $this->auditLogger->log(
                 action: AuditLogger::ACTION_LOGIN_SUCCESS,
                 auditable: $user,
