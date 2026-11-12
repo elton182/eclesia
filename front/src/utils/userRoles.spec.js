@@ -10,6 +10,7 @@ import {
   canSeeEccEquipesNav,
   canSeeEccEventosNav,
   canSeeEccFinanceiroNav,
+  canSeeEccRelatoriosNav,
   canSeeCalendarioNav,
   canSeePastoraisNav,
   isSomenteLiderEquipe,
@@ -222,6 +223,30 @@ describe('userRoles', () => {
       true,
     )
     assert.equal(canSeeEccFinanceiroNav(null, { isSuperAdmin: true }), true)
+  })
+
+  it('canSeeEccRelatoriosNav para admin/cadastros, não líder', () => {
+    assert.equal(
+      canSeeEccRelatoriosNav({ roles: [{ name: 'admin-igreja' }] }),
+      true,
+    )
+    assert.equal(
+      canSeeEccRelatoriosNav({ roles: [{ name: 'cadastros-casais' }] }),
+      true,
+    )
+    assert.equal(
+      canSeeEccRelatoriosNav({ roles: [{ name: 'cadastros-equipes' }] }),
+      true,
+    )
+    assert.equal(
+      canSeeEccRelatoriosNav({ roles: [{ name: 'lider-equipe' }] }),
+      false,
+    )
+    assert.equal(
+      canSeeEccRelatoriosNav({ permissions: ['ecc.relatorios.view'], roles: [] }),
+      true,
+    )
+    assert.equal(canSeeEccRelatoriosNav(null, { isSuperAdmin: true }), true)
   })
 
   it('canSeeCalendarioNav para admin-igreja e cadastros-calendario', () => {

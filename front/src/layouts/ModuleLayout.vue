@@ -13,6 +13,7 @@ import {
   canSeeEccEquipesNav,
   canSeeEccEventosNav,
   canSeeEccFinanceiroNav,
+  canSeeEccRelatoriosNav,
   canSeePastoraisNav,
   isSomenteLiderEquipe,
   isViewAsLider,
@@ -278,7 +279,9 @@ const navItems = computed(() => {
   if (can('ecc.perguntas.view') || can('ecc.perguntas.manage')) {
     items.push({ label: 'Perguntas', path: '/ecc/perguntas' })
   }
-  items.push({ label: 'Relatórios', path: '/ecc/relatorios', stub: true })
+  if (canSeeEccRelatoriosNav(authTenant.user, { isSuperAdmin: isPlatformAdmin.value })) {
+    items.push({ label: 'Relatórios', path: '/ecc/relatorios/cadastros-acessos' })
+  }
   return items
 })
 

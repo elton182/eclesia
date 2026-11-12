@@ -1364,6 +1364,70 @@ components:
         revisado_em: {type: string, format: date-time, nullable: true}
         created_at: {type: string, format: date-time}
         updated_at: {type: string, format: date-time}
+    EccCadastrosAcessosRelatorio:
+      type: object
+      description: SPEC-033 — dashboard de cadastros de casais e acessos das equipes
+      properties:
+        resumo:
+          type: object
+          properties:
+            janela_dias: {type: integer}
+            casais_total: {type: integer}
+            casais_atualizados_janela: {type: integer}
+            casais_estagnados: {type: integer}
+            equipes_total: {type: integer}
+            equipes_com_acesso: {type: integer}
+            equipes_sem_acesso: {type: integer}
+            equipes_nunca_acessaram: {type: integer}
+            equipes_inativas_janela: {type: integer}
+        equipes_acessos:
+          type: array
+          items:
+            type: object
+            properties:
+              id: {type: string}
+              nome: {type: string}
+              cor: {type: string, nullable: true}
+              casais_count: {type: integer}
+              tem_acesso: {type: boolean}
+              acesso_username: {type: string, nullable: true}
+              must_change_password: {type: boolean, nullable: true}
+              ultimo_acesso_em: {type: string, format: date-time, nullable: true}
+              status_acesso:
+                type: string
+                enum: [ativo, inativo, nunca_acessou, sem_acesso]
+        quem_atualizou:
+          type: array
+          items:
+            type: object
+            properties:
+              ator_user_id: {type: string, nullable: true}
+              ator_label: {type: string, nullable: true}
+              atualizacoes_count: {type: integer}
+              ultima_em: {type: string, format: date-time, nullable: true}
+        atualizacoes_recentes:
+          type: array
+          items:
+            type: object
+            properties:
+              em: {type: string, format: date-time}
+              acao: {type: string, enum: [created, updated]}
+              ator_label: {type: string, nullable: true}
+              ator_user_id: {type: string, nullable: true}
+              casal_id: {type: string, nullable: true}
+              casal_label: {type: string, nullable: true}
+        casais_estagnados:
+          type: array
+          items:
+            type: object
+            properties:
+              id: {type: string}
+              label: {type: string}
+              equipe_id: {type: string, nullable: true}
+              equipe_nome: {type: string, nullable: true}
+              atualizado_em: {type: string, format: date-time, nullable: true}
+              criado_em: {type: string, format: date-time, nullable: true}
+              dias_sem_atualizacao: {type: integer}
 paths:
   /health:
     get:
@@ -2497,6 +2561,40 @@ paths:
       responses:
         '200':
           description: Lista de permissões
+  /ecc/relatorios/cadastros-acessos:
+    get:
+      summary: Dashboard de cadastros de casais e acessos das equipes
+      description: |
+        SPEC-033. Resumo, último acesso por equipe, quem atualizou fichas e casais estagnados.
+        Requer `ecc.relatorios.view` (admin / cadastros). Líder de equipe → 403.
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: janela_dias
+          in: query
+          schema:
+            type: integer
+            minimum: 7
+            maximum: 365
+            default: 30
+          description: Janela em dias para “atualizado”, “inativo” e estagnação
+      responses:
+        '200':
+          description: Relatório agregado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/EccCadastrosAcessosRelatorio'
+        '401':
+          description: Não autenticado
+        '403':
+          description: Sem permissão
+        '422':
+          description: janela_dias inválida
   /ecc/equipes:
     get:
       summary: Listar equipes ECC
