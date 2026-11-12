@@ -94,6 +94,31 @@ class Casal extends Model
         return $this->belongsTo(Pessoa::class, 'pessoa_b_id');
     }
 
+    /**
+     * Rótulo legível para UI/auditoria (não há coluna nome no casal).
+     */
+    public function rotuloExibicao(): string
+    {
+        if (! $this->relationLoaded('pessoaA')) {
+            $this->loadMissing('pessoaA');
+        }
+        if (! $this->relationLoaded('pessoaB')) {
+            $this->loadMissing('pessoaB');
+        }
+
+        $a = is_string($this->pessoaA?->nome) ? trim($this->pessoaA->nome) : '';
+        $b = is_string($this->pessoaB?->nome) ? trim($this->pessoaB->nome) : '';
+        $label = trim(implode(' & ', array_filter([$a, $b], static fn (string $n): bool => $n !== '')));
+
+        if ($label !== '') {
+            return $label;
+        }
+
+        $key = $this->getAttribute('ulid') ?? $this->getKey();
+
+        return is_scalar($key) ? (string) $key : 'Casal';
+    }
+
     public function etapas(): HasMany
     {
         return $this->hasMany(EccCasalEtapa::class)->orderBy('etapa');

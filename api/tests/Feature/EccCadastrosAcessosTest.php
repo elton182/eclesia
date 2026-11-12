@@ -210,15 +210,44 @@ class EccCadastrosAcessosTest extends TestCase
         $this->assertSame($equipeSemAcessoId, $porNome['EQUIPE SEM ACESSO']['id']);
 
         $this->assertNotEmpty($data['atualizacoes_recentes']);
-        $this->assertTrue(
-            collect($data['atualizacoes_recentes'])->contains(
-                static fn (array $row): bool => ($row['casal_id'] ?? null) === $casalId
-                    || str_contains((string) ($row['casal_label'] ?? ''), 'José')
-                    || ($row['acao'] ?? null) === 'updated'
-            )
+        $atualizacaoCasal = collect($data['atualizacoes_recentes'])
+            ->first(static fn (array $row): bool => ($row['casal_id'] ?? null) === $casalId);
+        $this->assertNotNull($atualizacaoCasal);
+        $this->assertStringContainsString('José', (string) $atualizacaoCasal['casal_label']);
+        $this->assertStringContainsString('Ana', (string) $atualizacaoCasal['casal_label']);
+        $this->assertDoesNotMatchRegularExpression(
+            '/^[0-9A-HJKMNP-TV-Z]{26}$/i',
+            (string) $atualizacaoCasal['casal_label'],
         );
 
         $this->assertNotEmpty($data['quem_atualizou']);
+    }
+
+    public function test_relatorio_resolve_label_quando_auditoria_tem_ulid(): void
+    {
+        $casalId = $this->tenantJson('POST', '/api/v1/ecc/casais', [
+            'nome' => 'Pedro',
+            'nome_conjuge' => 'Lucia',
+            'sexo' => 'M',
+            'sexo_conjuge' => 'F',
+        ])->assertCreated()->json('data.id');
+
+        tenancy()->initialize($this->tenant);
+        \App\Models\AuditLog::query()
+            ->where('auditable_type', \App\Models\Casal::class)
+            ->where('auditable_ulid', $casalId)
+            ->update(['auditable_label' => $casalId]);
+        tenancy()->end();
+
+        $response = $this->tenantJson('GET', '/api/v1/ecc/relatorios/cadastros-acessos')
+            ->assertOk();
+
+        $row = collect($response->json('data.atualizacoes_recentes'))
+            ->first(static fn (array $item): bool => ($item['casal_id'] ?? null) === $casalId);
+
+        $this->assertNotNull($row);
+        $this->assertStringContainsString('Pedro', (string) $row['casal_label']);
+        $this->assertStringContainsString('Lucia', (string) $row['casal_label']);
     }
 
     public function test_login_grava_last_login_at(): void
