@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\AuditLog;
+use App\Models\Casal;
 use App\Models\Igreja;
 use App\Models\SuperAdmin;
 use App\Models\User;
@@ -241,6 +242,10 @@ private function describeActor(User|SuperAdmin|null $actor): array
     {
         if ($model === null) {
             return null;
+        }
+
+        if ($model instanceof Casal) {
+            return $model->rotuloExibicao();
         }
 
         foreach (['name', 'nome', 'titulo', 'email', 'slug'] as $attr) {

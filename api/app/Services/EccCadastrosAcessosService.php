@@ -240,16 +240,49 @@ class EccCadastrosAcessosService
             ->limit($limit)
             ->get();
 
-        return $logs->map(static function (AuditLog $log): array {
+        $casalIds = $logs
+            ->pluck('auditable_ulid')
+            ->filter(static fn (mixed $id): bool => is_string($id) && $id !== '')
+            ->unique()
+            ->values()
+            ->all();
+
+        $rotulos = Casal::query()
+            ->whereIn('id', $casalIds)
+            ->with(['pessoaA:id,nome', 'pessoaB:id,nome'])
+            ->get()
+            ->mapWithKeys(static fn (Casal $casal): array => [$casal->id => $casal->rotuloExibicao()]);
+
+        return $logs->map(static function (AuditLog $log) use ($rotulos): array {
+            $casalId = is_string($log->auditable_ulid) ? $log->auditable_ulid : null;
+            $stored = is_string($log->auditable_label) ? $log->auditable_label : null;
+            $resolved = $casalId !== null ? ($rotulos[$casalId] ?? null) : null;
+            $label = $resolved
+                ?? (self::pareceUlidOuVazio($stored, $casalId) ? null : $stored)
+                ?? $casalId
+                ?? 'Casal';
+
             return [
                 'em' => $log->created_at?->toIso8601String(),
                 'acao' => $log->action,
                 'ator_label' => $log->actor_label ?: $log->actor?->name,
                 'ator_user_id' => $log->actor?->ulid,
-                'casal_id' => $log->auditable_ulid,
-                'casal_label' => $log->auditable_label,
+                'casal_id' => $casalId,
+                'casal_label' => $label,
             ];
         })->values()->all();
+    }
+
+    private static function pareceUlidOuVazio(?string $label, ?string $casalId): bool
+    {
+        if ($label === null || $label === '') {
+            return true;
+        }
+        if ($casalId !== null && $label === $casalId) {
+            return true;
+        }
+
+        return (bool) preg_match('/^[0-9A-HJKMNP-TV-Z]{26}$/i', $label);
     }
 
     /**
@@ -266,18 +299,11 @@ class EccCadastrosAcessosService
             ->get();
 
         return $casais->map(static function (Casal $casal): array {
-            $nomeA = $casal->pessoaA?->nome;
-            $nomeB = $casal->pessoaB?->nome;
-            $label = trim(implode(' & ', array_filter([$nomeA, $nomeB], static fn ($n) => filled($n))));
-            if ($label === '') {
-                $label = (string) $casal->id;
-            }
-
             $ref = $casal->updated_at ?? $casal->created_at ?? now();
 
             return [
                 'id' => $casal->id,
-                'label' => $label,
+                'label' => $casal->rotuloExibicao(),
                 'equipe_id' => $casal->ecc_equipe_id,
                 'equipe_nome' => $casal->equipe?->nome,
                 'atualizado_em' => $casal->updated_at?->toIso8601String(),

@@ -133,6 +133,35 @@ class AuditLogTest extends TestCase
         });
     }
 
+    public function test_auditoria_de_casal_grava_label_com_nomes(): void
+    {
+        Sanctum::actingAs($this->admin);
+
+        $casalId = $this->withHeader('X-Tenant', 'paroquia-audit')
+            ->postJson('/api/v1/ecc/casais', [
+                'nome' => 'João',
+                'nome_conjuge' => 'Maria',
+                'sexo' => 'M',
+                'sexo_conjuge' => 'F',
+            ])
+            ->assertCreated()
+            ->json('data.id');
+
+        $this->tenant->run(function () use ($casalId): void {
+            $log = AuditLog::query()
+                ->where('action', AuditLogger::ACTION_CREATED)
+                ->where('auditable_type', \App\Models\Casal::class)
+                ->where('auditable_ulid', $casalId)
+                ->latest('id')
+                ->first();
+
+            $this->assertNotNull($log);
+            $this->assertStringContainsString('João', (string) $log->auditable_label);
+            $this->assertStringContainsString('Maria', (string) $log->auditable_label);
+            $this->assertNotSame($casalId, $log->auditable_label);
+        });
+    }
+
     public function test_listar_audit_logs_requer_permissao(): void
     {
         $this->withHeader('X-Tenant', 'paroquia-audit')
