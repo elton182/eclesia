@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '@/services/api'
-import { innovToast } from '@/composables/useInnovToast'
+import { innovToast } from '@/plugins/toast'
 import {
   acaoCadastroLabel,
   buildResumoCards,
