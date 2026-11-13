@@ -26,5 +26,72 @@
   <body>
     <div id="app"></div>
     <script type="module" src="/src/main.js"></script>
+    <!-- Fallback se o bundle não montar (SW/cache stale após deploy). -->
+    <script>
+      (function () {
+        var GUARD = 'eclesia_bundle_reload'
+        var booted = false
+        var root = document.getElementById('app')
+        if (!root) return
+
+        var obs = new MutationObserver(function () {
+          if (root.childElementCount > 0) {
+            booted = true
+            try { sessionStorage.removeItem(GUARD) } catch (e) {}
+            obs.disconnect()
+          }
+        })
+        obs.observe(root, { childList: true })
+
+        setTimeout(function () {
+          if (booted || root.childElementCount > 0) return
+          obs.disconnect()
+          var tried = false
+          try { tried = sessionStorage.getItem(GUARD) === '1' } catch (e) {}
+
+          root.setAttribute('data-testid', 'boot-fallback')
+          root.style.cssText =
+            'min-height:100vh;display:flex;align-items:center;justify-content:center;' +
+            'padding:24px;font-family:system-ui,sans-serif;background:#F7F4EF;color:#1A0C10;text-align:center'
+          root.innerHTML =
+            '<div style="max-width:22rem">' +
+            '<p style="font-size:1.125rem;font-weight:600;margin:0 0 8px">Não foi possível abrir o Apostolus</p>' +
+            '<p style="font-size:0.875rem;line-height:1.45;color:#5C4A4E;margin:0 0 16px">' +
+            (tried
+              ? 'Limpe os dados do site neste navegador (ou abra em aba anônima) e tente de novo.'
+              : 'Isso costuma acontecer após uma atualização. Toque em Atualizar para recarregar.') +
+            '</p>' +
+            (tried
+              ? ''
+              : '<button type="button" id="eclesia-boot-reload" style="appearance:none;border:0;border-radius:10px;' +
+                'background:#4E1220;color:#fff;font-weight:600;padding:12px 18px;font-size:0.9375rem;cursor:pointer">' +
+                'Atualizar</button>') +
+            '</div>'
+
+          var btn = document.getElementById('eclesia-boot-reload')
+          if (!btn) return
+          btn.addEventListener('click', function () {
+            try { sessionStorage.setItem(GUARD, '1') } catch (e) {}
+            var done = function () { location.reload() }
+            var pending = []
+            if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
+              pending.push(
+                navigator.serviceWorker.getRegistrations().then(function (regs) {
+                  return Promise.all(regs.map(function (r) { return r.unregister() }))
+                }),
+              )
+            }
+            if (window.caches && caches.keys) {
+              pending.push(
+                caches.keys().then(function (keys) {
+                  return Promise.all(keys.map(function (k) { return caches.delete(k) }))
+                }),
+              )
+            }
+            Promise.all(pending).then(done, done)
+          })
+        }, 8000)
+      })()
+    </script>
   </body>
 </html>

@@ -83,7 +83,11 @@ jobs:
           # -rlDz (sem -a/-p/-t/-o/-g): evita chown/chgrp/chmod no destino
           # (usuário de deploy costuma falhar com code 23 em bootstrap/cache).
           SSH_OPTS="-i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes"
+          # P front/dist/assets: não apaga JS/CSS hasheados do deploy anterior.
+          # Evita tela branca quando o service worker ainda serve index.html antigo
+          # apontando para assets que o --delete removeria (Samsung/WhatsApp).
           rsync -rlDz --delete \
+            --filter='P /front/dist/assets/***' \
             --exclude='.git' \
             --exclude='api/.env' \
             --exclude='api/vendor' \

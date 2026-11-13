@@ -127,6 +127,13 @@ const router = createRouter({
       meta: { publicSite: true },
     },
     {
+      path: '/o/:tenantSlug/planejamento/publico/:token',
+      name: 'planejamento-publico-tenant',
+      component: PlanejamentoPublicView,
+      meta: { publicSite: true },
+    },
+    {
+      // Legado: ?tenant=slug (mensageiros às vezes cortam a query)
       path: '/planejamento/publico/:token',
       name: 'planejamento-publico',
       component: PlanejamentoPublicView,

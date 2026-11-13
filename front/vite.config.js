@@ -60,10 +60,25 @@ const pwaPlugin = VitePWA({
     ],
   },
   workbox: {
-    globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2,webp}'],
+    // HTML fora do precache glob: navegação usa NetworkFirst (abaixo) para
+    // reduzir shell stale após deploy. navigateFallback ainda inclui index.html.
+    globPatterns: ['**/*.{js,css,ico,png,svg,woff2,webp}'],
+    cleanupOutdatedCaches: true,
     navigateFallback: '/index.html',
     navigateFallbackDenylist: [/^\/api\//, /^\/site\//],
     runtimeCaching: [
+      {
+        urlPattern: ({ request }) => request.mode === 'navigate',
+        handler: 'NetworkFirst',
+        options: {
+          cacheName: 'eclesia-navigations',
+          networkTimeoutSeconds: 3,
+          expiration: {
+            maxEntries: 32,
+            maxAgeSeconds: 60 * 60 * 24,
+          },
+        },
+      },
       {
         urlPattern: ({ url }) => url.pathname.startsWith('/api/'),
         handler: 'NetworkOnly',

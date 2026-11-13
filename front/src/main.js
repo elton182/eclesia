@@ -8,13 +8,16 @@ import App from './App.vue'
 import router from './router'
 import i18n from './i18n'
 import { registerInstallPrompt } from '@/utils/pwa'
-import { watchServiceWorkerUpdates } from '@/utils/pwaUpdate'
+import { installBundleRecovery, watchServiceWorkerUpdates } from '@/utils/pwaUpdate'
 
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import { library } from '@fortawesome/fontawesome-svg-core';
 import { faEdit, faTrash, faBuilding     } from '@fortawesome/free-solid-svg-icons';
 
 library.add(faEdit, faTrash, faBuilding);
+
+// Antes do registerSW: se o shell cached apontar para JS removido no deploy, recupera.
+installBundleRecovery()
 
 registerSW({
   immediate: true,
