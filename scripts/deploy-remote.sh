@@ -28,8 +28,14 @@ php artisan storage:link 2>/dev/null || true
 echo "==> Front estático"
 # O build já veio no rsync (front/dist). Servir via Nginx/Apache apontando
 # document root do site para front/dist (ou copiar para o path público).
+# Assets hasheados do deploy anterior são preservados no rsync (filtro P) e
+# limpos aqui após 14 dias — janela para service workers stale atualizarem.
 if [[ -d "$APP_DIR/front/dist" ]]; then
   echo "front/dist pronto ($(du -sh front/dist | cut -f1))"
+  if [[ -d "$APP_DIR/front/dist/assets" ]]; then
+    deleted="$(find "$APP_DIR/front/dist/assets" -type f -mtime +14 -print -delete | wc -l | tr -d ' ')"
+    echo "assets antigos removidos (>14d): ${deleted}"
+  fi
 fi
 
 echo "==> Reload PHP-FPM (se existir)"

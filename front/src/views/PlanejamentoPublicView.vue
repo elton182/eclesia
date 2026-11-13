@@ -14,6 +14,7 @@ import {
   labelStatusSolicitacao,
   normalizePastoralNomeInput,
   podeCarregarEventosPublicos,
+  resolvePublicTenantSlug,
   styleStatusSolicitacao,
 } from '@/utils/planejamento'
 import { innovToast } from '@/plugins/toast'
@@ -45,7 +46,7 @@ const WEEKDAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 const route = useRoute()
 const tenantStore = useTenantStore()
 const token = computed(() => String(route.params.token || ''))
-const tenant = computed(() => String(route.query.tenant || ''))
+const tenant = computed(() => resolvePublicTenantSlug(route, tenantStore.slug || ''))
 
 const meta = ref(null)
 const eventos = ref([])
@@ -255,6 +256,12 @@ async function load() {
   error.value = ''
   if (tenant.value && tenantStore.slug !== tenant.value) {
     tenantStore.select({ slug: tenant.value, name: tenantStore.name || '' })
+  }
+  if (!tenant.value) {
+    error.value =
+      'Link incompleto: falta a organização (tenant). Peça o link completo a quem compartilhou.'
+    loading.value = false
+    return
   }
   try {
     meta.value = await getPublicoMeta(token.value, headers.value)

@@ -631,3 +631,35 @@ export function plainTokenFromAnualToken(data) {
   if (!data || data.ativo === false) return ''
   return typeof data.token === 'string' ? data.token : ''
 }
+
+/**
+ * Monta URL do link público (tenant no path — mais resistente a apps que
+ * cortam `?tenant=`). Links antigos com query continuam válidos no router.
+ *
+ * @param {{ origin?: string, token?: string, tenantSlug?: string }} opts
+ * @returns {string}
+ */
+export function buildPlanejamentoPublicUrl(opts = {}) {
+  const token = String(opts.token || '').trim()
+  if (!token) return ''
+  const origin = String(opts.origin || '').replace(/\/$/, '')
+  const slug = String(opts.tenantSlug || '').trim()
+  const tokenPath = encodeURIComponent(token)
+  if (slug) {
+    return `${origin}/o/${encodeURIComponent(slug)}/planejamento/publico/${tokenPath}`
+  }
+  return `${origin}/planejamento/publico/${tokenPath}`
+}
+
+/**
+ * Slug do tenant na rota pública: path `/o/:tenantSlug/...` ou `?tenant=`.
+ * @param {{ params?: Record<string, unknown>, query?: Record<string, unknown> }|null|undefined} route
+ * @param {string} [fallback]
+ * @returns {string}
+ */
+export function resolvePublicTenantSlug(route, fallback = '') {
+  const fromPath = route?.params?.tenantSlug
+  const fromQuery = route?.query?.tenant
+  const raw = fromPath || fromQuery || fallback || ''
+  return String(Array.isArray(raw) ? raw[0] : raw).trim()
+}

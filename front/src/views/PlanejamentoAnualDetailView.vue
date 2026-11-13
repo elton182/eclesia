@@ -54,6 +54,7 @@ import {
   particionarEventosGradeSemana,
   pastoralIdsDoUsuario,
   plainTokenFromAnualToken,
+  buildPlanejamentoPublicUrl,
   proximosStatusPlanejamento,
   styleStatusSolicitacao,
   togglePastoralVisivel,
@@ -461,9 +462,11 @@ function closeDayModal() {
 }
 
 function publicLinkFor(token) {
-  if (!token) return ''
-  const qs = tenantStore.slug ? `?tenant=${encodeURIComponent(tenantStore.slug)}` : ''
-  return `${window.location.origin}/planejamento/publico/${token}${qs}`
+  return buildPlanejamentoPublicUrl({
+    origin: window.location.origin,
+    token,
+    tenantSlug: tenantStore.slug,
+  })
 }
 
 async function gerarLinkPastoral(pastoral) {

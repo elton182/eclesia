@@ -39,6 +39,8 @@ import {
   buildPublicEventosParams,
   buildPublicEventoPayload,
   plainTokenFromAnualToken,
+  buildPlanejamentoPublicUrl,
+  resolvePublicTenantSlug,
 } from './planejamento.js'
 
 describe('planejamento', () => {
@@ -289,5 +291,25 @@ describe('planejamento', () => {
     assert.equal(plainTokenFromAnualToken({ token: 'abc', ativo: true }), 'abc')
     assert.equal(plainTokenFromAnualToken({ token: 'abc', ativo: false }), '')
     assert.equal(plainTokenFromAnualToken(null), '')
+
+    assert.equal(
+      buildPlanejamentoPublicUrl({
+        origin: 'https://apostolus.com.br',
+        token: 'tok123',
+        tenantSlug: 'paroquia-x',
+      }),
+      'https://apostolus.com.br/o/paroquia-x/planejamento/publico/tok123',
+    )
+    assert.equal(
+      buildPlanejamentoPublicUrl({ origin: 'https://apostolus.com.br/', token: 'tok123' }),
+      'https://apostolus.com.br/planejamento/publico/tok123',
+    )
+    assert.equal(buildPlanejamentoPublicUrl({ token: '' }), '')
+    assert.equal(
+      resolvePublicTenantSlug({ params: { tenantSlug: 'a' }, query: { tenant: 'b' } }),
+      'a',
+    )
+    assert.equal(resolvePublicTenantSlug({ params: {}, query: { tenant: 'b' } }), 'b')
+    assert.equal(resolvePublicTenantSlug({ params: {}, query: {} }, 'fallback'), 'fallback')
   })
 })
