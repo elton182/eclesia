@@ -134,7 +134,7 @@ class SitePublicHtmlTest extends TestCase
         $this->assertStringContainsString('rel="canonical" href="http://front.test/site/org-html"', $html);
         $this->assertStringContainsString('rel="sitemap"', $html);
         $this->assertStringContainsString(
-            'rel="manifest" href="http://front.test/site/org-html/manifest.webmanifest"',
+            'rel="manifest" href="/site/org-html/manifest.webmanifest"',
             $html,
         );
         $this->assertStringContainsString('Bem-vindo à Matriz', $html);
@@ -217,13 +217,13 @@ class SitePublicHtmlTest extends TestCase
         $html = $response->getContent();
         $this->assertIsString($html);
         $this->assertStringContainsString(
-            'rel="manifest" href="http://front.test/site/org-html/manifest.webmanifest"',
+            'rel="manifest" href="/site/org-html/manifest.webmanifest"',
             $html,
         );
         $this->assertStringContainsString('Instalar acesso — Org Html', $html);
         $this->assertStringContainsString('id="app"', $html);
         $this->assertStringNotContainsString('href="/manifest.webmanifest"', $html);
-        $this->assertStringNotContainsString('href="http://front.test/manifest.webmanifest"', $html);
+        $this->assertStringNotContainsString('http://front.test/site/org-html/manifest.webmanifest', $html);
     }
 
     public function test_access_manifest_returns_404_when_unpublished(): void
@@ -251,7 +251,7 @@ class SitePublicHtmlTest extends TestCase
         $this->assertSame('/', $manifest['scope']);
         $this->assertSame('standalone', $manifest['display']);
         $this->assertSame('#4E1220', $manifest['theme_color']);
-        $this->assertSame('http://front.test/icons/icon-192x192.png', $manifest['icons'][0]['src'] ?? null);
+        $this->assertSame('/icons/icon-192x192.png', $manifest['icons'][0]['src'] ?? null);
     }
 
     public function test_access_manifest_unknown_tenant(): void

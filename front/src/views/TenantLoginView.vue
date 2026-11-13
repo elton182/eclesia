@@ -9,6 +9,7 @@ import {
   rememberTenantForLogin,
   resolveTenantFromLoginQuery,
 } from '../utils/tenantAuth'
+import { ensureTenantAccessManifest, restoreDefaultManifest } from '../utils/tenantAccessManifest'
 import { homePathForUser } from '../utils/userRoles'
 
 const route = useRoute()
@@ -33,11 +34,14 @@ function applyTenantFromQuery() {
   const fromQuery = resolveTenantFromLoginQuery(route.query)
   if (!fromQuery) {
     tenantLocked.value = false
+    restoreDefaultManifest()
     return
   }
   tenant.value = fromQuery
   rememberTenantForLogin(fromQuery)
   tenantLocked.value = true
+  // Mantém o PWA da paróquia no login (mesmo manifest da tela /instalar).
+  ensureTenantAccessManifest(fromQuery)
 }
 
 onMounted(applyTenantFromQuery)
@@ -45,6 +49,7 @@ watch(() => route.query.tenant, applyTenantFromQuery)
 
 function unlockTenant() {
   tenantLocked.value = false
+  restoreDefaultManifest()
   router.replace({ path: '/entrar', query: {} })
 }
 

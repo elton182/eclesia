@@ -62,7 +62,10 @@ class SitePublicHtmlRenderer
         $settings = $this->site->assertPublished();
         $base = rtrim((string) config('app.frontend_url'), '/');
         $name = $this->brandTitle($settings);
-        $manifestHref = $base.'/site/'.$tenantSlug.'/manifest.webmanifest';
+        // Manifest e ícones precisam ser same-origin com a página (path absoluto no host).
+        // URL absoluta com FRONTEND_URL errado faz o Chrome ignorar o PWA até o login
+        // (quando volta o /manifest.webmanifest da plataforma).
+        $manifestHref = '/site/'.$tenantSlug.'/manifest.webmanifest';
         $canonical = $base.'/site/'.$tenantSlug.'/instalar';
 
         $branding = $this->branding->brandingPayload();
@@ -100,7 +103,6 @@ class SitePublicHtmlRenderer
         $cacheKey = 'site_access_manifest:'.$tenantSlug.':'.$version;
 
         return Cache::remember($cacheKey, self::CACHE_TTL_SECONDS, function () use ($tenantSlug, $settings) {
-            $front = rtrim((string) config('app.frontend_url'), '/');
             $name = $this->brandTitle($settings);
             $short = $this->shortAppName($name);
             $branding = $this->branding->brandingPayload();
@@ -109,27 +111,28 @@ class SitePublicHtmlRenderer
                 ? $cores['primary']
                 : self::DEFAULT_THEME_COLOR;
 
+            // Paths na origem do front (mesmo host da página) — não usar FRONTEND_URL absoluto.
             $icons = [
                 [
-                    'src' => $front.'/icons/icon-192x192.png',
+                    'src' => '/icons/icon-192x192.png',
                     'sizes' => '192x192',
                     'type' => 'image/png',
                     'purpose' => 'any',
                 ],
                 [
-                    'src' => $front.'/icons/icon-512x512.png',
+                    'src' => '/icons/icon-512x512.png',
                     'sizes' => '512x512',
                     'type' => 'image/png',
                     'purpose' => 'any',
                 ],
                 [
-                    'src' => $front.'/icons/maskable-192x192.png',
+                    'src' => '/icons/maskable-192x192.png',
                     'sizes' => '192x192',
                     'type' => 'image/png',
                     'purpose' => 'maskable',
                 ],
                 [
-                    'src' => $front.'/icons/maskable-512x512.png',
+                    'src' => '/icons/maskable-512x512.png',
                     'sizes' => '512x512',
                     'type' => 'image/png',
                     'purpose' => 'maskable',
@@ -220,7 +223,7 @@ class SitePublicHtmlRenderer
             : $base.'/site/'.$tenantSlug.'/'.$pageSlug;
         $apiBase = rtrim((string) config('app.url'), '/');
         $sitemapHref = $apiBase.'/api/v1/public/site/sitemap/'.$tenantSlug;
-        $manifestHref = $base.'/site/'.$tenantSlug.'/manifest.webmanifest';
+        $manifestHref = '/site/'.$tenantSlug.'/manifest.webmanifest';
 
         $main = $this->renderMain($settings, $page);
 
