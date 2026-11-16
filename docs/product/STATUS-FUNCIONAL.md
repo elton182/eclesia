@@ -143,7 +143,7 @@ Entrada típica: card **ECC** no launcher → rotas sob `/ecc/*`.
 |----------------|---------------|
 | Equipes de serviço | Cadastro/gestão (painel ligado a casais) |
 | Casais | CRUD em `/ecc/casais`; ficha em `/ecc/casais/:id` |
-| Import Excel | Carga em lote de casais |
+| Import Excel | Carga em lote com revisão seletiva (preview + commit; legado cria sempre) |
 | Swap Ele/Ela | Inverte posições na ficha |
 | Ficha enriquecida | Etapas, preferências, atividades/serviço |
 | Filtro por equipe | Na listagem de casais |

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\CommitEccCasaisImportRequest;
 use App\Http\Requests\ImportEccCasaisRequest;
 use App\Http\Requests\StoreEccCasalRequest;
 use App\Http\Requests\UpdateEccCasalRequest;
@@ -73,6 +74,21 @@ class EccCasalController extends Controller
     public function import(ImportEccCasaisRequest $request): JsonResponse
     {
         $result = $this->casais->import($request->validated('rows'));
+
+        return response()->json($result);
+    }
+
+    public function importPreview(ImportEccCasaisRequest $request): JsonResponse
+    {
+        $result = $this->casais->previewImport($request->validated('rows'));
+
+        return response()->json($result);
+    }
+
+    public function importCommit(CommitEccCasaisImportRequest $request): JsonResponse
+    {
+        $data = $request->validated();
+        $result = $this->casais->commitImport($data['rows'], $data['decisions']);
 
         return response()->json($result);
     }

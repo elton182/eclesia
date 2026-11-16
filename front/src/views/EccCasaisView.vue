@@ -33,6 +33,16 @@ import {
   isLastFichaStep,
   validateFichaStep,
 } from '@/utils/eccFichaSteps'
+import {
+  buildInitialDecisions,
+  countPendingActions,
+  formatDiffValue,
+  formatPreviewSummary,
+  importFieldLabel,
+  patchDecision,
+  statusBadgeLabel,
+  toggleApplyField,
+} from '@/utils/eccCasalImportReview'
 
 const route = useRoute()
 const router = useRouter()
@@ -111,15 +121,60 @@ const casais = ref([])
 const equipes = ref([])
 const equipesServico = ref([])
 const loading = ref(false)
-/** @type {import('vue').Ref<'list'|'form'>} */
+/** @type {import('vue').Ref<'list'|'form'|'import-review'>} */
 const mode = ref('list')
 const saving = ref(false)
 const swapping = ref(false)
 const importing = ref(false)
+const committingImport = ref(false)
 const filterEquipe = ref('')
 const search = ref('')
 const fileInput = ref(null)
 const importErrors = ref([])
+const importRows = ref([])
+const importPreviewItems = ref([])
+const importPreviewSummary = ref(null)
+const importDecisions = ref([])
+const expandedImportRows = ref({})
+
+const importActionCounts = computed(() => countPendingActions(importDecisions.value))
+const importSummaryText = computed(() => formatPreviewSummary(importPreviewSummary.value))
+
+const decisionFor = (rowIndex) =>
+  importDecisions.value.find((d) => Number(d.row_index) === Number(rowIndex))
+
+const cancelImportReview = () => {
+  importRows.value = []
+  importPreviewItems.value = []
+  importPreviewSummary.value = null
+  importDecisions.value = []
+  importErrors.value = []
+  expandedImportRows.value = {}
+  mode.value = 'list'
+}
+
+const setImportAction = (rowIndex, action) => {
+  importDecisions.value = patchDecision(importDecisions.value, rowIndex, { action })
+}
+
+const setImportCasalId = (rowIndex, casalId) => {
+  importDecisions.value = patchDecision(importDecisions.value, rowIndex, {
+    action: 'update',
+    casal_id: casalId || null,
+  })
+}
+
+const onToggleImportField = (rowIndex, field, checked) => {
+  importDecisions.value = toggleApplyField(importDecisions.value, rowIndex, field, checked)
+}
+
+const toggleImportExpanded = (rowIndex) => {
+  const key = String(rowIndex)
+  expandedImportRows.value = {
+    ...expandedImportRows.value,
+    [key]: !expandedImportRows.value[key],
+  }
+}
 
 const applyFiltersFromQuery = () => {
   filterEquipe.value = route.query.equipe ? String(route.query.equipe) : ''
@@ -529,21 +584,65 @@ const onImportFile = async (event) => {
       return
     }
 
-    const { data } = await api.post('/ecc/casais/import', { rows })
-    importErrors.value = data.errors || []
-
-    const msg =
-      `${data.imported} casais importados` +
-      (data.skipped ? ` · ${data.skipped} linha(s) vazia(s)` : '') +
-      (data.errors?.length ? ` · ${data.errors.length} com erro` : '')
-
-    innovToast(data.imported > 0 ? 'success' : 'error', 'Importação', msg)
-    await load()
+    const { data } = await api.post('/ecc/casais/import/preview', { rows })
+    importRows.value = rows
+    importPreviewItems.value = data.items || []
+    importPreviewSummary.value = data.summary || null
+    importDecisions.value = buildInitialDecisions(data.items || [])
+    expandedImportRows.value = {}
+    mode.value = 'import-review'
+    innovToast('success', 'Importação', importSummaryText.value || 'Revise as linhas antes de aplicar')
   } catch (e) {
     innovToast('error', 'Importação', e.response?.data?.message || e.message || 'Falha')
   } finally {
     importing.value = false
     if (fileInput.value) fileInput.value.value = ''
+  }
+}
+
+const commitImportReview = async () => {
+  const counts = importActionCounts.value
+  const ok = await innovConfirm({
+    title: 'Aplicar importação?',
+    message:
+      `Serão criados ${counts.create} casal(is) e atualizados ${counts.update}. ` +
+      `${counts.skip} linha(s) serão ignoradas. Campos não marcados permanecem como estão no sistema.`,
+    confirmText: 'Aplicar',
+  })
+  if (!ok) return
+
+  committingImport.value = true
+  importErrors.value = []
+  try {
+    const { data } = await api.post('/ecc/casais/import/commit', {
+      rows: importRows.value,
+      decisions: importDecisions.value,
+    })
+    importErrors.value = (data.errors || []).map((err) => ({
+      line: (err.row_index ?? 0) + 1,
+      message: err.message,
+    }))
+
+    const msg =
+      `${data.created || 0} criado(s) · ${data.updated || 0} atualizado(s) · ${data.skipped || 0} ignorado(s)` +
+      (data.errors?.length ? ` · ${data.errors.length} com erro` : '')
+
+    innovToast(
+      (data.created || 0) + (data.updated || 0) > 0 ? 'success' : 'error',
+      'Importação',
+      msg,
+    )
+
+    if (!data.errors?.length) {
+      cancelImportReview()
+      await load()
+    } else {
+      await load()
+    }
+  } catch (e) {
+    innovToast('error', 'Importação', e.response?.data?.message || e.message || 'Falha')
+  } finally {
+    committingImport.value = false
   }
 }
 
@@ -581,7 +680,7 @@ onUnmounted(() => {
         {{
           somenteLider
             ? 'Ficha do casal da sua equipe. Incluir, excluir ou trocar de equipe fica com a secretaria.'
-            : 'Cadastro de casais e vínculo com equipe. Importe a planilha Excel do modelo atual.'
+            : 'Cadastro de casais e vínculo com equipe. Importe a planilha e revise o que sobrescrever.'
         }}
       </p>
     </div>
@@ -605,7 +704,7 @@ onUnmounted(() => {
             data-testid="casais-import-btn"
             @click="fileInput?.click()"
           >
-            {{ importing ? 'Importando…' : 'Importar Excel' }}
+            {{ importing ? 'Analisando…' : 'Importar Excel' }}
           </button>
           <router-link
             v-if="canManageEquipes"
@@ -736,6 +835,190 @@ onUnmounted(() => {
                 Excluir
               </button>
             </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Revisão seletiva da importação -->
+    <div
+      v-else-if="mode === 'import-review'"
+      class="space-y-5 w-full"
+      data-testid="casais-import-review"
+    >
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h3 class="font-serif text-xl" style="color: #2A1418">Revisar importação</h3>
+          <p class="mt-1 text-[13.5px]" style="color: rgba(42, 20, 24, 0.62)">
+            {{ importSummaryText }}. Marque só o que deve sobrescrever o cadastro atual.
+          </p>
+        </div>
+        <div class="flex flex-col gap-2 sm:flex-row">
+          <button
+            class="btn btn-ghost w-full sm:w-auto"
+            type="button"
+            data-testid="casais-import-cancel"
+            :disabled="committingImport"
+            @click="cancelImportReview"
+          >
+            Cancelar
+          </button>
+          <button
+            class="btn btn-primary w-full sm:w-auto"
+            type="button"
+            data-testid="casais-import-commit"
+            :disabled="committingImport || (!importActionCounts.create && !importActionCounts.update)"
+            @click="commitImportReview"
+          >
+            {{ committingImport ? 'Aplicando…' : `Aplicar (${importActionCounts.create + importActionCounts.update})` }}
+          </button>
+        </div>
+      </div>
+
+      <div
+        v-if="importErrors.length"
+        class="card p-4 text-sm"
+        style="border-color: #f5c2c7; background: #fff5f5"
+      >
+        <p class="font-semibold mb-2 text-red-800">Erros na importação ({{ importErrors.length }})</p>
+        <ul class="max-h-40 overflow-auto space-y-1 text-red-700">
+          <li v-for="err in importErrors.slice(0, 30)" :key="'rev-' + err.line + err.message">
+            Linha {{ err.line }}: {{ err.message }}
+          </li>
+        </ul>
+      </div>
+
+      <div
+        class="w-full overflow-hidden rounded-[11px]"
+        style="background: #FFFDFA; border: 1px solid rgba(42, 20, 24, 0.1)"
+      >
+        <div
+          v-for="item in importPreviewItems"
+          :key="item.row_index"
+          class="px-5 md:px-6 py-4"
+          style="border-top: 1px solid rgba(42, 20, 24, 0.07)"
+          :data-testid="`casais-import-row-${item.row_index}`"
+        >
+          <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div class="min-w-0 flex-1">
+              <div class="flex flex-wrap items-center gap-2">
+                <span
+                  class="inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide"
+                  style="background: var(--color-accent-soft); color: var(--color-accent-dark)"
+                >
+                  {{ statusBadgeLabel(item.status) }}
+                </span>
+                <span class="font-medium" style="color: #2A1418">
+                  {{ item.label || `Linha ${item.row_index + 1}` }}
+                </span>
+              </div>
+              <p v-if="item.message" class="mt-1 text-[12.5px]" style="color: rgba(42, 20, 24, 0.62)">
+                {{ item.message }}
+              </p>
+              <p
+                v-else-if="item.status === 'match'"
+                class="mt-1 text-[12.5px]"
+                style="color: rgba(42, 20, 24, 0.62)"
+              >
+                {{ item.field_diffs?.length || 0 }} campo(s) diferentes — por padrão o sistema é preservado.
+              </p>
+            </div>
+
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <label class="text-[12px]" style="color: rgba(42, 20, 24, 0.62)">
+                Ação
+                <select
+                  class="mt-1 block w-full sm:w-44 rounded-md border px-2 py-1.5 text-sm"
+                  style="border-color: rgba(42, 20, 24, 0.15)"
+                  :value="decisionFor(item.row_index)?.action || 'skip'"
+                  :data-testid="`casais-import-action-${item.row_index}`"
+                  @change="setImportAction(item.row_index, $event.target.value)"
+                >
+                  <option v-if="item.status === 'new' || item.status === 'ambiguous'" value="create">
+                    Criar novo
+                  </option>
+                  <option
+                    v-if="item.status === 'match' || item.status === 'identical' || item.status === 'ambiguous'"
+                    value="update"
+                  >
+                    Atualizar
+                  </option>
+                  <option value="skip">Ignorar</option>
+                </select>
+              </label>
+
+              <label
+                v-if="item.status === 'ambiguous' && decisionFor(item.row_index)?.action === 'update'"
+                class="text-[12px]"
+                style="color: rgba(42, 20, 24, 0.62)"
+              >
+                Casal
+                <select
+                  class="mt-1 block w-full sm:w-56 rounded-md border px-2 py-1.5 text-sm"
+                  style="border-color: rgba(42, 20, 24, 0.15)"
+                  :value="decisionFor(item.row_index)?.casal_id || ''"
+                  :data-testid="`casais-import-casal-${item.row_index}`"
+                  @change="setImportCasalId(item.row_index, $event.target.value)"
+                >
+                  <option value="">Selecione…</option>
+                  <option v-for="c in item.candidates || []" :key="c.id" :value="c.id">
+                    {{ c.nome }} & {{ c.nome_conjuge }}{{ c.equipe_nome ? ` · ${c.equipe_nome}` : '' }}
+                  </option>
+                </select>
+              </label>
+
+              <button
+                v-if="item.field_diffs?.length"
+                type="button"
+                class="btn btn-ghost text-sm"
+                :data-testid="`casais-import-toggle-diffs-${item.row_index}`"
+                @click="toggleImportExpanded(item.row_index)"
+              >
+                {{ expandedImportRows[String(item.row_index)] ? 'Ocultar campos' : 'Campos' }}
+              </button>
+            </div>
+          </div>
+
+          <div
+            v-if="item.field_diffs?.length && (expandedImportRows[String(item.row_index)] || decisionFor(item.row_index)?.action === 'update')"
+            class="mt-4 overflow-x-auto"
+          >
+            <table class="w-full text-left text-[12.5px]" :data-testid="`casais-import-diffs-${item.row_index}`">
+              <thead>
+                <tr style="color: rgba(42, 20, 24, 0.55)">
+                  <th class="py-2 pr-3 font-medium">Usar planilha</th>
+                  <th class="py-2 pr-3 font-medium">Campo</th>
+                  <th class="py-2 pr-3 font-medium">No sistema</th>
+                  <th class="py-2 font-medium">Na planilha</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="diff in item.field_diffs"
+                  :key="diff.field"
+                  style="border-top: 1px solid rgba(42, 20, 24, 0.06)"
+                >
+                  <td class="py-2 pr-3 align-top">
+                    <input
+                      type="checkbox"
+                      class="rounded"
+                      :checked="(decisionFor(item.row_index)?.apply_fields || []).includes(diff.field)"
+                      :data-testid="`casais-import-field-${item.row_index}-${diff.field}`"
+                      @change="onToggleImportField(item.row_index, diff.field, $event.target.checked)"
+                    >
+                  </td>
+                  <td class="py-2 pr-3 align-top font-medium" style="color: #2A1418">
+                    {{ importFieldLabel(diff.field) }}
+                  </td>
+                  <td class="py-2 pr-3 align-top break-words" style="color: rgba(42, 20, 24, 0.72)">
+                    {{ formatDiffValue(diff.current) }}
+                  </td>
+                  <td class="py-2 align-top break-words" style="color: rgba(42, 20, 24, 0.72)">
+                    {{ formatDiffValue(diff.incoming) }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </div>

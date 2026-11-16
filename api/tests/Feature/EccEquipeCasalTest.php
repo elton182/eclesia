@@ -268,4 +268,153 @@ class EccEquipeCasalTest extends TestCase
         $this->assertNotNull($ind2025);
         $this->assertSame('IC', $ind2025['status']);
     }
+
+    public function test_import_preview_classifica_new_match_identical(): void
+    {
+        $created = $this->tenantJson('POST', '/api/v1/ecc/casais', [
+            'equipe' => 'Equipe Alpha',
+            'nome' => 'João',
+            'nome_conjuge' => 'Maria',
+            'telefone' => '11999990000',
+            'endereco' => 'Rua Sistema, 1',
+        ])->assertCreated()->json('data');
+
+        $preview = $this->tenantJson('POST', '/api/v1/ecc/casais/import/preview', [
+            'rows' => [
+                [
+                    'Equipe' => 'Equipe Alpha',
+                    'Nome' => 'João e Maria',
+                    'Endereço' => 'Rua Planilha, 99',
+                    'Telefone' => '11999990000',
+                ],
+                [
+                    'Equipe' => 'Equipe Beta',
+                    'Nome' => 'Pedro e Ana',
+                    'Endereço' => 'Av. Nova, 10',
+                    'Telefone' => '11888887777',
+                ],
+                [
+                    'Equipe' => 'Equipe Alpha',
+                    'Nome' => 'João e Maria',
+                    'Endereço' => 'Rua Sistema, 1',
+                    'Telefone' => '11999990000',
+                ],
+            ],
+        ])->assertOk()->json();
+
+        $this->assertSame(1, $preview['summary']['match']);
+        $this->assertSame(1, $preview['summary']['new']);
+        $this->assertSame(1, $preview['summary']['identical']);
+
+        $match = collect($preview['items'])->firstWhere('status', 'match');
+        $this->assertNotNull($match);
+        $this->assertSame($created['id'], $match['suggested_casal_id']);
+        $this->assertSame('update', $match['suggested_action']);
+        $enderecoDiff = collect($match['field_diffs'])->firstWhere('field', 'endereco');
+        $this->assertNotNull($enderecoDiff);
+        $this->assertSame('Rua Sistema, 1', $enderecoDiff['current']);
+        $this->assertSame('Rua Planilha, 99', $enderecoDiff['incoming']);
+        $this->assertFalse($enderecoDiff['suggest_apply']);
+
+        $novo = collect($preview['items'])->firstWhere('status', 'new');
+        $this->assertSame('create', $novo['suggested_action']);
+
+        $identical = collect($preview['items'])->firstWhere('status', 'identical');
+        $this->assertSame('skip', $identical['suggested_action']);
+    }
+
+    public function test_import_commit_atualiza_campos_escolhidos_e_cria_novos(): void
+    {
+        $created = $this->tenantJson('POST', '/api/v1/ecc/casais', [
+            'equipe' => 'Equipe Alpha',
+            'nome' => 'Carlos',
+            'nome_conjuge' => 'Beatriz',
+            'telefone' => '11777776666',
+            'endereco' => 'Rua Antiga, 5',
+            'filhos' => '1 filho',
+        ])->assertCreated()->json('data');
+
+        $rows = [
+            [
+                'Equipe' => 'Equipe Alpha',
+                'Nome' => 'Carlos e Beatriz',
+                'Endereço' => 'Rua Nova, 50',
+                'Telefone' => '11777776666 / 11666665555',
+                'Têm filhos? Se sim, qual idade?' => '2 filhos',
+            ],
+            [
+                'Equipe' => 'Equipe Gamma',
+                'Nome' => 'Lucas e Helena',
+                'Endereço' => 'Rua Criar, 1',
+                'Telefone' => '11555554444',
+            ],
+        ];
+
+        $result = $this->tenantJson('POST', '/api/v1/ecc/casais/import/commit', [
+            'rows' => $rows,
+            'decisions' => [
+                [
+                    'row_index' => 0,
+                    'action' => 'update',
+                    'casal_id' => $created['id'],
+                    'apply_fields' => ['endereco'],
+                ],
+                [
+                    'row_index' => 1,
+                    'action' => 'create',
+                ],
+            ],
+        ])->assertOk()->json();
+
+        $this->assertSame(1, $result['created']);
+        $this->assertSame(1, $result['updated']);
+        $this->assertSame([], $result['errors']);
+
+        $atualizado = $this->tenantJson('GET', '/api/v1/ecc/casais/'.$created['id'])
+            ->assertOk()
+            ->json('data');
+
+        $this->assertSame('Rua Nova, 50', $atualizado['endereco']);
+        $this->assertSame('1 filho', $atualizado['filhos']);
+        $this->assertSame('11777776666', $atualizado['telefone']);
+        // telefone_conjuge da planilha NÃO foi aplicado
+        $this->assertNotSame('11666665555', $atualizado['telefone_conjuge']);
+
+        $lista = $this->tenantJson('GET', '/api/v1/ecc/casais')->assertOk()->json('data');
+        $this->assertCount(2, $lista);
+        $this->assertNotNull(collect($lista)->firstWhere('nome', 'Lucas'));
+    }
+
+    public function test_import_preview_ambiguous_quando_duplicata_no_banco(): void
+    {
+        $this->tenantJson('POST', '/api/v1/ecc/casais', [
+            'equipe' => 'Equipe A',
+            'nome' => 'Paulo',
+            'nome_conjuge' => 'Clara',
+            'endereco' => 'Rua 1',
+        ])->assertCreated();
+
+        $this->tenantJson('POST', '/api/v1/ecc/casais', [
+            'equipe' => 'Equipe B',
+            'nome' => 'Clara',
+            'nome_conjuge' => 'Paulo',
+            'endereco' => 'Rua 2',
+        ])->assertCreated();
+
+        $preview = $this->tenantJson('POST', '/api/v1/ecc/casais/import/preview', [
+            'rows' => [
+                [
+                    'Nome' => 'Paulo e Clara',
+                    'Endereço' => 'Rua Planilha',
+                ],
+            ],
+        ])->assertOk()->json();
+
+        $this->assertSame(1, $preview['summary']['ambiguous']);
+        $item = $preview['items'][0];
+        $this->assertSame('ambiguous', $item['status']);
+        $this->assertCount(2, $item['candidates']);
+        $this->assertSame('skip', $item['suggested_action']);
+    }
+
 }
