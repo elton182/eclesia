@@ -32,6 +32,7 @@ export { default as RichTextEditor } from './components/form/RichTextEditor.vue'
 export { default as SelectSearch } from './components/form/SelectSearch.vue'
 export { default as SelectSearchable } from './components/form/SelectSearchable.vue'
 export { default as SelectSearchServer } from './components/form/SelectSearchServer.vue'
+export { default as MultiSelectChips } from './components/form/MultiSelectChips.vue'
 export { default as TextAreaInput } from './components/form/TextAreaInput.vue'
 export { default as TextInput } from './components/form/TextInput.vue'
 export { default as ToggleSwitch } from './components/form/ToggleSwitch.vue'
@@ -100,6 +101,7 @@ export function install(app, options = {}) {
     SelectSearch,
     SelectSearchable,
     SelectSearchServer,
+    MultiSelectChips,
     TextAreaInput,
     TextInput,
     ToggleSwitch,
