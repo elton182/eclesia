@@ -13,6 +13,7 @@ import { isoToBr } from '@/utils/dateBr'
 import { userHasPermission, isSomenteLiderEquipe } from '@/utils/userRoles'
 import { casalEle, casalEla, formFieldsFromEleEla, swapEleElaFormFields } from '@/utils/casalDisplay'
 import DateInput from '@/components/form/DateInput.vue'
+import MultiSelectChips from '@/components/form/MultiSelectChips.vue'
 import PessoaFotoField from '@/components/ecc/PessoaFotoField.vue'
 import { uploadPessoaFoto } from '@/utils/pessoaFoto'
 import {
@@ -315,6 +316,12 @@ const filtered = computed(() =>
 )
 
 const mergePair = computed(() => resolveMergePair(casais.value, mergeSelected.value))
+
+const equipeOptions = computed(() =>
+  (equipes.value || [])
+    .filter((eq) => eq.ativo !== false)
+    .map((eq) => ({ value: eq.id, label: eq.nome })),
+)
 
 const ensureTenant = () => {
   if (!tenantStore.slug) {
@@ -1161,18 +1168,21 @@ onUnmounted(() => {
       <form class="grid grid-cols-1 md:grid-cols-2 gap-4" @submit.prevent="isLastStep ? finishSteps() : continueStep()">
         <template v-if="currentStep?.id === 'contato'">
           <div class="md:col-span-2">
-            <label class="fld">Equipes</label>
-            <select
+            <label class="fld" for="casal-form-equipes">Equipes</label>
+            <MultiSelectChips
+              id="casal-form-equipes"
               v-model="form.equipe_ids"
-              class="input"
-              multiple
+              :options="equipeOptions"
               :disabled="!!form.id && !canManageCasais"
+              placeholder="Pesquisar equipe…"
+              empty-label="Selecionar equipes…"
+              none-summary="Nenhuma equipe"
+              singular="equipe"
+              plural="equipes"
               data-testid="casal-form-equipe"
-            >
-              <option v-for="eq in equipes" :key="eq.id" :value="eq.id">{{ eq.nome }}</option>
-            </select>
+            />
             <p class="text-[12.5px] mt-1" style="color: var(--color-muted)">
-              Segure Ctrl/Cmd para marcar mais de uma equipe.
+              Toque para marcar uma ou mais equipes de perseverança.
             </p>
             <p
               v-if="form.id && !canManageCasais"
