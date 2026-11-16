@@ -79,6 +79,11 @@ import { useAuthStore } from '@/stores/auth'
 import { useAuthAdminStore } from '@/stores/authAdmin'
 import { userHasPermission } from '@/utils/userRoles'
 import { brToIso, isoToBr } from '@/utils/dateBr'
+import {
+  buildPlanejamentoAnoWorkbook,
+  buildPlanejamentoMesWorkbook,
+  downloadXlsxBuffer,
+} from '@/utils/planejamentoExport'
 
 const WEEKDAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 
@@ -129,6 +134,8 @@ const novaPastoralNome = ref('')
 const salvandoPastoral = ref(false)
 /** @type {import('vue').Ref<''|'agenda'|'links'>} */
 const pdfBusy = ref('')
+/** @type {import('vue').Ref<''|'mes'|'ano'>} */
+const excelBusy = ref('')
 let dispTimer = null
 let dispSeq = 0
 
@@ -822,6 +829,43 @@ async function baixarPdf(tipo) {
   }
 }
 
+/**
+ * SPEC-036 — Excel do mês selecionado ou ano (12 abas).
+ * @param {'mes'|'ano'} escopo
+ */
+async function baixarExcel(escopo) {
+  if (excelBusy.value || !anual.value) return
+  if (anoStatus.value === 'rascunho') {
+    innovToast('error', 'Excel', 'Disponível a partir da coleta.')
+    return
+  }
+  excelBusy.value = escopo
+  try {
+    const XLSX = await import('xlsx')
+    if (escopo === 'ano') {
+      const buffer = buildPlanejamentoAnoWorkbook(XLSX, eventos.value)
+      downloadXlsxBuffer(buffer, `planejamento-agenda-${anual.value.ano}.xlsx`)
+      innovToast('success', 'Excel', `Ano ${anual.value.ano} · 12 abas`)
+    } else {
+      const buffer = buildPlanejamentoMesWorkbook(XLSX, eventos.value, mesView.value)
+      const mm = String(mesView.value).padStart(2, '0')
+      downloadXlsxBuffer(
+        buffer,
+        `planejamento-agenda-${anual.value.ano}-${mm}.xlsx`,
+      )
+      innovToast(
+        'success',
+        'Excel',
+        `Agenda de ${MES_NOMES[mesView.value] || mesView.value}`,
+      )
+    }
+  } catch (e) {
+    innovToast('error', 'Excel', e?.message || 'Falha ao gerar planilha')
+  } finally {
+    excelBusy.value = ''
+  }
+}
+
 async function incluirPastoral() {
   if (!canGerir.value) return
   const nome = novaPastoralNome.value.trim()
@@ -919,8 +963,26 @@ onMounted(load)
             <button
               type="button"
               class="btn btn-ghost"
+              data-testid="planejamento-excel-mes"
+              :disabled="!!excelBusy || !!pdfBusy || anoStatus === 'rascunho'"
+              @click="baixarExcel('mes')"
+            >
+              {{ excelBusy === 'mes' ? 'Gerando…' : 'Excel mês' }}
+            </button>
+            <button
+              type="button"
+              class="btn btn-ghost"
+              data-testid="planejamento-excel-ano"
+              :disabled="!!excelBusy || !!pdfBusy || anoStatus === 'rascunho'"
+              @click="baixarExcel('ano')"
+            >
+              {{ excelBusy === 'ano' ? 'Gerando…' : 'Excel ano' }}
+            </button>
+            <button
+              type="button"
+              class="btn btn-ghost"
               data-testid="planejamento-pdf-agenda"
-              :disabled="!!pdfBusy || anoStatus === 'rascunho'"
+              :disabled="!!pdfBusy || !!excelBusy || anoStatus === 'rascunho'"
               @click="baixarPdf('agenda')"
             >
               {{ pdfBusy === 'agenda' ? 'Gerando…' : 'PDF agenda' }}
@@ -929,7 +991,7 @@ onMounted(load)
               type="button"
               class="btn btn-primary"
               data-testid="planejamento-pdf-links"
-              :disabled="!!pdfBusy || anoStatus === 'rascunho'"
+              :disabled="!!pdfBusy || !!excelBusy || anoStatus === 'rascunho'"
               @click="baixarPdf('links')"
             >
               {{ pdfBusy === 'links' ? 'Gerando…' : 'PDF links' }}
