@@ -32,7 +32,10 @@ class StoreEccCasalRequest extends FormRequest
     {
         return [
             'equipe_id' => ['nullable', 'string'],
+            'equipe_ids' => ['nullable', 'array'],
+            'equipe_ids.*' => ['string'],
             'equipe' => ['nullable', 'string', 'max:255'],
+            'ativo' => ['sometimes', 'boolean'],
             'nome' => ['required', 'string', 'max:255'],
             'email' => ['nullable', 'email', 'max:255'],
             'telefone' => ['nullable', 'string', 'max:50'],

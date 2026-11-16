@@ -121,7 +121,12 @@ class EccVisibilityScope
 
         return Casal::query()
             ->where('igreja_id', $igrejaId)
-            ->whereIn('ecc_equipe_id', $ids)
+            ->where(function ($query) use ($ids): void {
+                $query->whereIn('ecc_equipe_id', $ids)
+                    ->orWhereHas('equipes', function ($eq) use ($ids): void {
+                        $eq->whereIn('ecc_equipes.id', $ids);
+                    });
+            })
             ->where(function ($query) use ($pessoaId): void {
                 $query->where('pessoa_a_id', $pessoaId)
                     ->orWhere('pessoa_b_id', $pessoaId);

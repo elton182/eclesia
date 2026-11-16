@@ -711,6 +711,9 @@ components:
         cor:
           type: string
           nullable: true
+        ativo:
+          type: boolean
+          description: SPEC-035 — equipe ativa
         casais_count:
           type: integer
         tem_acesso:
@@ -730,9 +733,25 @@ components:
           type: string
           format: uuid
           nullable: true
+          description: Equipe principal (compat); preferir equipes[]
         equipe_nome:
           type: string
           nullable: true
+        equipe_ids:
+          type: array
+          items:
+            type: string
+          description: SPEC-035 — todas as equipes de perseverança
+        equipes:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string }
+              nome: { type: string }
+        ativo:
+          type: boolean
+          description: SPEC-035 — casal ativo
         nome:
           type: string
           description: Pessoa A (ordem de cadastro); preferir ele/ela para exibição
@@ -2899,8 +2918,10 @@ paths:
           description: Criado
   /ecc/casais/import:
     post:
-      summary: Importar casais (linhas da planilha)
-      description: Requer ecc.casais.manage.
+      summary: Importar casais (linhas da planilha) — cria sempre
+      description: >
+        Legado: cria casais a partir das linhas (pode duplicar). Preferir
+        `/ecc/casais/import/preview` + `/commit` (SPEC-034). Requer ecc.casais.manage.
       security:
         - bearerAuth: []
           tenantHeader: []
@@ -2919,6 +2940,141 @@ paths:
       responses:
         '200':
           description: Resultado da importação
+  /ecc/casais/import/preview:
+    post:
+      summary: Pré-visualizar importação de casais (revisão seletiva)
+      description: >
+        Classifica cada linha (new/match/identical/ambiguous/invalid), calcula
+        diffs campo a campo e sugere ação/apply_fields. Não grava. SPEC-034.
+        Requer ecc.casais.manage.
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rows]
+              properties:
+                rows:
+                  type: array
+                  items:
+                    type: object
+      responses:
+        '200':
+          description: Itens para revisão + summary
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, summary]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                  summary:
+                    type: object
+                    properties:
+                      new: { type: integer }
+                      match: { type: integer }
+                      identical: { type: integer }
+                      ambiguous: { type: integer }
+                      invalid: { type: integer }
+                      skipped_empty: { type: integer }
+        '403':
+          description: Sem permissão
+  /ecc/casais/merge:
+    post:
+      summary: Unificar dois casais duplicados
+      description: >
+        Mantém keep_id, absorve absorb_id (equipes em união, preenche lacunas,
+        reaponta FKs e remove o absorvido). SPEC-035. Requer ecc.casais.manage.
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [keep_id, absorb_id]
+              properties:
+                keep_id: { type: string }
+                absorb_id: { type: string }
+      responses:
+        '200':
+          description: Casal mantido após unificação
+        '403':
+          description: Sem permissão
+        '422':
+          description: Validação
+  /ecc/casais/import/commit:
+    post:
+      summary: Confirmar importação seletiva de casais
+      description: >
+        Aplica decisões da revisão (create/update/skip). Reenvia as mesmas rows
+        do preview. SPEC-034. Requer ecc.casais.manage.
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rows, decisions]
+              properties:
+                rows:
+                  type: array
+                  items:
+                    type: object
+                decisions:
+                  type: array
+                  items:
+                    type: object
+                    required: [row_index, action]
+                    properties:
+                      row_index:
+                        type: integer
+                        minimum: 0
+                      action:
+                        type: string
+                        enum: [create, update, skip]
+                      casal_id:
+                        type: string
+                        description: Obrigatório quando action=update
+                      apply_fields:
+                        type: array
+                        items:
+                          type: string
+                        description: Campos da planilha a aplicar no update
+      responses:
+        '200':
+          description: Resultado do commit
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  created: { type: integer }
+                  updated: { type: integer }
+                  skipped: { type: integer }
+                  errors:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        row_index: { type: integer }
+                        message: { type: string }
+        '403':
+          description: Sem permissão
+        '422':
+          description: Validação
   /ecc/casais/{id}:
     get:
       summary: Detalhe casal

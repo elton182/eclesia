@@ -20,10 +20,27 @@ class EccCasalResource extends JsonResource
     {
         [$ele, $ela] = $this->resolveEleEla();
 
+        $equipes = $this->relationLoaded('equipes')
+            ? $this->equipes
+            : $this->equipes()->orderBy('nome')->get();
+
+        $equipesPayload = $equipes
+            ->map(static fn ($e) => [
+                'id' => (string) $e->id,
+                'nome' => (string) $e->nome,
+            ])
+            ->values()
+            ->all();
+
+        $principal = $equipesPayload[0] ?? null;
+
         return [
             'id' => $this->id,
-            'equipe_id' => $this->ecc_equipe_id,
-            'equipe_nome' => $this->equipe?->nome,
+            'equipe_id' => $principal['id'] ?? $this->ecc_equipe_id,
+            'equipe_nome' => $principal['nome'] ?? $this->equipe?->nome,
+            'equipe_ids' => array_map(static fn (array $e) => $e['id'], $equipesPayload),
+            'equipes' => $equipesPayload,
+            'ativo' => (bool) ($this->ativo ?? true),
             // Compat: ordem de cadastro (pessoa A / B)
             'nome' => $this->pessoaA?->nome,
             'email' => $this->pessoaA?->email,

@@ -22,6 +22,7 @@ class UpdateEccEquipeRequest extends FormRequest
         return [
             'nome' => ['sometimes', 'required', 'string', 'max:255'],
             'cor' => ['nullable', 'string', 'max:32'],
+            'ativo' => ['sometimes', 'boolean'],
         ];
     }
 }

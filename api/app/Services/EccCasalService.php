@@ -10,6 +10,7 @@ use App\Models\Pessoa;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Throwable;
 
 class EccCasalService
@@ -33,12 +34,14 @@ class EccCasalService
                 'pessoaA',
                 'pessoaB',
                 'equipe',
+                'equipes',
                 'etapas',
                 'atividades.equipeServico',
                 'preferencias.equipeServico',
             ]);
 
         $this->applyEquipeScope($query);
+        $this->applyAtivoFilter($query, request()->query('ativo'));
 
         return $query->orderByDesc('created_at')->get();
     }
@@ -51,6 +54,7 @@ class EccCasalService
                 'pessoaA',
                 'pessoaB',
                 'equipe',
+                'equipes',
                 'etapas',
                 'atividades.equipeServico',
                 'preferencias.equipeServico',
@@ -71,7 +75,30 @@ class EccCasalService
             return;
         }
 
-        $query->whereIn('ecc_equipe_id', $equipeIds);
+        $query->where(function ($q) use ($equipeIds): void {
+            $q->whereIn('ecc_equipe_id', $equipeIds)
+                ->orWhereHas('equipes', function ($eq) use ($equipeIds): void {
+                    $eq->whereIn('ecc_equipes.id', $equipeIds);
+                });
+        });
+    }
+
+    /**
+     * @param  \Illuminate\Database\Eloquent\Builder<Casal>  $query
+     */
+    private function applyAtivoFilter($query, mixed $ativo): void
+    {
+        if ($ativo === null || $ativo === '') {
+            return;
+        }
+        if ($ativo === '1' || $ativo === 1 || $ativo === true || $ativo === 'true') {
+            $query->where('ativo', true);
+
+            return;
+        }
+        if ($ativo === '0' || $ativo === 0 || $ativo === false || $ativo === 'false') {
+            $query->where('ativo', false);
+        }
     }
 
     /**
@@ -89,8 +116,7 @@ class EccCasalService
     {
         return DB::transaction(function () use ($casal, $data) {
             if (! $this->visibility->userCan('ecc.casais.manage')) {
-                unset($data['equipe']);
-                $data['equipe_id'] = $casal->ecc_equipe_id;
+                unset($data['equipe'], $data['equipe_id'], $data['equipe_ids']);
             }
 
             $pessoaAData = [
@@ -117,18 +143,15 @@ class EccCasalService
             }
             $casal->pessoaB->update($pessoaBData);
 
-            $equipeId = $data['equipe_id'] ?? null;
-            if (! empty($data['equipe']) && empty($equipeId)) {
-                $equipeId = $this->equipes->findOrCreateByNome((string) $data['equipe'])->id;
-            }
-
-            $casal->update($this->casalAttributes($data, $equipeId));
+            $casal->update($this->casalAttributes($data));
             $this->syncFichaRelations($casal, $data);
+            $this->syncEquipesFromPayload($casal, $data);
 
             return $casal->refresh()->load([
                 'pessoaA',
                 'pessoaB',
                 'equipe',
+                'equipes',
                 'etapas',
                 'atividades.equipeServico',
                 'preferencias.equipeServico',
@@ -212,6 +235,135 @@ class EccCasalService
     }
 
     /**
+     * Pré-visualização da importação com matching e diffs (SPEC-034).
+     *
+     * @param  list<array<string, mixed>>  $rows
+     * @return array{items: list<array<string, mixed>>, summary: array<string, int>}
+     */
+    public function previewImport(array $rows): array
+    {
+        $catalog = $this->equipeServicoCatalog();
+        $index = $this->buildCoupleMatchIndex();
+        $items = [];
+        $summary = [
+            'new' => 0,
+            'match' => 0,
+            'identical' => 0,
+            'ambiguous' => 0,
+            'invalid' => 0,
+            'skipped_empty' => 0,
+        ];
+
+        foreach ($rows as $rowIndex => $row) {
+            if ($this->isEmptyImportRow($row)) {
+                $summary['skipped_empty']++;
+                continue;
+            }
+
+            $item = $this->buildPreviewItem((int) $rowIndex, $row, $catalog, $index);
+            $status = (string) $item['status'];
+            if (isset($summary[$status])) {
+                $summary[$status]++;
+            }
+            $items[] = $item;
+        }
+
+        return compact('items', 'summary');
+    }
+
+    /**
+     * Aplica decisões da revisão seletiva (SPEC-034).
+     *
+     * @param  list<array<string, mixed>>  $rows
+     * @param  list<array<string, mixed>>  $decisions
+     * @return array{created: int, updated: int, skipped: int, errors: list<array{row_index: int, message: string}>}
+     */
+    public function commitImport(array $rows, array $decisions): array
+    {
+        $catalog = $this->equipeServicoCatalog();
+        $created = 0;
+        $updated = 0;
+        $skipped = 0;
+        $errors = [];
+
+        $byIndex = [];
+        foreach ($decisions as $decision) {
+            if (! is_array($decision) || ! array_key_exists('row_index', $decision)) {
+                continue;
+            }
+            $byIndex[(int) $decision['row_index']] = $decision;
+        }
+
+        foreach ($byIndex as $rowIndex => $decision) {
+            $action = (string) ($decision['action'] ?? 'skip');
+            if ($action === 'skip') {
+                $skipped++;
+                continue;
+            }
+
+            if (! array_key_exists($rowIndex, $rows) || ! is_array($rows[$rowIndex])) {
+                $errors[] = [
+                    'row_index' => $rowIndex,
+                    'message' => 'Linha da planilha não encontrada para esta decisão.',
+                ];
+                continue;
+            }
+
+            $row = $rows[$rowIndex];
+            try {
+                if ($this->isEmptyImportRow($row)) {
+                    $skipped++;
+                    continue;
+                }
+
+                $mapped = $this->mapImportRow($row, $catalog);
+                if ($mapped['nome'] === '' || $mapped['nome_conjuge'] === '') {
+                    throw new \InvalidArgumentException('nome e nome do cônjuge são obrigatórios.');
+                }
+
+                if ($action === 'create') {
+                    $this->create($mapped);
+                    $created++;
+                    continue;
+                }
+
+                if ($action === 'update') {
+                    $casalId = (string) ($decision['casal_id'] ?? '');
+                    if ($casalId === '') {
+                        throw new \InvalidArgumentException('casal_id é obrigatório para update.');
+                    }
+                    $casal = $this->find($casalId);
+                    $applyFields = $decision['apply_fields'] ?? [];
+                    if (! is_array($applyFields)) {
+                        $applyFields = [];
+                    }
+                    /** @var list<string> $applyFields */
+                    $applyFields = array_values(array_filter(array_map(
+                        static fn ($f) => is_string($f) ? $f : '',
+                        $applyFields,
+                    )));
+                    if ($applyFields === []) {
+                        $skipped++;
+                        continue;
+                    }
+                    $this->applyImportFields($casal, $mapped, $applyFields);
+                    $updated++;
+                    continue;
+                }
+
+                throw new \InvalidArgumentException("Ação inválida: {$action}");
+            } catch (Throwable $e) {
+                $errors[] = [
+                    'row_index' => $rowIndex,
+                    'message' => $e->getMessage(),
+                ];
+            }
+        }
+
+        return compact('created', 'updated', 'skipped', 'errors');
+    }
+
+    /**
      * @return list<array{id: string, nome: string, slug: string}>
      */
     private function equipeServicoCatalog(): array
@@ -261,26 +413,24 @@ class EccCasalService
             ? $this->pessoaExtras($data['ela'])
             : []));
 
-        $equipeId = $data['equipe_id'] ?? null;
-        if (! empty($data['equipe']) && empty($equipeId)) {
-            $equipeId = $this->equipes->findOrCreateByNome((string) $data['equipe'])->id;
-        }
-
         $casal = Casal::query()->create(array_merge(
             [
                 'igreja_id' => $igrejaId,
                 'pessoa_a_id' => $pessoaA->id,
                 'pessoa_b_id' => $pessoaB->id,
+                'ecc_equipe_id' => null,
             ],
-            $this->casalAttributes($data, $equipeId),
+            $this->casalAttributes($data),
         ));
 
         $this->syncFichaRelations($casal, $data);
+        $this->syncEquipesFromPayload($casal, $data, replace: true);
 
         return $casal->load([
             'pessoaA',
             'pessoaB',
             'equipe',
+            'equipes',
             'etapas',
             'atividades.equipeServico',
             'preferencias.equipeServico',
@@ -291,10 +441,9 @@ class EccCasalService
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
-    private function casalAttributes(array $data, mixed $equipeId): array
+    private function casalAttributes(array $data): array
     {
-        return [
-            'ecc_equipe_id' => $equipeId,
+        $attrs = [
             'endereco' => $data['endereco'] ?? null,
             'bairro' => $data['bairro'] ?? null,
             'cidade' => $data['cidade'] ?? null,
@@ -311,6 +460,85 @@ class EccCasalService
             'funcao_dirigente' => $this->stringifyCell($data['funcao_dirigente'] ?? null),
             'foi_coordenador_geral' => (bool) ($data['foi_coordenador_geral'] ?? false),
         ];
+
+        if (array_key_exists('ativo', $data)) {
+            $attrs['ativo'] = (bool) $data['ativo'];
+        }
+
+        return $attrs;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function syncEquipesFromPayload(Casal $casal, array $data, bool $replace = false): void
+    {
+        $hasIds = array_key_exists('equipe_ids', $data);
+        $hasSingle = ! empty($data['equipe']) || ! empty($data['equipe_id']);
+
+        if (! $hasIds && ! $hasSingle) {
+            return;
+        }
+
+        $ids = $this->resolveEquipeIdsFromData($data);
+
+        if ($replace || $hasIds) {
+            $this->syncCasalEquipes($casal, $ids);
+
+            return;
+        }
+
+        foreach ($ids as $id) {
+            $this->attachEquipeToCasal($casal, $id);
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return list<string>
+     */
+    private function resolveEquipeIdsFromData(array $data): array
+    {
+        $ids = [];
+
+        if (isset($data['equipe_ids']) && is_array($data['equipe_ids'])) {
+            foreach ($data['equipe_ids'] as $id) {
+                if (is_string($id) && $id !== '') {
+                    $ids[] = $id;
+                }
+            }
+        }
+
+        if (! empty($data['equipe_id'])) {
+            $ids[] = (string) $data['equipe_id'];
+        }
+
+        if (! empty($data['equipe'])) {
+            $ids[] = (string) $this->equipes->findOrCreateByNome((string) $data['equipe'])->id;
+        }
+
+        return array_values(array_unique($ids));
+    }
+
+    /**
+     * @param  list<string>  $equipeIds
+     */
+    private function syncCasalEquipes(Casal $casal, array $equipeIds): void
+    {
+        $casal->equipes()->sync($equipeIds);
+        $this->refreshPrimaryEquipe($casal);
+    }
+
+    private function attachEquipeToCasal(Casal $casal, string $equipeId): void
+    {
+        $casal->equipes()->syncWithoutDetaching([$equipeId]);
+        $this->refreshPrimaryEquipe($casal);
+    }
+
+    private function refreshPrimaryEquipe(Casal $casal): void
+    {
+        $primary = $casal->equipes()->orderBy('ecc_equipes.nome')->value('ecc_equipes.id');
+        $casal->forceFill(['ecc_equipe_id' => $primary])->saveQuietly();
     }
 
     /**
@@ -690,6 +918,552 @@ class EccCasalService
             return Carbon::parse($raw)->toDateString();
         } catch (Throwable) {
             throw new \InvalidArgumentException("Data inválida: {$raw}");
+        }
+    }
+
+    /**
+     * @param  list<array{id: string, nome: string, slug: string}>  $catalog
+     * @param  array<string, list<array<string, mixed>>>  $index
+     * @return array<string, mixed>
+     */
+    private function buildPreviewItem(int $rowIndex, array $row, array $catalog, array $index): array
+    {
+        try {
+            $mapped = $this->mapImportRow($row, $catalog);
+        } catch (Throwable $e) {
+            return [
+                'row_index' => $rowIndex,
+                'status' => 'invalid',
+                'label' => null,
+                'incoming' => null,
+                'current' => null,
+                'candidates' => [],
+                'field_diffs' => [],
+                'suggested_action' => 'skip',
+                'suggested_apply_fields' => [],
+                'suggested_casal_id' => null,
+                'message' => $e->getMessage(),
+            ];
+        }
+
+        $nome = (string) ($mapped['nome'] ?? '');
+        $nomeConjuge = (string) ($mapped['nome_conjuge'] ?? '');
+        $label = trim($nome.' & '.$nomeConjuge);
+
+        if ($nome === '' || $nomeConjuge === '') {
+            return [
+                'row_index' => $rowIndex,
+                'status' => 'invalid',
+                'label' => $label !== '&' ? $label : null,
+                'incoming' => $this->importComparableFromMapped($mapped),
+                'current' => null,
+                'candidates' => [],
+                'field_diffs' => [],
+                'suggested_action' => 'skip',
+                'suggested_apply_fields' => [],
+                'suggested_casal_id' => null,
+                'message' => 'nome e nome do cônjuge são obrigatórios (ou use Nome no formato "Fulano e Ciclana").',
+            ];
+        }
+
+        $key = $this->coupleMatchKey($nome, $nomeConjuge);
+        $candidates = $index[$key] ?? [];
+        $incoming = $this->importComparableFromMapped($mapped);
+
+        if (count($candidates) === 0) {
+            return [
+                'row_index' => $rowIndex,
+                'status' => 'new',
+                'label' => $label,
+                'incoming' => $incoming,
+                'current' => null,
+                'candidates' => [],
+                'field_diffs' => [],
+                'suggested_action' => 'create',
+                'suggested_apply_fields' => [],
+                'suggested_casal_id' => null,
+                'message' => null,
+            ];
+        }
+
+        if (count($candidates) > 1) {
+            return [
+                'row_index' => $rowIndex,
+                'status' => 'ambiguous',
+                'label' => $label,
+                'incoming' => $incoming,
+                'current' => null,
+                'candidates' => $candidates,
+                'field_diffs' => [],
+                'suggested_action' => 'skip',
+                'suggested_apply_fields' => [],
+                'suggested_casal_id' => null,
+                'message' => 'Mais de um casal com os mesmos nomes — escolha qual atualizar ou pule.',
+            ];
+        }
+
+        $candidate = $candidates[0];
+        $casalId = (string) $candidate['id'];
+        $casal = $this->find($casalId);
+        $current = $this->importComparableFromCasal($casal);
+        $diffs = $this->buildFieldDiffs($current, $incoming);
+
+        if ($diffs === []) {
+            return [
+                'row_index' => $rowIndex,
+                'status' => 'identical',
+                'label' => $label,
+                'incoming' => $incoming,
+                'current' => $current,
+                'candidates' => $candidates,
+                'field_diffs' => [],
+                'suggested_action' => 'skip',
+                'suggested_apply_fields' => [],
+                'suggested_casal_id' => $casalId,
+                'message' => null,
+            ];
+        }
+
+        $suggestedApply = [];
+        foreach ($diffs as $diff) {
+            if (($diff['suggest_apply'] ?? false) === true) {
+                $suggestedApply[] = (string) $diff['field'];
+            }
+        }
+
+        return [
+            'row_index' => $rowIndex,
+            'status' => 'match',
+            'label' => $label,
+            'incoming' => $incoming,
+            'current' => $current,
+            'candidates' => $candidates,
+            'field_diffs' => $diffs,
+            'suggested_action' => 'update',
+            'suggested_apply_fields' => $suggestedApply,
+            'suggested_casal_id' => $casalId,
+            'message' => null,
+        ];
+    }
+
+    /**
+     * @return array<string, list<array{id: string, nome: string, nome_conjuge: string, equipe_nome: ?string}>>
+     */
+    private function buildCoupleMatchIndex(): array
+    {
+        $index = [];
+        foreach ($this->list() as $casal) {
+            $nomeA = (string) ($casal->pessoaA?->nome ?? '');
+            $nomeB = (string) ($casal->pessoaB?->nome ?? '');
+            if ($nomeA === '' || $nomeB === '') {
+                continue;
+            }
+            $key = $this->coupleMatchKey($nomeA, $nomeB);
+            $index[$key] ??= [];
+            $index[$key][] = [
+                'id' => (string) $casal->id,
+                'nome' => $nomeA,
+                'nome_conjuge' => $nomeB,
+                'equipe_nome' => $casal->equipe?->nome,
+            ];
+        }
+
+        return $index;
+    }
+
+    private function coupleMatchKey(string $nomeA, string $nomeB): string
+    {
+        $parts = [
+            $this->normalizePersonName($nomeA),
+            $this->normalizePersonName($nomeB),
+        ];
+        sort($parts, SORT_STRING);
+
+        return implode('|', $parts);
+    }
+
+    private function normalizePersonName(string $name): string
+    {
+        $name = mb_strtolower(trim($name));
+        $transliterated = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $name);
+        if (is_string($transliterated) && $transliterated !== '') {
+            $name = $transliterated;
+        }
+        $name = preg_replace('/[^a-z0-9]+/u', '', $name) ?? $name;
+
+        return $name;
+    }
+
+    /**
+     * @param  array<string, mixed>  $mapped
+     * @return array<string, mixed>
+     */
+    private function importComparableFromMapped(array $mapped): array
+    {
+        $out = [];
+        foreach ($this->importComparableFields() as $field) {
+            if (! array_key_exists($field, $mapped)) {
+                continue;
+            }
+            $out[$field] = $this->normalizeComparableValue($field, $mapped[$field]);
+        }
+
+        return $out;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function importComparableFromCasal(Casal $casal): array
+    {
+        $etapas = $casal->relationLoaded('etapas') ? $casal->etapas : $casal->etapas()->get();
+        $atividades = $casal->relationLoaded('atividades') ? $casal->atividades : $casal->atividades()->with('equipeServico')->get();
+        $preferencias = $casal->relationLoaded('preferencias') ? $casal->preferencias : $casal->preferencias()->get();
+
+        $payload = [
+            'equipe' => $casal->equipe?->nome,
+            'nome' => $casal->pessoaA?->nome,
+            'email' => $casal->pessoaA?->email,
+            'telefone' => $casal->pessoaA?->telefone,
+            'endereco' => $casal->endereco,
+            'bairro' => $casal->bairro,
+            'cidade' => $casal->cidade,
+            'uf' => $casal->uf,
+            'cep' => $casal->cep,
+            'data_nascimento' => $casal->pessoaA?->data_nascimento?->toDateString(),
+            'nome_conjuge' => $casal->pessoaB?->nome,
+            'email_conjuge' => $casal->pessoaB?->email,
+            'telefone_conjuge' => $casal->pessoaB?->telefone,
+            'data_nascimento_conjuge' => $casal->pessoaB?->data_nascimento?->toDateString(),
+            'data_casamento' => $casal->data_casamento?->toDateString(),
+            'filhos' => $casal->filhos,
+            'observacoes' => $casal->observacoes,
+            'piloto' => (bool) $casal->piloto,
+            'anos_casados' => $casal->anos_casados,
+            'ecc_origem' => $casal->ecc_origem,
+            'funcao_dirigente' => $casal->funcao_dirigente,
+            'foi_coordenador_geral' => (bool) $casal->foi_coordenador_geral,
+            'etapas' => $etapas->map(static fn ($e) => [
+                'etapa' => (int) $e->etapa,
+                'ecc_numero' => $e->ecc_numero,
+                'data' => $e->data?->toDateString(),
+                'local' => $e->local,
+            ])->values()->all(),
+            'atividades' => $atividades->map(static fn ($a) => [
+                'ecc_numero' => (string) $a->ecc_numero,
+                'equipe_servico_id' => (string) $a->ecc_equipe_servico_id,
+                'status' => (string) $a->status,
+                'observacao' => $a->observacao,
+            ])->values()->all(),
+            'preferencias' => $preferencias->map(static fn ($p) => [
+                'equipe_servico_id' => (string) $p->ecc_equipe_servico_id,
+                'ordem' => $p->ordem !== null ? (int) $p->ordem : null,
+            ])->values()->all(),
+        ];
+
+        return $this->importComparableFromMapped($payload);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function importComparableFields(): array
+    {
+        return [
+            'equipe',
+            'nome',
+            'email',
+            'telefone',
+            'endereco',
+            'bairro',
+            'cidade',
+            'uf',
+            'cep',
+            'data_nascimento',
+            'nome_conjuge',
+            'email_conjuge',
+            'telefone_conjuge',
+            'data_nascimento_conjuge',
+            'data_casamento',
+            'filhos',
+            'observacoes',
+            'piloto',
+            'anos_casados',
+            'ecc_origem',
+            'funcao_dirigente',
+            'foi_coordenador_geral',
+            'etapas',
+            'atividades',
+            'preferencias',
+        ];
+    }
+
+    private function normalizeComparableValue(string $field, mixed $value): mixed
+    {
+        if (in_array($field, ['piloto', 'foi_coordenador_geral'], true)) {
+            return (bool) $value;
+        }
+
+        if ($field === 'anos_casados') {
+            return $this->parseAnosCasados($value);
+        }
+
+        if (in_array($field, ['data_nascimento', 'data_nascimento_conjuge', 'data_casamento'], true)) {
+            if ($value === null || $value === '') {
+                return null;
+            }
+            try {
+                return $this->parseDate($value);
+            } catch (Throwable) {
+                return is_string($value) ? trim($value) : $value;
+            }
+        }
+
+        if (in_array($field, ['etapas', 'atividades', 'preferencias'], true)) {
+            return is_array($value) ? array_values($value) : [];
+        }
+
+        if (in_array($field, ['uf', 'equipe'], true) && $value !== null && $value !== '') {
+            return mb_strtoupper(trim((string) $value));
+        }
+
+        if ($value === null) {
+            return null;
+        }
+        if (is_string($value)) {
+            $trimmed = trim($value);
+
+            return $trimmed === '' ? null : $trimmed;
+        }
+
+        return $value;
+    }
+
+    /**
+     * @param  array<string, mixed>  $current
+     * @param  array<string, mixed>  $incoming
+     * @return list<array{field: string, current: mixed, incoming: mixed, suggest_apply: bool}>
+     */
+    private function buildFieldDiffs(array $current, array $incoming): array
+    {
+        $diffs = [];
+        foreach ($this->importComparableFields() as $field) {
+            if (! array_key_exists($field, $incoming)) {
+                continue;
+            }
+            $inVal = $incoming[$field];
+            $curVal = $current[$field] ?? null;
+
+            if ($this->comparableValuesEqual($field, $curVal, $inVal)) {
+                continue;
+            }
+
+            // Planilha vazia não sobrescreve por padrão (nem aparece como conflito útil)
+            if ($this->isComparableEmpty($inVal)) {
+                continue;
+            }
+
+            $diffs[] = [
+                'field' => $field,
+                'current' => $curVal,
+                'incoming' => $inVal,
+                'suggest_apply' => $this->isComparableEmpty($curVal),
+            ];
+        }
+
+        return $diffs;
+    }
+
+    private function comparableValuesEqual(string $field, mixed $a, mixed $b): bool
+    {
+        if (in_array($field, ['etapas', 'atividades', 'preferencias'], true)) {
+            return json_encode($a ?? [], JSON_UNESCAPED_UNICODE) === json_encode($b ?? [], JSON_UNESCAPED_UNICODE);
+        }
+
+        $na = $this->normalizeComparableValue($field, $a);
+        $nb = $this->normalizeComparableValue($field, $b);
+
+        if ($this->isComparableEmpty($na) && $this->isComparableEmpty($nb)) {
+            return true;
+        }
+
+        return $na === $nb;
+    }
+
+    private function isComparableEmpty(mixed $value): bool
+    {
+        if ($value === null) {
+            return true;
+        }
+        if (is_string($value) && trim($value) === '') {
+            return true;
+        }
+        if (is_array($value) && $value === []) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * @param  array<string, mixed>  $incoming
+     * @param  list<string>  $applyFields
+     */
+    private function applyImportFields(Casal $casal, array $incoming, array $applyFields): Casal
+    {
+        $allowed = array_flip($this->importComparableFields());
+        $apply = [];
+        foreach ($applyFields as $field) {
+            if (! isset($allowed[$field]) || ! array_key_exists($field, $incoming)) {
+                continue;
+            }
+            $apply[$field] = $incoming[$field];
+        }
+
+        if ($apply === []) {
+            return $casal;
+        }
+
+        $base = $this->importComparableFromCasal($casal);
+        // Evita re-sync de equipes no update a partir do snapshot; só aplica se veio em apply_fields.
+        unset($base['equipe'], $base['equipe_id'], $base['equipe_ids']);
+        $merged = array_merge($base, $apply);
+
+        return $this->update($casal, $merged);
+    }
+
+    /**
+     * Unifica dois registros de casal (SPEC-035). Mantém keep, absorve absorb.
+     */
+    public function merge(string $keepId, string $absorbId): Casal
+    {
+        if ($keepId === $absorbId) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'absorb_id' => ['Selecione dois casais diferentes para unificar.'],
+            ]);
+        }
+
+        return DB::transaction(function () use ($keepId, $absorbId) {
+            $keep = $this->find($keepId);
+            $absorb = $this->find($absorbId);
+
+            $absorbEquipeIds = $absorb->equipes()->pluck('ecc_equipes.id')->map(fn ($id) => (string) $id)->all();
+            if ($absorbEquipeIds !== []) {
+                $keep->equipes()->syncWithoutDetaching($absorbEquipeIds);
+            }
+
+            $this->fillEmptyFromAbsorb($keep, $absorb);
+            $this->reattachCasalForeignKeys($keep, $absorb);
+            $this->refreshPrimaryEquipe($keep);
+
+            $pessoaA = $absorb->pessoaA;
+            $pessoaB = $absorb->pessoaB;
+            $absorb->equipes()->detach();
+            $absorb->delete();
+            if ($pessoaA !== null) {
+                $this->fotos->deleteFile($pessoaA);
+                $pessoaA->delete();
+            }
+            if ($pessoaB !== null) {
+                $this->fotos->deleteFile($pessoaB);
+                $pessoaB->delete();
+            }
+
+            return $this->find((string) $keep->id);
+        });
+    }
+
+    private function fillEmptyFromAbsorb(Casal $keep, Casal $absorb): void
+    {
+        $keep->loadMissing(['pessoaA', 'pessoaB', 'etapas', 'atividades', 'preferencias']);
+        $absorb->loadMissing(['pessoaA', 'pessoaB', 'etapas', 'atividades', 'preferencias']);
+
+        foreach (['endereco', 'bairro', 'cidade', 'uf', 'cep', 'filhos', 'observacoes', 'engajamento_paroquial', 'habilidades', 'ecc_origem', 'funcao_dirigente'] as $field) {
+            if ($this->isComparableEmpty($keep->{$field}) && ! $this->isComparableEmpty($absorb->{$field})) {
+                $keep->{$field} = $absorb->{$field};
+            }
+        }
+        if ($keep->data_casamento === null && $absorb->data_casamento !== null) {
+            $keep->data_casamento = $absorb->data_casamento;
+        }
+        if ($keep->anos_casados === null && $absorb->anos_casados !== null) {
+            $keep->anos_casados = $absorb->anos_casados;
+        }
+        if (! $keep->piloto && $absorb->piloto) {
+            $keep->piloto = true;
+        }
+        if (! $keep->foi_coordenador_geral && $absorb->foi_coordenador_geral) {
+            $keep->foi_coordenador_geral = true;
+        }
+        $keep->save();
+
+        foreach (['pessoaA' => $absorb->pessoaA, 'pessoaB' => $absorb->pessoaB] as $rel => $src) {
+            $dst = $keep->{$rel};
+            if ($dst === null || $src === null) {
+                continue;
+            }
+            foreach (['email', 'telefone', 'nome_usual', 'profissao', 'religiao', 'endereco_profissional', 'telefone_profissional'] as $field) {
+                if ($this->isComparableEmpty($dst->{$field}) && ! $this->isComparableEmpty($src->{$field})) {
+                    $dst->{$field} = $src->{$field};
+                }
+            }
+            if ($dst->data_nascimento === null && $src->data_nascimento !== null) {
+                $dst->data_nascimento = $src->data_nascimento;
+            }
+            $dst->save();
+        }
+
+        if ($keep->etapas->isEmpty() && $absorb->etapas->isNotEmpty()) {
+            foreach ($absorb->etapas as $etapa) {
+                $keep->etapas()->create([
+                    'etapa' => $etapa->etapa,
+                    'ecc_numero' => $etapa->ecc_numero,
+                    'data' => $etapa->data,
+                    'local' => $etapa->local,
+                ]);
+            }
+        }
+    }
+
+    private function reattachCasalForeignKeys(Casal $keep, Casal $absorb): void
+    {
+        $keepId = (string) $keep->id;
+        $absorbId = (string) $absorb->id;
+
+        if (Schema::hasTable('ecc_eventos')) {
+            DB::table('ecc_eventos')->where('casal_compras_id', $absorbId)->update(['casal_compras_id' => $keepId]);
+        }
+
+        if (Schema::hasTable('ecc_itens_compra')) {
+            DB::table('ecc_itens_compra')->where('doador_casal_id', $absorbId)->update(['doador_casal_id' => $keepId]);
+        }
+
+        if (Schema::hasTable('ecc_evento_lancamentos')) {
+            DB::table('ecc_evento_lancamentos')->where('casal_id', $absorbId)->update(['casal_id' => $keepId]);
+        }
+
+        if (Schema::hasTable('ecc_evento_casal')) {
+            $keepPairs = DB::table('ecc_evento_casal')
+                ->where('casal_id', $keepId)
+                ->pluck('ecc_evento_id')
+                ->map(fn ($id) => (string) $id)
+                ->all();
+
+            $absorbRows = DB::table('ecc_evento_casal')->where('casal_id', $absorbId)->get();
+            foreach ($absorbRows as $row) {
+                $eventoId = (string) $row->ecc_evento_id;
+                if (in_array($eventoId, $keepPairs, true)) {
+                    DB::table('ecc_evento_casal')
+                        ->where('ecc_evento_id', $eventoId)
+                        ->where('casal_id', $absorbId)
+                        ->delete();
+                } else {
+                    DB::table('ecc_evento_casal')
+                        ->where('ecc_evento_id', $eventoId)
+                        ->where('casal_id', $absorbId)
+                        ->update(['casal_id' => $keepId]);
+                }
+            }
         }
     }
 }

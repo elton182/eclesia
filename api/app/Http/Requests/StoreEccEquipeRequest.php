@@ -22,6 +22,7 @@ class StoreEccEquipeRequest extends FormRequest
         return [
             'nome' => ['required', 'string', 'max:255'],
             'cor' => ['nullable', 'string', 'max:32'],
+            'ativo' => ['sometimes', 'boolean'],
         ];
     }
 }

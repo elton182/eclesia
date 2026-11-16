@@ -20,7 +20,7 @@ class SyncEccEquipeCasaisRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'casal_ids' => ['required', 'array'],
+            'casal_ids' => ['present', 'array'],
             'casal_ids.*' => ['string', 'ulid'],
         ];
     }

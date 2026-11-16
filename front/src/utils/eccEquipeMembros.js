@@ -29,7 +29,7 @@ export function removeCasaisFromEquipe(naEquipeIds, selectedIds) {
 }
 
 /**
- * @param {Array<{ id: string|number, equipe_id?: string|null }>} casais
+ * @param {Array<{ id: string|number, equipe_id?: string|null, equipe_ids?: Array<string|number> }>} casais
  * @param {string} equipeId
  * @returns {Set<string>}
  */
@@ -37,7 +37,12 @@ export function initialEquipeCasalIds(casais, equipeId) {
   const eq = String(equipeId || '')
   return new Set(
     (casais || [])
-      .filter((c) => String(c.equipe_id || '') === eq)
+      .filter((c) => {
+        if (Array.isArray(c.equipe_ids) && c.equipe_ids.length) {
+          return c.equipe_ids.map(String).includes(eq)
+        }
+        return String(c.equipe_id || '') === eq
+      })
       .map((c) => String(c.id)),
   )
 }
