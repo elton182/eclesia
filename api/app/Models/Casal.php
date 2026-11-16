@@ -9,6 +9,7 @@ use ESolution\DBEncryption\Traits\EncryptedAttribute;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Casal extends Model
@@ -58,6 +59,7 @@ class Casal extends Model
         'funcao_dirigente',
         'foi_coordenador_geral',
         'ficha_com_foto',
+        'ativo',
     ];
 
     /**
@@ -71,6 +73,7 @@ class Casal extends Model
             'foi_coordenador_geral' => 'boolean',
             'ficha_com_foto' => 'boolean',
             'anos_casados' => 'integer',
+            'ativo' => 'boolean',
         ];
     }
 
@@ -82,6 +85,21 @@ class Casal extends Model
     public function equipe(): BelongsTo
     {
         return $this->belongsTo(EccEquipe::class, 'ecc_equipe_id');
+    }
+
+    /**
+     * Equipes de perseverança (N:N — SPEC-035).
+     *
+     * @return BelongsToMany<EccEquipe, $this>
+     */
+    public function equipes(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            EccEquipe::class,
+            'ecc_casal_equipe',
+            'casal_id',
+            'ecc_equipe_id',
+        )->withTimestamps();
     }
 
     public function pessoaA(): BelongsTo

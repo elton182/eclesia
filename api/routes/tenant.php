@@ -176,6 +176,7 @@ Route::middleware([
     Route::post('ecc/casais/import', [EccCasalController::class, 'import']);
     Route::post('ecc/casais/import/preview', [EccCasalController::class, 'importPreview']);
     Route::post('ecc/casais/import/commit', [EccCasalController::class, 'importCommit']);
+    Route::post('ecc/casais/merge', [EccCasalController::class, 'merge']);
     Route::post('ecc/casais/{id}/swap', [EccCasalController::class, 'swap']);
     Route::apiResource('ecc/casais', EccCasalController::class)->names('ecc.casais');
 

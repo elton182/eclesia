@@ -13,10 +13,11 @@ describe('eccEquipeMembros', () => {
         { id: 'a', equipe_id: 'eq1' },
         { id: 'b', equipe_id: 'eq2' },
         { id: 'c', equipe_id: 'eq1' },
+        { id: 'd', equipe_ids: ['eq1', 'eq3'] },
       ],
       'eq1',
     )
-    assert.deepEqual([...ids].sort(), ['a', 'c'])
+    assert.deepEqual([...ids].sort(), ['a', 'c', 'd'])
   })
 
   it('addCasaisToEquipe move selecionados para a equipe', () => {

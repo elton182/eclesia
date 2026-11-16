@@ -10,6 +10,7 @@ use App\Models\Pessoa;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Throwable;
 
 class EccCasalService
@@ -33,12 +34,14 @@ class EccCasalService
                 'pessoaA',
                 'pessoaB',
                 'equipe',
+                'equipes',
                 'etapas',
                 'atividades.equipeServico',
                 'preferencias.equipeServico',
             ]);
 
         $this->applyEquipeScope($query);
+        $this->applyAtivoFilter($query, request()->query('ativo'));
 
         return $query->orderByDesc('created_at')->get();
     }
@@ -51,6 +54,7 @@ class EccCasalService
                 'pessoaA',
                 'pessoaB',
                 'equipe',
+                'equipes',
                 'etapas',
                 'atividades.equipeServico',
                 'preferencias.equipeServico',
@@ -71,7 +75,30 @@ class EccCasalService
             return;
         }
 
-        $query->whereIn('ecc_equipe_id', $equipeIds);
+        $query->where(function ($q) use ($equipeIds): void {
+            $q->whereIn('ecc_equipe_id', $equipeIds)
+                ->orWhereHas('equipes', function ($eq) use ($equipeIds): void {
+                    $eq->whereIn('ecc_equipes.id', $equipeIds);
+                });
+        });
+    }
+
+    /**
+     * @param  \Illuminate\Database\Eloquent\Builder<Casal>  $query
+     */
+    private function applyAtivoFilter($query, mixed $ativo): void
+    {
+        if ($ativo === null || $ativo === '') {
+            return;
+        }
+        if ($ativo === '1' || $ativo === 1 || $ativo === true || $ativo === 'true') {
+            $query->where('ativo', true);
+
+            return;
+        }
+        if ($ativo === '0' || $ativo === 0 || $ativo === false || $ativo === 'false') {
+            $query->where('ativo', false);
+        }
     }
 
     /**
@@ -89,8 +116,7 @@ class EccCasalService
     {
         return DB::transaction(function () use ($casal, $data) {
             if (! $this->visibility->userCan('ecc.casais.manage')) {
-                unset($data['equipe']);
-                $data['equipe_id'] = $casal->ecc_equipe_id;
+                unset($data['equipe'], $data['equipe_id'], $data['equipe_ids']);
             }
 
             $pessoaAData = [
@@ -117,18 +143,15 @@ class EccCasalService
             }
             $casal->pessoaB->update($pessoaBData);
 
-            $equipeId = $data['equipe_id'] ?? null;
-            if (! empty($data['equipe']) && empty($equipeId)) {
-                $equipeId = $this->equipes->findOrCreateByNome((string) $data['equipe'])->id;
-            }
-
-            $casal->update($this->casalAttributes($data, $equipeId));
+            $casal->update($this->casalAttributes($data));
             $this->syncFichaRelations($casal, $data);
+            $this->syncEquipesFromPayload($casal, $data);
 
             return $casal->refresh()->load([
                 'pessoaA',
                 'pessoaB',
                 'equipe',
+                'equipes',
                 'etapas',
                 'atividades.equipeServico',
                 'preferencias.equipeServico',
@@ -390,26 +413,24 @@ class EccCasalService
             ? $this->pessoaExtras($data['ela'])
             : []));
 
-        $equipeId = $data['equipe_id'] ?? null;
-        if (! empty($data['equipe']) && empty($equipeId)) {
-            $equipeId = $this->equipes->findOrCreateByNome((string) $data['equipe'])->id;
-        }
-
         $casal = Casal::query()->create(array_merge(
             [
                 'igreja_id' => $igrejaId,
                 'pessoa_a_id' => $pessoaA->id,
                 'pessoa_b_id' => $pessoaB->id,
+                'ecc_equipe_id' => null,
             ],
-            $this->casalAttributes($data, $equipeId),
+            $this->casalAttributes($data),
         ));
 
         $this->syncFichaRelations($casal, $data);
+        $this->syncEquipesFromPayload($casal, $data, replace: true);
 
         return $casal->load([
             'pessoaA',
             'pessoaB',
             'equipe',
+            'equipes',
             'etapas',
             'atividades.equipeServico',
             'preferencias.equipeServico',
@@ -420,10 +441,9 @@ class EccCasalService
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
-    private function casalAttributes(array $data, mixed $equipeId): array
+    private function casalAttributes(array $data): array
     {
-        return [
-            'ecc_equipe_id' => $equipeId,
+        $attrs = [
             'endereco' => $data['endereco'] ?? null,
             'bairro' => $data['bairro'] ?? null,
             'cidade' => $data['cidade'] ?? null,
@@ -440,6 +460,85 @@ class EccCasalService
             'funcao_dirigente' => $this->stringifyCell($data['funcao_dirigente'] ?? null),
             'foi_coordenador_geral' => (bool) ($data['foi_coordenador_geral'] ?? false),
         ];
+
+        if (array_key_exists('ativo', $data)) {
+            $attrs['ativo'] = (bool) $data['ativo'];
+        }
+
+        return $attrs;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function syncEquipesFromPayload(Casal $casal, array $data, bool $replace = false): void
+    {
+        $hasIds = array_key_exists('equipe_ids', $data);
+        $hasSingle = ! empty($data['equipe']) || ! empty($data['equipe_id']);
+
+        if (! $hasIds && ! $hasSingle) {
+            return;
+        }
+
+        $ids = $this->resolveEquipeIdsFromData($data);
+
+        if ($replace || $hasIds) {
+            $this->syncCasalEquipes($casal, $ids);
+
+            return;
+        }
+
+        foreach ($ids as $id) {
+            $this->attachEquipeToCasal($casal, $id);
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return list<string>
+     */
+    private function resolveEquipeIdsFromData(array $data): array
+    {
+        $ids = [];
+
+        if (isset($data['equipe_ids']) && is_array($data['equipe_ids'])) {
+            foreach ($data['equipe_ids'] as $id) {
+                if (is_string($id) && $id !== '') {
+                    $ids[] = $id;
+                }
+            }
+        }
+
+        if (! empty($data['equipe_id'])) {
+            $ids[] = (string) $data['equipe_id'];
+        }
+
+        if (! empty($data['equipe'])) {
+            $ids[] = (string) $this->equipes->findOrCreateByNome((string) $data['equipe'])->id;
+        }
+
+        return array_values(array_unique($ids));
+    }
+
+    /**
+     * @param  list<string>  $equipeIds
+     */
+    private function syncCasalEquipes(Casal $casal, array $equipeIds): void
+    {
+        $casal->equipes()->sync($equipeIds);
+        $this->refreshPrimaryEquipe($casal);
+    }
+
+    private function attachEquipeToCasal(Casal $casal, string $equipeId): void
+    {
+        $casal->equipes()->syncWithoutDetaching([$equipeId]);
+        $this->refreshPrimaryEquipe($casal);
+    }
+
+    private function refreshPrimaryEquipe(Casal $casal): void
+    {
+        $primary = $casal->equipes()->orderBy('ecc_equipes.nome')->value('ecc_equipes.id');
+        $casal->forceFill(['ecc_equipe_id' => $primary])->saveQuietly();
     }
 
     /**
@@ -1226,9 +1325,145 @@ class EccCasalService
         }
 
         $base = $this->importComparableFromCasal($casal);
+        // Evita re-sync de equipes no update a partir do snapshot; só aplica se veio em apply_fields.
+        unset($base['equipe'], $base['equipe_id'], $base['equipe_ids']);
         $merged = array_merge($base, $apply);
 
-        // update() espera nomes obrigatórios e equipe como string/id
         return $this->update($casal, $merged);
+    }
+
+    /**
+     * Unifica dois registros de casal (SPEC-035). Mantém keep, absorve absorb.
+     */
+    public function merge(string $keepId, string $absorbId): Casal
+    {
+        if ($keepId === $absorbId) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'absorb_id' => ['Selecione dois casais diferentes para unificar.'],
+            ]);
+        }
+
+        return DB::transaction(function () use ($keepId, $absorbId) {
+            $keep = $this->find($keepId);
+            $absorb = $this->find($absorbId);
+
+            $absorbEquipeIds = $absorb->equipes()->pluck('ecc_equipes.id')->map(fn ($id) => (string) $id)->all();
+            if ($absorbEquipeIds !== []) {
+                $keep->equipes()->syncWithoutDetaching($absorbEquipeIds);
+            }
+
+            $this->fillEmptyFromAbsorb($keep, $absorb);
+            $this->reattachCasalForeignKeys($keep, $absorb);
+            $this->refreshPrimaryEquipe($keep);
+
+            $pessoaA = $absorb->pessoaA;
+            $pessoaB = $absorb->pessoaB;
+            $absorb->equipes()->detach();
+            $absorb->delete();
+            if ($pessoaA !== null) {
+                $this->fotos->deleteFile($pessoaA);
+                $pessoaA->delete();
+            }
+            if ($pessoaB !== null) {
+                $this->fotos->deleteFile($pessoaB);
+                $pessoaB->delete();
+            }
+
+            return $this->find((string) $keep->id);
+        });
+    }
+
+    private function fillEmptyFromAbsorb(Casal $keep, Casal $absorb): void
+    {
+        $keep->loadMissing(['pessoaA', 'pessoaB', 'etapas', 'atividades', 'preferencias']);
+        $absorb->loadMissing(['pessoaA', 'pessoaB', 'etapas', 'atividades', 'preferencias']);
+
+        foreach (['endereco', 'bairro', 'cidade', 'uf', 'cep', 'filhos', 'observacoes', 'engajamento_paroquial', 'habilidades', 'ecc_origem', 'funcao_dirigente'] as $field) {
+            if ($this->isComparableEmpty($keep->{$field}) && ! $this->isComparableEmpty($absorb->{$field})) {
+                $keep->{$field} = $absorb->{$field};
+            }
+        }
+        if ($keep->data_casamento === null && $absorb->data_casamento !== null) {
+            $keep->data_casamento = $absorb->data_casamento;
+        }
+        if ($keep->anos_casados === null && $absorb->anos_casados !== null) {
+            $keep->anos_casados = $absorb->anos_casados;
+        }
+        if (! $keep->piloto && $absorb->piloto) {
+            $keep->piloto = true;
+        }
+        if (! $keep->foi_coordenador_geral && $absorb->foi_coordenador_geral) {
+            $keep->foi_coordenador_geral = true;
+        }
+        $keep->save();
+
+        foreach (['pessoaA' => $absorb->pessoaA, 'pessoaB' => $absorb->pessoaB] as $rel => $src) {
+            $dst = $keep->{$rel};
+            if ($dst === null || $src === null) {
+                continue;
+            }
+            foreach (['email', 'telefone', 'nome_usual', 'profissao', 'religiao', 'endereco_profissional', 'telefone_profissional'] as $field) {
+                if ($this->isComparableEmpty($dst->{$field}) && ! $this->isComparableEmpty($src->{$field})) {
+                    $dst->{$field} = $src->{$field};
+                }
+            }
+            if ($dst->data_nascimento === null && $src->data_nascimento !== null) {
+                $dst->data_nascimento = $src->data_nascimento;
+            }
+            $dst->save();
+        }
+
+        if ($keep->etapas->isEmpty() && $absorb->etapas->isNotEmpty()) {
+            foreach ($absorb->etapas as $etapa) {
+                $keep->etapas()->create([
+                    'etapa' => $etapa->etapa,
+                    'ecc_numero' => $etapa->ecc_numero,
+                    'data' => $etapa->data,
+                    'local' => $etapa->local,
+                ]);
+            }
+        }
+    }
+
+    private function reattachCasalForeignKeys(Casal $keep, Casal $absorb): void
+    {
+        $keepId = (string) $keep->id;
+        $absorbId = (string) $absorb->id;
+
+        if (Schema::hasTable('ecc_eventos')) {
+            DB::table('ecc_eventos')->where('casal_compras_id', $absorbId)->update(['casal_compras_id' => $keepId]);
+        }
+
+        if (Schema::hasTable('ecc_itens_compra')) {
+            DB::table('ecc_itens_compra')->where('doador_casal_id', $absorbId)->update(['doador_casal_id' => $keepId]);
+        }
+
+        if (Schema::hasTable('ecc_evento_lancamentos')) {
+            DB::table('ecc_evento_lancamentos')->where('casal_id', $absorbId)->update(['casal_id' => $keepId]);
+        }
+
+        if (Schema::hasTable('ecc_evento_casal')) {
+            $keepPairs = DB::table('ecc_evento_casal')
+                ->where('casal_id', $keepId)
+                ->pluck('ecc_evento_id')
+                ->map(fn ($id) => (string) $id)
+                ->all();
+
+            $absorbRows = DB::table('ecc_evento_casal')->where('casal_id', $absorbId)->get();
+            foreach ($absorbRows as $row) {
+                $eventoId = (string) $row->ecc_evento_id;
+                if (in_array($eventoId, $keepPairs, true)) {
+                    DB::table('ecc_evento_casal')
+                        ->where('ecc_evento_id', $eventoId)
+                        ->where('casal_id', $absorbId)
+                        ->delete();
+                } else {
+                    DB::table('ecc_evento_casal')
+                        ->where('ecc_evento_id', $eventoId)
+                        ->where('casal_id', $absorbId)
+                        ->update(['casal_id' => $keepId]);
+                }
+            }
+        }
     }
 }

@@ -26,16 +26,47 @@ class EccEquipe extends Model
         'nome',
         'cor',
         'acesso_user_id',
+        'ativo',
     ];
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'ativo' => 'boolean',
+        ];
+    }
 
     public function igreja(): BelongsTo
     {
         return $this->belongsTo(Igreja::class);
     }
 
-    public function casais(): HasMany
+    /**
+     * Compat: casais cuja equipe principal aponta para esta.
+     *
+     * @return HasMany<Casal, $this>
+     */
+    public function casaisPrincipais(): HasMany
     {
         return $this->hasMany(Casal::class, 'ecc_equipe_id');
+    }
+
+    /**
+     * Membros via pivot N:N (SPEC-035).
+     *
+     * @return BelongsToMany<Casal, $this>
+     */
+    public function casais(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            Casal::class,
+            'ecc_casal_equipe',
+            'ecc_equipe_id',
+            'casal_id',
+        )->withTimestamps();
     }
 
     public function acessoUser(): BelongsTo

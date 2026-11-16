@@ -417,4 +417,98 @@ class EccEquipeCasalTest extends TestCase
         $this->assertSame('skip', $item['suggested_action']);
     }
 
+    public function test_casal_pode_pertencer_a_varias_equipes(): void
+    {
+        $eqA = $this->tenantJson('POST', '/api/v1/ecc/equipes', ['nome' => 'Equipe A'])->assertCreated()->json('data');
+        $eqB = $this->tenantJson('POST', '/api/v1/ecc/equipes', ['nome' => 'Equipe B'])->assertCreated()->json('data');
+
+        $casal = $this->tenantJson('POST', '/api/v1/ecc/casais', [
+            'nome' => 'Rui',
+            'nome_conjuge' => 'Lia',
+            'equipe_ids' => [$eqA['id'], $eqB['id']],
+        ])->assertCreated()->json('data');
+
+        $this->assertCount(2, $casal['equipes']);
+        $this->assertEqualsCanonicalizing([$eqA['id'], $eqB['id']], $casal['equipe_ids']);
+
+        $this->tenantJson('PUT', '/api/v1/ecc/equipes/'.$eqA['id'].'/casais', [
+            'casal_ids' => [],
+        ])->assertOk();
+
+        $atualizado = $this->tenantJson('GET', '/api/v1/ecc/casais/'.$casal['id'])->assertOk()->json('data');
+        $this->assertSame([$eqB['id']], $atualizado['equipe_ids']);
+        $this->assertSame($eqB['id'], $atualizado['equipe_id']);
+    }
+
+    public function test_merge_unifica_casais_e_equipes(): void
+    {
+        $eqA = $this->tenantJson('POST', '/api/v1/ecc/equipes', ['nome' => 'Alpha'])->assertCreated()->json('data');
+        $eqB = $this->tenantJson('POST', '/api/v1/ecc/equipes', ['nome' => 'Beta'])->assertCreated()->json('data');
+
+        $keep = $this->tenantJson('POST', '/api/v1/ecc/casais', [
+            'nome' => 'Tiago',
+            'nome_conjuge' => 'Sara',
+            'equipe_id' => $eqA['id'],
+            'endereco' => 'Rua Keep',
+        ])->assertCreated()->json('data');
+
+        $absorb = $this->tenantJson('POST', '/api/v1/ecc/casais', [
+            'nome' => 'Tiago',
+            'nome_conjuge' => 'Sara',
+            'equipe_id' => $eqB['id'],
+            'telefone' => '11911112222',
+            'endereco' => 'Rua Absorb',
+        ])->assertCreated()->json('data');
+
+        $merged = $this->tenantJson('POST', '/api/v1/ecc/casais/merge', [
+            'keep_id' => $keep['id'],
+            'absorb_id' => $absorb['id'],
+        ])->assertOk()->json('data');
+
+        $this->assertSame($keep['id'], $merged['id']);
+        $this->assertEqualsCanonicalizing([$eqA['id'], $eqB['id']], $merged['equipe_ids']);
+        $this->assertSame('Rua Keep', $merged['endereco']);
+        $this->assertSame('11911112222', $merged['telefone']);
+
+        $this->tenantJson('GET', '/api/v1/ecc/casais/'.$absorb['id'])->assertNotFound();
+        $lista = $this->tenantJson('GET', '/api/v1/ecc/casais')->assertOk()->json('data');
+        $this->assertCount(1, $lista);
+    }
+
+    public function test_ativo_casal_e_equipe(): void
+    {
+        $eq = $this->tenantJson('POST', '/api/v1/ecc/equipes', [
+            'nome' => 'Ativa',
+            'ativo' => true,
+        ])->assertCreated()->json('data');
+        $this->assertTrue($eq['ativo']);
+
+        $this->tenantJson('PUT', '/api/v1/ecc/equipes/'.$eq['id'], [
+            'ativo' => false,
+        ])->assertOk()->assertJsonPath('data.ativo', false);
+
+        $casal = $this->tenantJson('POST', '/api/v1/ecc/casais', [
+            'nome' => 'Nuno',
+            'nome_conjuge' => 'Inês',
+            'equipe_id' => $eq['id'],
+            'ativo' => true,
+        ])->assertCreated()->json('data');
+        $this->assertTrue($casal['ativo']);
+
+        $this->tenantJson('PUT', '/api/v1/ecc/casais/'.$casal['id'], [
+            'nome' => 'Nuno',
+            'nome_conjuge' => 'Inês',
+            'ativo' => false,
+        ])->assertOk()->assertJsonPath('data.ativo', false);
+
+        $this->assertCount(
+            0,
+            $this->tenantJson('GET', '/api/v1/ecc/casais?ativo=1')->assertOk()->json('data')
+        );
+        $this->assertCount(
+            1,
+            $this->tenantJson('GET', '/api/v1/ecc/casais?ativo=0')->assertOk()->json('data')
+        );
+    }
+
 }

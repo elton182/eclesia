@@ -43,6 +43,11 @@ import {
   statusBadgeLabel,
   toggleApplyField,
 } from '@/utils/eccCasalImportReview'
+import {
+  casalEquipesLabel,
+  resolveMergePair,
+  toggleMergeSelection,
+} from '@/utils/eccCasalMerge'
 
 const route = useRoute()
 const router = useRouter()
@@ -153,6 +158,44 @@ const cancelImportReview = () => {
   mode.value = 'list'
 }
 
+const toggleMergeMode = () => {
+  mergeMode.value = !mergeMode.value
+  mergeSelected.value = new Set()
+}
+
+const onToggleMergeCasal = (casalId, checked) => {
+  mergeSelected.value = toggleMergeSelection(mergeSelected.value, casalId, checked, 2)
+}
+
+const runMerge = async () => {
+  const { keep, absorb } = mergePair.value
+  if (!keep || !absorb) {
+    innovToast('error', 'Unificar', 'Selecione exatamente dois casais.')
+    return
+  }
+  const ok = await innovConfirm({
+    title: 'Unificar casais?',
+    message:
+      `Manter “${casalEle(keep)} & ${casalEla(keep)}” e absorver “${casalEle(absorb)} & ${casalEla(absorb)}”. ` +
+      'As equipes serão unidas; o segundo registro será removido.',
+    confirmText: 'Unificar',
+    danger: true,
+  })
+  if (!ok) return
+  try {
+    await api.post('/ecc/casais/merge', {
+      keep_id: keep.id,
+      absorb_id: absorb.id,
+    })
+    innovToast('success', 'Unificar', 'Casais unificados.')
+    mergeMode.value = false
+    mergeSelected.value = new Set()
+    await load()
+  } catch (e) {
+    innovToast('error', 'Unificar', e.response?.data?.message || 'Falha ao unificar')
+  }
+}
+
 const setImportAction = (rowIndex, action) => {
   importDecisions.value = patchDecision(importDecisions.value, rowIndex, { action })
 }
@@ -210,6 +253,8 @@ const openCasalDetail = (casal) => {
 const emptyForm = () => ({
   id: null,
   equipe_id: '',
+  equipe_ids: [],
+  ativo: true,
   nome: '',
   email: '',
   telefone: '',
@@ -256,13 +301,20 @@ const emptyForm = () => ({
 
 const form = ref(emptyForm())
 
+const showInativos = ref(false)
+const mergeMode = ref(false)
+const mergeSelected = ref(/** @type {Set<string>} */ (new Set()))
+
 const filtered = computed(() =>
   filterCasais({
     casais: casais.value,
     search: search.value,
     equipeId: filterEquipe.value,
+    includeInativos: showInativos.value,
   }),
 )
+
+const mergePair = computed(() => resolveMergePair(casais.value, mergeSelected.value))
 
 const ensureTenant = () => {
   if (!tenantStore.slug) {
@@ -324,6 +376,10 @@ const openEdit = async (item) => {
     ...item,
     ...pessoas,
     equipe_id: item.equipe_id || '',
+    equipe_ids: Array.isArray(item.equipe_ids)
+      ? [...item.equipe_ids]
+      : (item.equipe_id ? [item.equipe_id] : []),
+    ativo: item.ativo !== false,
     data_nascimento: isoToBr(pessoas.data_nascimento),
     data_nascimento_conjuge: isoToBr(pessoas.data_nascimento_conjuge),
     data_casamento: isoToBr(item.data_casamento),
@@ -392,9 +448,14 @@ const payload = () => {
     ela: _ela,
     ...rest
   } = form.value
+  const equipeIds = Array.isArray(form.value.equipe_ids)
+    ? form.value.equipe_ids.filter(Boolean)
+    : []
   return {
     ...rest,
-    equipe_id: form.value.equipe_id || null,
+    equipe_ids: equipeIds,
+    equipe_id: equipeIds[0] || form.value.equipe_id || null,
+    ativo: form.value.ativo !== false,
     anos_casados: form.value.anos_casados === '' || form.value.anos_casados === null
       ? null
       : Number(form.value.anos_casados),
@@ -500,6 +561,10 @@ const persistForm = async () => {
   const pessoas = formFieldsFromEleEla(saved)
   form.value.id = saved.id
   form.value.equipe_id = saved.equipe_id || form.value.equipe_id || ''
+  form.value.equipe_ids = Array.isArray(saved.equipe_ids)
+    ? [...saved.equipe_ids]
+    : (saved.equipe_id ? [saved.equipe_id] : form.value.equipe_ids)
+  form.value.ativo = saved.ativo !== false
   form.value.pessoa_a_id = pessoas.pessoa_a_id
   form.value.pessoa_b_id = pessoas.pessoa_b_id
   form.value.foto_url_ele = pessoas.foto_url_ele
@@ -706,6 +771,25 @@ onUnmounted(() => {
           >
             {{ importing ? 'Analisando…' : 'Importar Excel' }}
           </button>
+          <button
+            v-if="canManageCasais"
+            class="btn btn-ghost w-full sm:w-auto"
+            type="button"
+            data-testid="casais-merge-toggle"
+            @click="toggleMergeMode"
+          >
+            {{ mergeMode ? 'Cancelar unificação' : 'Unificar casais' }}
+          </button>
+          <button
+            v-if="canManageCasais && mergeMode"
+            class="btn btn-primary w-full sm:w-auto"
+            type="button"
+            data-testid="casais-merge-run"
+            :disabled="mergeSelected.size !== 2"
+            @click="runMerge"
+          >
+            Unificar selecionados ({{ mergeSelected.size }}/2)
+          </button>
           <router-link
             v-if="canManageEquipes"
             to="/ecc/equipes"
@@ -741,6 +825,10 @@ onUnmounted(() => {
           <option value="">Todas as equipes</option>
           <option v-for="eq in equipes" :key="eq.id" :value="eq.id">{{ eq.nome }}</option>
         </select>
+        <label class="flex items-center gap-2 text-[13px] w-full md:w-auto" style="color: rgba(42, 20, 24, 0.72)">
+          <input v-model="showInativos" type="checkbox" data-testid="casais-show-inativos">
+          Mostrar inativos
+        </label>
       </div>
 
       <div
@@ -772,6 +860,14 @@ onUnmounted(() => {
             style="border-top: 1px solid rgba(42, 20, 24, 0.07)"
           >
             <div class="flex items-center gap-3 min-w-0 flex-1">
+              <input
+                v-if="mergeMode && canManageCasais"
+                type="checkbox"
+                class="rounded shrink-0"
+                :checked="mergeSelected.has(String(casal.id))"
+                :data-testid="`casais-merge-check-${casal.id}`"
+                @change="onToggleMergeCasal(casal.id, $event.target.checked)"
+              >
               <div class="flex -space-x-2 shrink-0">
                 <div
                   class="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center text-xs font-bold text-white border-2 border-white"
@@ -805,7 +901,8 @@ onUnmounted(() => {
                   {{ casalEle(casal) }} & {{ casalEla(casal) }}
                 </div>
                 <div class="text-[13px] mt-1" style="color: rgba(42, 20, 24, 0.62)">
-                  {{ casal.equipe_nome || 'Sem equipe' }}
+                  {{ casalEquipesLabel(casal) }}
+                  <span v-if="casal.ativo === false" class="ml-2 text-[11px] font-semibold uppercase" style="color: #8A2436">Inativo</span>
                   <span v-if="casal.cidade"> · {{ casal.cidade }}/{{ casal.uf }}</span>
                   <span v-if="casal.piloto" class="badge badge-warning ml-2">Piloto</span>
                   <span v-if="casal.ecc_origem" class="ml-1">· ECC {{ casal.ecc_origem }}</span>
@@ -1064,16 +1161,19 @@ onUnmounted(() => {
       <form class="grid grid-cols-1 md:grid-cols-2 gap-4" @submit.prevent="isLastStep ? finishSteps() : continueStep()">
         <template v-if="currentStep?.id === 'contato'">
           <div class="md:col-span-2">
-            <label class="fld">Equipe</label>
+            <label class="fld">Equipes</label>
             <select
-              v-model="form.equipe_id"
+              v-model="form.equipe_ids"
               class="input"
+              multiple
               :disabled="!!form.id && !canManageCasais"
               data-testid="casal-form-equipe"
             >
-              <option value="">Sem equipe</option>
               <option v-for="eq in equipes" :key="eq.id" :value="eq.id">{{ eq.nome }}</option>
             </select>
+            <p class="text-[12.5px] mt-1" style="color: var(--color-muted)">
+              Segure Ctrl/Cmd para marcar mais de uma equipe.
+            </p>
             <p
               v-if="form.id && !canManageCasais"
               class="text-[12.5px] mt-1"
@@ -1081,6 +1181,13 @@ onUnmounted(() => {
             >
               A troca de equipe fica com a secretaria.
             </p>
+          </div>
+
+          <div class="md:col-span-2" v-if="canManageCasais">
+            <label class="flex items-center gap-2 text-[13.5px]" style="color: var(--color-ink)">
+              <input v-model="form.ativo" type="checkbox" data-testid="casal-form-ativo">
+              Casal ativo
+            </label>
           </div>
 
           <div>

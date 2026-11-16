@@ -36,7 +36,14 @@ const mode = ref('list')
 const saving = ref(false)
 const acessoLoadingId = ref(null)
 const pdfLoading = ref(false)
-const equipeForm = ref({ id: null, nome: '', cor: '#6B1C2B' })
+const equipeForm = ref({ id: null, nome: '', cor: '#6B1C2B', ativo: true })
+const showInativas = ref(false)
+
+const filteredEquipesVisible = computed(() => {
+  const base = filteredEquipes.value
+  if (showInativas.value) return base
+  return base.filter((eq) => eq.ativo !== false)
+})
 const membrosOpen = ref(false)
 const membrosEquipe = ref(null)
 
@@ -77,7 +84,7 @@ const load = async () => {
 }
 
 const openCreate = () => {
-  equipeForm.value = { id: null, nome: '', cor: '#6B1C2B' }
+  equipeForm.value = { id: null, nome: '', cor: '#6B1C2B', ativo: true }
   mode.value = 'form'
 }
 
@@ -86,6 +93,7 @@ const openEdit = (item) => {
     id: item.id,
     nome: item.nome,
     cor: item.cor || '#6B1C2B',
+    ativo: item.ativo !== false,
   }
   mode.value = 'form'
 }
@@ -97,11 +105,13 @@ const saveEquipe = async () => {
       await api.put(`/ecc/equipes/${equipeForm.value.id}`, {
         nome: equipeForm.value.nome,
         cor: equipeForm.value.cor,
+        ativo: equipeForm.value.ativo !== false,
       })
     } else {
       await api.post('/ecc/equipes', {
         nome: equipeForm.value.nome,
         cor: equipeForm.value.cor,
+        ativo: equipeForm.value.ativo !== false,
       })
     }
     innovToast('success', 'OK', 'Equipe salva')
@@ -317,6 +327,10 @@ onMounted(load)
           data-testid="equipes-search"
           aria-label="Pesquisar equipes"
         >
+        <label class="flex items-center gap-2 text-[13px]" style="color: rgba(42, 20, 24, 0.72)">
+          <input v-model="showInativas" type="checkbox" data-testid="equipes-show-inativas">
+          Mostrar inativas
+        </label>
       </div>
 
       <div
@@ -334,14 +348,14 @@ onMounted(load)
         data-testid="equipes-lista"
       >
         <div
-          v-if="!filteredEquipes.length"
+          v-if="!filteredEquipesVisible.length"
           class="p-10 text-center"
           style="color: rgba(42, 20, 24, 0.5)"
         >
           {{ search.trim() ? 'Nenhuma equipe encontrada.' : 'Nenhuma equipe cadastrada.' }}
         </div>
         <div
-          v-for="(equipe, index) in filteredEquipes"
+          v-for="(equipe, index) in filteredEquipesVisible"
           :key="equipe.id"
           class="flex flex-col gap-3 px-5 md:px-6 py-5 sm:flex-row sm:items-center sm:justify-between"
           :style="index > 0 ? 'border-top: 1px solid rgba(42, 20, 24, 0.07)' : undefined"
@@ -368,6 +382,7 @@ onMounted(load)
               </div>
               <div class="text-[12.5px]" style="color: rgba(42, 20, 24, 0.62)">
                 {{ equipe.casais_count ?? 0 }} casais
+                <span v-if="equipe.ativo === false" class="ml-2 text-[11px] font-semibold uppercase" style="color: #8A2436">Inativa</span>
               </div>
             </div>
           </div>
@@ -469,6 +484,10 @@ onMounted(load)
             data-testid="equipe-cor"
           >
         </div>
+        <label class="flex items-center gap-2 text-[13.5px]" style="color: #2A1418">
+          <input v-model="equipeForm.ativo" type="checkbox" data-testid="equipe-form-ativo">
+          Equipe ativa
+        </label>
         <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <button
             type="button"

@@ -25,6 +25,7 @@ class EccEquipeResource extends JsonResource
             'id' => $this->id,
             'nome' => $this->nome,
             'cor' => $this->cor,
+            'ativo' => (bool) ($this->ativo ?? true),
             'casais_count' => $this->casais_count ?? $this->casais()->count(),
             'tem_acesso' => $this->acesso_user_id !== null,
             'acesso_username' => $acessoUser?->username,

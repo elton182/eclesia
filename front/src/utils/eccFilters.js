@@ -8,17 +8,29 @@ export function filterEquipesBySearch(equipes, search) {
   return equipes.filter((e) => String(e.nome || '').toLowerCase().includes(q))
 }
 
-export function filterCasais({ casais, search, equipeId }) {
+export function filterCasais({ casais, search, equipeId, includeInativos = true }) {
   const q = String(search || '').trim().toLowerCase()
   return casais.filter((c) => {
-    if (equipeId && c.equipe_id !== equipeId) return false
+    if (!includeInativos && c.ativo === false) return false
+    if (equipeId) {
+      const ids = Array.isArray(c.equipe_ids) && c.equipe_ids.length
+        ? c.equipe_ids.map(String)
+        : c.equipe_id
+          ? [String(c.equipe_id)]
+          : []
+      if (!ids.includes(String(equipeId))) return false
+    }
     if (!q) return true
+    const equipeNomes = Array.isArray(c.equipes)
+      ? c.equipes.map((e) => e?.nome).filter(Boolean)
+      : []
     const haystack = [
       c.nome,
       c.nome_conjuge,
       c.ele?.nome,
       c.ela?.nome,
       c.equipe_nome,
+      ...equipeNomes,
       c.cidade,
       c.bairro,
       c.telefone,

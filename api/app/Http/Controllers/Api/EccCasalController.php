@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\CommitEccCasaisImportRequest;
 use App\Http\Requests\ImportEccCasaisRequest;
+use App\Http\Requests\MergeEccCasaisRequest;
 use App\Http\Requests\StoreEccCasalRequest;
 use App\Http\Requests\UpdateEccCasalRequest;
 use App\Http\Resources\EccCasalResource;
@@ -91,5 +92,13 @@ class EccCasalController extends Controller
         $result = $this->casais->commitImport($data['rows'], $data['decisions']);
 
         return response()->json($result);
+    }
+
+    public function merge(MergeEccCasaisRequest $request): EccCasalResource
+    {
+        $data = $request->validated();
+        $casal = $this->casais->merge($data['keep_id'], $data['absorb_id']);
+
+        return new EccCasalResource($casal);
     }
 }

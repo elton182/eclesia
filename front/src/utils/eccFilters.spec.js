@@ -51,6 +51,18 @@ describe('filterCasais', () => {
     assert.equal(filterCasais({ casais, search: 'eliseu', equipeId: '' }).length, 1)
     assert.equal(filterCasais({ casais, search: 'campinas', equipeId: '' })[0].id, 'a')
   })
+
+  it('aceita equipe_ids e oculta inativos', () => {
+    const multi = [
+      { id: 'x', equipe_ids: ['1', '9'], nome: 'A', nome_conjuge: 'B', ativo: true },
+      { id: 'y', equipe_ids: ['1'], nome: 'C', nome_conjuge: 'D', ativo: false },
+    ]
+    assert.equal(filterCasais({ casais: multi, equipeId: '9' }).length, 1)
+    assert.equal(
+      filterCasais({ casais: multi, equipeId: '1', includeInativos: false }).length,
+      1,
+    )
+  })
 })
 
 describe('casaisListQuery', () => {

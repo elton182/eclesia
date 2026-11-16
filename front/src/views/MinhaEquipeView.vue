@@ -58,7 +58,14 @@ const equipeAtual = computed(() =>
 )
 
 const casaisDaEquipe = computed(() =>
-  casais.value.filter((casal) => String(casal.equipe_id) === String(equipeId.value)),
+  casais.value.filter((casal) => {
+    const ids = Array.isArray(casal.equipe_ids) && casal.equipe_ids.length
+      ? casal.equipe_ids.map(String)
+      : casal.equipe_id
+        ? [String(casal.equipe_id)]
+        : []
+    return ids.includes(String(equipeId.value))
+  }),
 )
 
 const depositosDaEquipe = computed(() =>

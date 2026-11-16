@@ -38,6 +38,13 @@ class EccEquipeService
             $query->whereIn('id', $equipeIds);
         }
 
+        $ativo = request()->query('ativo');
+        if ($ativo === '1' || $ativo === 1 || $ativo === true || $ativo === 'true') {
+            $query->where('ativo', true);
+        } elseif ($ativo === '0' || $ativo === 0 || $ativo === false || $ativo === 'false') {
+            $query->where('ativo', false);
+        }
+
         return $query->orderBy('nome')->get();
     }
 
@@ -57,7 +64,7 @@ class EccEquipeService
     }
 
     /**
-     * @param  array{nome: string, cor?: string|null}  $data
+     * @param  array{nome: string, cor?: string|null, ativo?: bool}  $data
      */
     public function create(array $data): EccEquipe
     {
@@ -65,11 +72,12 @@ class EccEquipeService
             'igreja_id' => $this->igrejaContext->current()->id,
             'nome' => Str::upper(trim($data['nome'])),
             'cor' => $data['cor'] ?? null,
+            'ativo' => array_key_exists('ativo', $data) ? (bool) $data['ativo'] : true,
         ]);
     }
 
     /**
-     * @param  array{nome?: string, cor?: string|null}  $data
+     * @param  array{nome?: string, cor?: string|null, ativo?: bool}  $data
      */
     public function update(EccEquipe $equipe, array $data): EccEquipe
     {
@@ -140,17 +148,34 @@ class EccEquipeService
         }
 
         DB::transaction(function () use ($equipe, $igrejaId, $casalIds): void {
-            Casal::query()
-                ->where('igreja_id', $igrejaId)
-                ->where('ecc_equipe_id', $equipe->id)
-                ->whereNotIn('id', $casalIds === [] ? ['_'] : $casalIds)
-                ->update(['ecc_equipe_id' => null]);
+            $atuais = $equipe->casais()
+                ->where('casais.igreja_id', $igrejaId)
+                ->pluck('casais.id')
+                ->map(fn ($id) => (string) $id)
+                ->all();
 
-            if ($casalIds !== []) {
-                Casal::query()
-                    ->where('igreja_id', $igrejaId)
-                    ->whereIn('id', $casalIds)
-                    ->update(['ecc_equipe_id' => $equipe->id]);
+            $remover = array_values(array_diff($atuais, $casalIds));
+            if ($remover !== []) {
+                $equipe->casais()->detach($remover);
+                foreach ($remover as $casalId) {
+                    $casal = Casal::query()->where('igreja_id', $igrejaId)->find($casalId);
+                    if ($casal !== null) {
+                        $primary = $casal->equipes()->orderBy('ecc_equipes.nome')->value('ecc_equipes.id');
+                        $casal->forceFill(['ecc_equipe_id' => $primary])->saveQuietly();
+                    }
+                }
+            }
+
+            $adicionar = array_values(array_diff($casalIds, $atuais));
+            if ($adicionar !== []) {
+                $equipe->casais()->syncWithoutDetaching($adicionar);
+                foreach ($adicionar as $casalId) {
+                    $casal = Casal::query()->where('igreja_id', $igrejaId)->find($casalId);
+                    if ($casal !== null) {
+                        $primary = $casal->equipes()->orderBy('ecc_equipes.nome')->value('ecc_equipes.id');
+                        $casal->forceFill(['ecc_equipe_id' => $primary])->saveQuietly();
+                    }
+                }
             }
         });
 

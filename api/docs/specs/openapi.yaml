@@ -711,6 +711,9 @@ components:
         cor:
           type: string
           nullable: true
+        ativo:
+          type: boolean
+          description: SPEC-035 — equipe ativa
         casais_count:
           type: integer
         tem_acesso:
@@ -730,9 +733,25 @@ components:
           type: string
           format: uuid
           nullable: true
+          description: Equipe principal (compat); preferir equipes[]
         equipe_nome:
           type: string
           nullable: true
+        equipe_ids:
+          type: array
+          items:
+            type: string
+          description: SPEC-035 — todas as equipes de perseverança
+        equipes:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string }
+              nome: { type: string }
+        ativo:
+          type: boolean
+          description: SPEC-035 — casal ativo
         nome:
           type: string
           description: Pessoa A (ordem de cadastro); preferir ele/ela para exibição
@@ -2967,6 +2986,32 @@ paths:
                       skipped_empty: { type: integer }
         '403':
           description: Sem permissão
+  /ecc/casais/merge:
+    post:
+      summary: Unificar dois casais duplicados
+      description: >
+        Mantém keep_id, absorve absorb_id (equipes em união, preenche lacunas,
+        reaponta FKs e remove o absorvido). SPEC-035. Requer ecc.casais.manage.
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [keep_id, absorb_id]
+              properties:
+                keep_id: { type: string }
+                absorb_id: { type: string }
+      responses:
+        '200':
+          description: Casal mantido após unificação
+        '403':
+          description: Sem permissão
+        '422':
+          description: Validação
   /ecc/casais/import/commit:
     post:
       summary: Confirmar importação seletiva de casais
