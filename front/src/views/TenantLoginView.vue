@@ -218,8 +218,8 @@ const handleLogin = async () => {
               :type="showPassword ? 'text' : 'password'"
               class="flex-1 min-w-0 border-0 outline-none bg-transparent py-3 px-3.5 text-[14px]"
               style="color: #2A1418"
-              placeholder="••••••••"
               required
+              autocomplete="current-password"
               data-testid="tenant-login-password"
             >
             <button
