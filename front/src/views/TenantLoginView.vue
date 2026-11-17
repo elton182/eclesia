@@ -81,7 +81,7 @@ const handleLogin = async () => {
 
 <template>
   <div
-    class="min-h-screen grid lg:grid-cols-2"
+    class="min-h-app grid lg:grid-cols-2"
     data-testid="tenant-login-portico"
     style="background: #FFFDFA"
   >
@@ -123,7 +123,7 @@ const handleLogin = async () => {
     </aside>
 
     <!-- Formulário -->
-    <div class="flex flex-col justify-center px-6 py-10 sm:px-11 lg:px-11">
+    <div class="flex flex-col justify-center px-6 py-10 sm:px-11 lg:px-11 safe-pt safe-pb">
       <div class="w-full max-w-[380px] mx-auto" data-testid="tenant-login-card">
         <div class="lg:hidden flex flex-col items-center gap-1.5 mb-8">
           <div

@@ -15,7 +15,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="min-h-screen" style="background: var(--color-bg)">
+  <div class="min-h-app" style="background: var(--color-bg)">
     <RouterView />
   </div>
 </template>

@@ -208,10 +208,10 @@ function go(path) {
 </script>
 
 <template>
-  <div class="min-h-screen" style="background: var(--color-bg)" data-testid="welcome-page">
+  <div class="min-h-app" style="background: var(--color-bg)" data-testid="welcome-page">
     <!-- Desktop top bar (1c) -->
     <header
-      class="hidden md:flex items-center justify-between px-[26px] h-14"
+      class="hidden md:flex items-center justify-between px-[26px] h-14 safe-header-14"
       style="background: var(--color-primary); color: var(--color-on-primary)"
       data-testid="launcher-topbar"
     >
@@ -282,8 +282,9 @@ function go(path) {
 
     <!-- Mobile header (1d) -->
     <header
-      class="md:hidden px-[18px] pt-4 pb-[18px]"
+      class="md:hidden px-[18px] safe-pt-4 pb-[18px]"
       style="background: var(--color-primary); color: var(--color-on-primary)"
+      data-testid="launcher-mobile-header"
     >
       <div class="flex items-center justify-between mb-4">
         <div class="flex items-center gap-2">

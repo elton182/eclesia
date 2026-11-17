@@ -62,6 +62,8 @@ Tipografia global: `h1–h6` já usam serif no `main.css`. Em títulos de págin
 
 **Sidebar:** item ativo = fundo `#FFFDFA` + texto `var(--color-primary)`; altura mínima ~40px; gap entre itens `gap-1`.
 
+**Safe area (iPhone / PWA):** a app usa `viewport-fit=cover` + status bar `black-translucent`. Headers sticky/fixos devem usar as classes `safe-header-14` / `safe-header-16` / `safe-pt` (em `main.css`) para não ficarem sob a bandeja; shells usam `min-h-app` (`100dvh`) em vez de só `min-h-screen`.
+
 ---
 
 ## 4. Anatomia de uma página de módulo

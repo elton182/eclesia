@@ -254,6 +254,64 @@
   }
 }
 
+/*
+ * Safe area iOS (PWA / notch / Dynamic Island).
+ * index.html: viewport-fit=cover + apple-mobile-web-app-status-bar-style=black-translucent
+ * O padding vai no header colorido para o fundo estender sob a bandeja.
+ * Fora de @layer para vencer utilitários Tailwind (h-14/h-16/min-h-screen).
+ */
+.safe-pt {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+.safe-pb {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.safe-pt-4 {
+  padding-top: calc(1rem + env(safe-area-inset-top, 0px));
+}
+
+.safe-header-14 {
+  box-sizing: border-box;
+  height: auto;
+  padding-top: env(safe-area-inset-top, 0px);
+  min-height: calc(3.5rem + env(safe-area-inset-top, 0px));
+}
+
+.safe-header-16 {
+  box-sizing: border-box;
+  height: auto;
+  padding-top: env(safe-area-inset-top, 0px);
+  min-height: calc(4rem + env(safe-area-inset-top, 0px));
+}
+
+.safe-aside-pt {
+  padding-top: max(1.25rem, env(safe-area-inset-top, 0px));
+}
+
+.safe-offset-top-16 {
+  top: calc(4rem + env(safe-area-inset-top, 0px));
+}
+
+.safe-pad-top-16 {
+  padding-top: calc(4rem + env(safe-area-inset-top, 0px));
+}
+
+.safe-admin-aside-h {
+  height: calc(100vh - 4rem - env(safe-area-inset-top, 0px));
+  height: calc(100dvh - 4rem - env(safe-area-inset-top, 0px));
+}
+
+.safe-lider-main-pb {
+  padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+}
+
+.min-h-app {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
 .fade-enter-active,
 .fade-leave-active {
   transition: opacity 0.3s ease;

@@ -186,12 +186,12 @@ onUnmounted(() => {
 
 <template>
   <div
-    class="min-h-screen flex flex-col"
+    class="min-h-app flex flex-col"
     style="background: var(--color-bg); color: var(--color-ink)"
     data-testid="site-access-install-page"
   >
     <header
-      class="px-5 md:px-8 h-14 flex items-center justify-between gap-3"
+      class="px-5 md:px-8 h-14 safe-header-14 flex items-center justify-between gap-3"
       style="border-bottom: 1px solid var(--color-line); background: var(--color-surface)"
     >
       <RouterLink

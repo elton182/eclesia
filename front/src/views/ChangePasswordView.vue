@@ -51,7 +51,7 @@ const handleSubmit = async () => {
 
 <template>
   <div
-    class="min-h-screen flex items-center justify-center px-6 py-10"
+    class="min-h-app flex items-center justify-center px-6 py-10 safe-pt safe-pb"
     style="background: #FFFDFA"
     data-testid="change-password-view"
   >
