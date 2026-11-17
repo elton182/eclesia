@@ -45,8 +45,13 @@ import {
   toggleApplyField,
 } from '@/utils/eccCasalImportReview'
 import {
+  buildInitialMergeApplyFields,
   casalEquipesLabel,
+  formatMergeEquipes,
+  formatMergeReviewSummary,
+  mergeFieldLabel,
   resolveMergePair,
+  toggleMergeApplyField,
   toggleMergeSelection,
 } from '@/utils/eccCasalMerge'
 
@@ -127,12 +132,18 @@ const casais = ref([])
 const equipes = ref([])
 const equipesServico = ref([])
 const loading = ref(false)
-/** @type {import('vue').Ref<'list'|'form'|'import-review'>} */
+/** @type {import('vue').Ref<'list'|'form'|'import-review'|'merge-review'>} */
 const mode = ref('list')
 const saving = ref(false)
 const swapping = ref(false)
 const importing = ref(false)
 const committingImport = ref(false)
+const loadingMergePreview = ref(false)
+const committingMerge = ref(false)
+const mergePreview = ref(null)
+const mergeKeepId = ref(null)
+const mergeAbsorbId = ref(null)
+const mergeApplyFields = ref(/** @type {string[]} */ ([]))
 const filterEquipe = ref('')
 const search = ref('')
 const fileInput = ref(null)
@@ -168,32 +179,94 @@ const onToggleMergeCasal = (casalId, checked) => {
   mergeSelected.value = toggleMergeSelection(mergeSelected.value, casalId, checked, 2)
 }
 
-const runMerge = async () => {
+const mergeReviewSummaryText = computed(() =>
+  formatMergeReviewSummary(mergePreview.value, mergeApplyFields.value),
+)
+
+const cancelMergeReview = () => {
+  mergePreview.value = null
+  mergeKeepId.value = null
+  mergeAbsorbId.value = null
+  mergeApplyFields.value = []
+  mode.value = 'list'
+}
+
+const loadMergePreview = async (keepId, absorbId) => {
+  loadingMergePreview.value = true
+  try {
+    const { data } = await api.post('/ecc/casais/merge/preview', {
+      keep_id: keepId,
+      absorb_id: absorbId,
+    })
+    mergePreview.value = data
+    mergeKeepId.value = keepId
+    mergeAbsorbId.value = absorbId
+    mergeApplyFields.value = buildInitialMergeApplyFields(data)
+  } catch (e) {
+    innovToast('error', 'Unificar', e.response?.data?.message || 'Falha ao comparar casais')
+    throw e
+  } finally {
+    loadingMergePreview.value = false
+  }
+}
+
+const openMergeReview = async () => {
   const { keep, absorb } = mergePair.value
   if (!keep || !absorb) {
     innovToast('error', 'Unificar', 'Selecione exatamente dois casais.')
     return
   }
+  try {
+    await loadMergePreview(keep.id, absorb.id)
+    mode.value = 'merge-review'
+  } catch {
+    // toast já exibido
+  }
+}
+
+const swapMergeKeepAbsorb = async () => {
+  if (!mergeKeepId.value || !mergeAbsorbId.value || loadingMergePreview.value) return
+  try {
+    await loadMergePreview(mergeAbsorbId.value, mergeKeepId.value)
+  } catch {
+    // toast já exibido
+  }
+}
+
+const onToggleMergeField = (field, checked) => {
+  mergeApplyFields.value = toggleMergeApplyField(mergeApplyFields.value, field, checked)
+}
+
+const commitMergeReview = async () => {
+  if (!mergeKeepId.value || !mergeAbsorbId.value) return
+  const keepLabel = mergePreview.value?.keep?.label || 'casal mantido'
+  const absorbLabel = mergePreview.value?.absorb?.label || 'casal absorvido'
   const ok = await innovConfirm({
-    title: 'Unificar casais?',
+    title: 'Confirmar unificação?',
     message:
-      `Manter “${casalEle(keep)} & ${casalEla(keep)}” e absorver “${casalEle(absorb)} & ${casalEla(absorb)}”. ` +
-      'As equipes serão unidas; o segundo registro será removido.',
+      `Manter “${keepLabel}” e remover “${absorbLabel}”. ` +
+      'As equipes serão unidas. Esta ação não pode ser desfeita.',
     confirmText: 'Unificar',
     danger: true,
   })
   if (!ok) return
+
+  committingMerge.value = true
   try {
     await api.post('/ecc/casais/merge', {
-      keep_id: keep.id,
-      absorb_id: absorb.id,
+      keep_id: mergeKeepId.value,
+      absorb_id: mergeAbsorbId.value,
+      apply_fields: [...mergeApplyFields.value],
     })
     innovToast('success', 'Unificar', 'Casais unificados.')
     mergeMode.value = false
     mergeSelected.value = new Set()
+    cancelMergeReview()
     await load()
   } catch (e) {
     innovToast('error', 'Unificar', e.response?.data?.message || 'Falha ao unificar')
+  } finally {
+    committingMerge.value = false
   }
 }
 
@@ -792,10 +865,10 @@ onUnmounted(() => {
             class="btn btn-primary w-full sm:w-auto"
             type="button"
             data-testid="casais-merge-run"
-            :disabled="mergeSelected.size !== 2"
-            @click="runMerge"
+            :disabled="mergeSelected.size !== 2 || loadingMergePreview"
+            @click="openMergeReview"
           >
-            Unificar selecionados ({{ mergeSelected.size }}/2)
+            {{ loadingMergePreview ? 'Comparando…' : `Revisar unificação (${mergeSelected.size}/2)` }}
           </button>
           <router-link
             v-if="canManageEquipes"
@@ -1124,6 +1197,149 @@ onUnmounted(() => {
               </tbody>
             </table>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Revisão seletiva da unificação -->
+    <div
+      v-else-if="mode === 'merge-review'"
+      class="space-y-5 w-full"
+      data-testid="casais-merge-review"
+    >
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h3 class="font-serif text-xl" style="color: #2A1418">Revisar unificação</h3>
+          <p class="mt-1 text-[13.5px]" style="color: rgba(42, 20, 24, 0.62)">
+            {{ mergeReviewSummaryText }}. Marque os campos do absorvido que devem sobrescrever o mantido.
+          </p>
+        </div>
+        <div class="flex flex-col gap-2 sm:flex-row">
+          <button
+            class="btn btn-ghost w-full sm:w-auto"
+            type="button"
+            data-testid="casais-merge-cancel"
+            :disabled="committingMerge || loadingMergePreview"
+            @click="cancelMergeReview"
+          >
+            Cancelar
+          </button>
+          <button
+            class="btn btn-primary w-full sm:w-auto"
+            type="button"
+            data-testid="casais-merge-commit"
+            :disabled="committingMerge || loadingMergePreview || !mergeKeepId"
+            @click="commitMergeReview"
+          >
+            {{ committingMerge ? 'Unificando…' : 'Confirmar unificação' }}
+          </button>
+        </div>
+      </div>
+
+      <div
+        v-if="mergePreview"
+        class="grid gap-3 md:grid-cols-2"
+        data-testid="casais-merge-parties"
+      >
+        <div
+          class="rounded-[11px] px-5 py-4"
+          style="background: #FFFDFA; border: 1px solid rgba(42, 20, 24, 0.1)"
+        >
+          <p class="text-[11px] font-semibold uppercase tracking-wide" style="color: #B4703F">
+            Mantido
+          </p>
+          <p class="mt-1 font-medium" style="color: #2A1418" data-testid="casais-merge-keep-label">
+            {{ mergePreview.keep?.label }}
+          </p>
+          <p class="mt-1 text-[12.5px]" style="color: rgba(42, 20, 24, 0.62)">
+            {{ formatMergeEquipes(mergePreview.keep?.equipes) }}
+          </p>
+        </div>
+        <div
+          class="rounded-[11px] px-5 py-4"
+          style="background: #FFFDFA; border: 1px solid rgba(42, 20, 24, 0.1)"
+        >
+          <p class="text-[11px] font-semibold uppercase tracking-wide" style="color: #B4703F">
+            Absorvido (será removido)
+          </p>
+          <p class="mt-1 font-medium" style="color: #2A1418" data-testid="casais-merge-absorb-label">
+            {{ mergePreview.absorb?.label }}
+          </p>
+          <p class="mt-1 text-[12.5px]" style="color: rgba(42, 20, 24, 0.62)">
+            {{ formatMergeEquipes(mergePreview.absorb?.equipes) }}
+          </p>
+        </div>
+      </div>
+
+      <div class="flex flex-wrap gap-2 items-center">
+        <button
+          type="button"
+          class="btn btn-ghost text-sm"
+          data-testid="casais-merge-swap"
+          :disabled="loadingMergePreview || committingMerge"
+          @click="swapMergeKeepAbsorb"
+        >
+          Trocar mantido ↔ absorvido
+        </button>
+        <p
+          v-if="mergePreview?.equipes_union?.length"
+          class="text-[12.5px]"
+          style="color: rgba(42, 20, 24, 0.62)"
+          data-testid="casais-merge-equipes-union"
+        >
+          Equipes após união: {{ formatMergeEquipes(mergePreview.equipes_union) }}
+        </p>
+      </div>
+
+      <div
+        class="w-full overflow-hidden rounded-[11px]"
+        style="background: #FFFDFA; border: 1px solid rgba(42, 20, 24, 0.1)"
+      >
+        <div
+          v-if="!mergePreview?.field_diffs?.length"
+          class="px-5 md:px-6 py-5 text-[13.5px]"
+          style="color: rgba(42, 20, 24, 0.62)"
+          data-testid="casais-merge-no-diffs"
+        >
+          Nenhuma diferença de campos — a unificação só une as equipes e remove o registro absorvido.
+        </div>
+        <div v-else class="overflow-x-auto px-5 md:px-6 py-2">
+          <table class="w-full text-left text-[12.5px]" data-testid="casais-merge-diffs">
+            <thead>
+              <tr style="color: rgba(42, 20, 24, 0.55)">
+                <th class="py-2 pr-3 font-medium">Usar absorvido</th>
+                <th class="py-2 pr-3 font-medium">Campo</th>
+                <th class="py-2 pr-3 font-medium">Mantido</th>
+                <th class="py-2 font-medium">Absorvido</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="diff in mergePreview.field_diffs"
+                :key="diff.field"
+                style="border-top: 1px solid rgba(42, 20, 24, 0.06)"
+              >
+                <td class="py-2 pr-3 align-top">
+                  <input
+                    type="checkbox"
+                    class="rounded"
+                    :checked="mergeApplyFields.includes(diff.field)"
+                    :data-testid="`casais-merge-field-${diff.field}`"
+                    @change="onToggleMergeField(diff.field, $event.target.checked)"
+                  >
+                </td>
+                <td class="py-2 pr-3 align-top font-medium" style="color: #2A1418">
+                  {{ mergeFieldLabel(diff.field) }}
+                </td>
+                <td class="py-2 pr-3 align-top break-words" style="color: rgba(42, 20, 24, 0.72)">
+                  {{ formatDiffValue(diff.keep) }}
+                </td>
+                <td class="py-2 align-top break-words" style="color: rgba(42, 20, 24, 0.72)">
+                  {{ formatDiffValue(diff.absorb) }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
