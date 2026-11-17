@@ -20,4 +20,13 @@ describe('useFilePickerFallback', () => {
     assert.match(src, /onSilentFail/)
     assert.match(src, /fallback\.silent/)
   })
+
+  it('cancela o alerta falso quando câmera/galeria do SO abre (blur/visibility)', () => {
+    assert.match(src, /addEventListener\('blur'/)
+    assert.match(src, /visibilitychange/)
+    assert.match(src, /document\.visibilityState === 'hidden'/)
+    assert.match(src, /fallback\.picker_opened/)
+    assert.match(src, /onPickerLikelyOpened/)
+    assert.match(src, /stopWatchingPickerOpen/)
+  })
 })

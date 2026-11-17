@@ -76,8 +76,8 @@ const handleLogin = async () => {
             v-model="password"
             :type="showPassword ? 'text' : 'password'"
             class="input pr-12"
-            placeholder="••••••••"
             required
+            autocomplete="current-password"
             data-testid="login-password"
           />
           <button

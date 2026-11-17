@@ -298,7 +298,6 @@ onUnmounted(() => {
                 :type="showPassword ? 'text' : 'password'"
                 class="flex-1 min-w-0 border-0 outline-none bg-transparent py-3 px-3.5 text-[14px]"
                 style="color: var(--color-ink)"
-                placeholder="••••••••"
                 required
                 autocomplete="current-password"
                 data-testid="site-access-install-password"
