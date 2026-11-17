@@ -15,13 +15,15 @@ class MergeEccCasaisRequest extends FormRequest
     }
 
     /**
-     * @return array<string, list<string>>
+     * @return array<string, list<string|\Illuminate\Validation\Rules\In>|string>
      */
     public function rules(): array
     {
         return [
             'keep_id' => ['required', 'string'],
             'absorb_id' => ['required', 'string', 'different:keep_id'],
+            'apply_fields' => ['sometimes', 'array'],
+            'apply_fields.*' => ['string'],
         ];
     }
 }

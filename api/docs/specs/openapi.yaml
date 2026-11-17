@@ -2986,12 +2986,13 @@ paths:
                       skipped_empty: { type: integer }
         '403':
           description: Sem permissão
-  /ecc/casais/merge:
+  /ecc/casais/merge/preview:
     post:
-      summary: Unificar dois casais duplicados
+      summary: Pré-visualizar unificação de dois casais
       description: >
-        Mantém keep_id, absorve absorb_id (equipes em união, preenche lacunas,
-        reaponta FKs e remove o absorvido). SPEC-035. Requer ecc.casais.manage.
+        Compara keep e absorb campo a campo (como a revisão de import),
+        sugere apply_fields e lista a união de equipes. Não grava. SPEC-036.
+        Requer ecc.casais.manage.
       security:
         - bearerAuth: []
           tenantHeader: []
@@ -3005,6 +3006,61 @@ paths:
               properties:
                 keep_id: { type: string }
                 absorb_id: { type: string }
+      responses:
+        '200':
+          description: Diffs e resumo para revisão
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [keep, absorb, equipes_union, field_diffs, suggested_apply_fields]
+                properties:
+                  keep:
+                    type: object
+                  absorb:
+                    type: object
+                  equipes_union:
+                    type: array
+                    items:
+                      type: object
+                  field_diffs:
+                    type: array
+                    items:
+                      type: object
+                  suggested_apply_fields:
+                    type: array
+                    items:
+                      type: string
+        '403':
+          description: Sem permissão
+        '422':
+          description: Validação
+  /ecc/casais/merge:
+    post:
+      summary: Unificar dois casais duplicados
+      description: >
+        Mantém keep_id, absorve absorb_id (equipes em união, reaponta FKs e
+        remove o absorvido). Com apply_fields aplica só esses campos do absorb;
+        sem apply_fields preenche lacunas (legado SPEC-035). SPEC-036.
+        Requer ecc.casais.manage.
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [keep_id, absorb_id]
+              properties:
+                keep_id: { type: string }
+                absorb_id: { type: string }
+                apply_fields:
+                  type: array
+                  items:
+                    type: string
+                  description: Campos do absorb que sobrescrevem o keep (revisão seletiva)
       responses:
         '200':
           description: Casal mantido após unificação

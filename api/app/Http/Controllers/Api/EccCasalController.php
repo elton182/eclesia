@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\CommitEccCasaisImportRequest;
 use App\Http\Requests\ImportEccCasaisRequest;
 use App\Http\Requests\MergeEccCasaisRequest;
+use App\Http\Requests\PreviewMergeEccCasaisRequest;
 use App\Http\Requests\StoreEccCasalRequest;
 use App\Http\Requests\UpdateEccCasalRequest;
 use App\Http\Resources\EccCasalResource;
@@ -94,10 +95,19 @@ class EccCasalController extends Controller
         return response()->json($result);
     }
 
+    public function mergePreview(PreviewMergeEccCasaisRequest $request): JsonResponse
+    {
+        $data = $request->validated();
+        $result = $this->casais->previewMerge($data['keep_id'], $data['absorb_id']);
+
+        return response()->json($result);
+    }
+
     public function merge(MergeEccCasaisRequest $request): EccCasalResource
     {
         $data = $request->validated();
-        $casal = $this->casais->merge($data['keep_id'], $data['absorb_id']);
+        $applyFields = array_key_exists('apply_fields', $data) ? $data['apply_fields'] : null;
+        $casal = $this->casais->merge($data['keep_id'], $data['absorb_id'], $applyFields);
 
         return new EccCasalResource($casal);
     }

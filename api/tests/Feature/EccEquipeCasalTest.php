@@ -475,6 +475,59 @@ class EccEquipeCasalTest extends TestCase
         $this->assertCount(1, $lista);
     }
 
+    public function test_merge_preview_e_apply_fields_seletivo(): void
+    {
+        $eqA = $this->tenantJson('POST', '/api/v1/ecc/equipes', ['nome' => 'Gama'])->assertCreated()->json('data');
+        $eqB = $this->tenantJson('POST', '/api/v1/ecc/equipes', ['nome' => 'Delta'])->assertCreated()->json('data');
+
+        $keep = $this->tenantJson('POST', '/api/v1/ecc/casais', [
+            'nome' => 'Paulo',
+            'nome_conjuge' => 'Lia',
+            'equipe_id' => $eqA['id'],
+            'endereco' => 'Rua Keep',
+            'cidade' => 'Campinas',
+        ])->assertCreated()->json('data');
+
+        $absorb = $this->tenantJson('POST', '/api/v1/ecc/casais', [
+            'nome' => 'Paulo',
+            'nome_conjuge' => 'Lia',
+            'equipe_id' => $eqB['id'],
+            'telefone' => '11999998888',
+            'endereco' => 'Rua Absorb',
+            'cidade' => 'Jundiaí',
+        ])->assertCreated()->json('data');
+
+        $preview = $this->tenantJson('POST', '/api/v1/ecc/casais/merge/preview', [
+            'keep_id' => $keep['id'],
+            'absorb_id' => $absorb['id'],
+        ])->assertOk()->json();
+
+        $this->assertSame($keep['id'], $preview['keep']['id']);
+        $this->assertSame($absorb['id'], $preview['absorb']['id']);
+        $this->assertEqualsCanonicalizing([$eqA['id'], $eqB['id']], array_column($preview['equipes_union'], 'id'));
+
+        $fields = array_column($preview['field_diffs'], 'field');
+        $this->assertContains('endereco', $fields);
+        $this->assertContains('cidade', $fields);
+        $this->assertContains('telefone', $fields);
+        $this->assertNotContains('equipe', $fields);
+        $this->assertContains('telefone', $preview['suggested_apply_fields']);
+        $this->assertNotContains('endereco', $preview['suggested_apply_fields']);
+
+        $merged = $this->tenantJson('POST', '/api/v1/ecc/casais/merge', [
+            'keep_id' => $keep['id'],
+            'absorb_id' => $absorb['id'],
+            'apply_fields' => ['cidade'],
+        ])->assertOk()->json('data');
+
+        $this->assertSame($keep['id'], $merged['id']);
+        $this->assertSame('Rua Keep', $merged['endereco']);
+        $this->assertSame('Jundiaí', $merged['cidade']);
+        $this->assertTrue(empty($merged['telefone']));
+        $this->assertEqualsCanonicalizing([$eqA['id'], $eqB['id']], $merged['equipe_ids']);
+        $this->tenantJson('GET', '/api/v1/ecc/casais/'.$absorb['id'])->assertNotFound();
+    }
+
     public function test_ativo_casal_e_equipe(): void
     {
         $eq = $this->tenantJson('POST', '/api/v1/ecc/equipes', [

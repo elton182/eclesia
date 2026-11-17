@@ -1333,9 +1333,17 @@ class EccCasalService
     }
 
     /**
-     * Unifica dois registros de casal (SPEC-035). Mantém keep, absorve absorb.
+     * Pré-visualiza unificação (SPEC-036). Não grava.
+     *
+     * @return array{
+     *   keep: array<string, mixed>,
+     *   absorb: array<string, mixed>,
+     *   equipes_union: list<array{id: string, nome: string}>,
+     *   field_diffs: list<array{field: string, keep: mixed, absorb: mixed, suggest_apply: bool}>,
+     *   suggested_apply_fields: list<string>
+     * }
      */
-    public function merge(string $keepId, string $absorbId): Casal
+    public function previewMerge(string $keepId, string $absorbId): array
     {
         if ($keepId === $absorbId) {
             throw \Illuminate\Validation\ValidationException::withMessages([
@@ -1343,7 +1351,45 @@ class EccCasalService
             ]);
         }
 
-        return DB::transaction(function () use ($keepId, $absorbId) {
+        $keep = $this->find($keepId);
+        $absorb = $this->find($absorbId);
+
+        $keepComparable = $this->importComparableFromCasal($keep);
+        $absorbComparable = $this->importComparableFromCasal($absorb);
+        $diffs = $this->buildMergeFieldDiffs($keepComparable, $absorbComparable);
+
+        $suggestedApply = [];
+        foreach ($diffs as $diff) {
+            if (($diff['suggest_apply'] ?? false) === true) {
+                $suggestedApply[] = (string) $diff['field'];
+            }
+        }
+
+        return [
+            'keep' => $this->mergePartySummary($keep),
+            'absorb' => $this->mergePartySummary($absorb),
+            'equipes_union' => $this->mergeEquipesUnion($keep, $absorb),
+            'field_diffs' => $diffs,
+            'suggested_apply_fields' => $suggestedApply,
+        ];
+    }
+
+    /**
+     * Unifica dois registros de casal (SPEC-035 / SPEC-036).
+     * Com $applyFields: revisão seletiva (só esses campos do absorb).
+     * Sem $applyFields (null): preenche lacunas vazias do keep (legado).
+     *
+     * @param  list<string>|null  $applyFields
+     */
+    public function merge(string $keepId, string $absorbId, ?array $applyFields = null): Casal
+    {
+        if ($keepId === $absorbId) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'absorb_id' => ['Selecione dois casais diferentes para unificar.'],
+            ]);
+        }
+
+        return DB::transaction(function () use ($keepId, $absorbId, $applyFields) {
             $keep = $this->find($keepId);
             $absorb = $this->find($absorbId);
 
@@ -1352,7 +1398,15 @@ class EccCasalService
                 $keep->equipes()->syncWithoutDetaching($absorbEquipeIds);
             }
 
-            $this->fillEmptyFromAbsorb($keep, $absorb);
+            if ($applyFields === null) {
+                $this->fillEmptyFromAbsorb($keep, $absorb);
+            } elseif ($applyFields !== []) {
+                $incoming = $this->importComparableFromCasal($absorb);
+                // Equipe sempre via pivot; nunca sobrescrever pelo nome da planilha/comparável.
+                unset($incoming['equipe']);
+                $keep = $this->applyImportFields($keep, $incoming, $applyFields);
+            }
+
             $this->reattachCasalForeignKeys($keep, $absorb);
             $this->refreshPrimaryEquipe($keep);
 
@@ -1371,6 +1425,103 @@ class EccCasalService
 
             return $this->find((string) $keep->id);
         });
+    }
+
+    /**
+     * @return array{id: string, label: string, equipes: list<array{id: string, nome: string}>}
+     */
+    private function mergePartySummary(Casal $casal): array
+    {
+        $nomeA = (string) ($casal->pessoaA?->nome ?? '');
+        $nomeB = (string) ($casal->pessoaB?->nome ?? '');
+        $label = trim($nomeA.' & '.$nomeB);
+        if ($label === '&') {
+            $label = 'Casal';
+        }
+
+        $equipes = $casal->relationLoaded('equipes')
+            ? $casal->equipes
+            : $casal->equipes()->orderBy('nome')->get();
+
+        return [
+            'id' => (string) $casal->id,
+            'label' => $label,
+            'equipes' => $equipes
+                ->map(static fn ($e) => [
+                    'id' => (string) $e->id,
+                    'nome' => (string) $e->nome,
+                ])
+                ->values()
+                ->all(),
+        ];
+    }
+
+    /**
+     * @return list<array{id: string, nome: string}>
+     */
+    private function mergeEquipesUnion(Casal $keep, Casal $absorb): array
+    {
+        $byId = [];
+        foreach ([$keep, $absorb] as $casal) {
+            $equipes = $casal->relationLoaded('equipes')
+                ? $casal->equipes
+                : $casal->equipes()->orderBy('nome')->get();
+            foreach ($equipes as $e) {
+                $byId[(string) $e->id] = [
+                    'id' => (string) $e->id,
+                    'nome' => (string) $e->nome,
+                ];
+            }
+        }
+        $list = array_values($byId);
+        usort($list, static fn ($a, $b) => strcmp($a['nome'], $b['nome']));
+
+        return $list;
+    }
+
+    /**
+     * Diffs keep × absorb (SPEC-036). Ignora campo equipe (união no pivot).
+     *
+     * @param  array<string, mixed>  $keep
+     * @param  array<string, mixed>  $absorb
+     * @return list<array{field: string, keep: mixed, absorb: mixed, suggest_apply: bool}>
+     */
+    private function buildMergeFieldDiffs(array $keep, array $absorb): array
+    {
+        $diffs = [];
+        foreach ($this->importComparableFields() as $field) {
+            if ($field === 'equipe') {
+                continue;
+            }
+            if (! array_key_exists($field, $absorb) && ! array_key_exists($field, $keep)) {
+                continue;
+            }
+
+            $keepVal = $keep[$field] ?? null;
+            $absorbVal = $absorb[$field] ?? null;
+
+            if ($this->comparableValuesEqual($field, $keepVal, $absorbVal)) {
+                continue;
+            }
+
+            // Ambos vazios já tratados por equal; se absorb vazio e keep preenchido, não há o que aplicar.
+            if ($this->isComparableEmpty($absorbVal) && ! $this->isComparableEmpty($keepVal)) {
+                continue;
+            }
+
+            if ($this->isComparableEmpty($absorbVal) && $this->isComparableEmpty($keepVal)) {
+                continue;
+            }
+
+            $diffs[] = [
+                'field' => $field,
+                'keep' => $keepVal,
+                'absorb' => $absorbVal,
+                'suggest_apply' => $this->isComparableEmpty($keepVal) && ! $this->isComparableEmpty($absorbVal),
+            ];
+        }
+
+        return $diffs;
     }
 
     private function fillEmptyFromAbsorb(Casal $keep, Casal $absorb): void
