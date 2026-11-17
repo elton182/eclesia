@@ -97,12 +97,12 @@ function onSiteLogin() {
 
 <template>
   <div
-    class="min-h-screen flex flex-col"
+    class="min-h-app flex flex-col"
     style="background: var(--color-surface); color: var(--color-ink)"
     data-testid="public-site"
   >
     <header
-      class="sticky top-0 z-20 px-6 md:px-8 h-16 flex items-center justify-between gap-4"
+      class="sticky top-0 z-20 px-6 md:px-8 h-16 safe-header-16 flex items-center justify-between gap-4"
       style="background: color-mix(in srgb, var(--color-surface) 94%, transparent); border-bottom: 1px solid color-mix(in srgb, var(--color-ink) 9%, transparent)"
     >
       <RouterLink

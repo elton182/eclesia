@@ -26,7 +26,7 @@ export function asideNavClasses({ open, widthClass = 'w-[214px]', gapClass = 'ga
 export function adminAsideClasses({ open } = { open: false }) {
   const parts = [
     'flex flex-col overflow-y-auto',
-    'fixed left-0 top-16 z-40 h-[calc(100vh-4rem)]',
+    'fixed left-0 z-40 safe-offset-top-16 safe-admin-aside-h',
     'max-md:shadow-xl transition-all duration-300 ease-in-out',
     open ? 'translate-x-0 w-60' : '-translate-x-full w-60 md:translate-x-0 md:w-20',
   ]

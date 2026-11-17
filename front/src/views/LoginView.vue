@@ -35,7 +35,7 @@ const handleLogin = async () => {
 
 <template>
   <div
-    class="min-h-screen flex items-center justify-center p-4"
+    class="min-h-app flex items-center justify-center p-4 safe-pt safe-pb"
     style="background: var(--color-bg)"
   >
   <div class="card p-8 space-y-6 w-full max-w-md" data-testid="login-card">

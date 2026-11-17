@@ -42,7 +42,7 @@ watch(
 </script>
 
 <template>
-  <div class="flex flex-col min-h-screen overflow-x-auto" style="background: var(--color-bg)">
+  <div class="flex flex-col min-h-app overflow-x-auto" style="background: var(--color-bg)">
     <TopNavbar
       class="fixed top-0 left-0 right-0 z-50"
       @toggle-sidebar="toggleSidebar"
@@ -50,18 +50,18 @@ watch(
 
     <div
       v-if="isSidebarOpen"
-      class="fixed inset-0 top-16 z-30 md:hidden"
+      class="fixed inset-0 safe-offset-top-16 z-30 md:hidden"
       style="background: rgba(42, 20, 24, 0.45)"
       data-testid="admin-nav-backdrop"
       @click="isSidebarOpen = false"
     />
 
-    <div class="flex pt-16">
+    <div class="flex safe-pad-top-16">
       <Sidebar :is-open="isSidebarOpen" />
 
       <main
         :class="[
-          'flex-1 transition-all duration-300 flex flex-col min-h-[calc(100vh-4rem)] px-4 py-6 md:px-8',
+          'flex-1 transition-all duration-300 flex flex-col min-h-app px-4 py-6 md:px-8',
           isSidebarOpen ? 'md:ml-60' : 'md:ml-20',
         ]"
       >

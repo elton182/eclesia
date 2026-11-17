@@ -31,4 +31,12 @@ describe('adminAsideClasses', () => {
     assert.match(cls, /w-60/)
     assert.match(cls, /translate-x-0/)
   })
+
+  it('respeita safe-area abaixo do TopNavbar no iPhone', () => {
+    const cls = adminAsideClasses({ open: true })
+    const tokens = cls.split(/\s+/)
+    assert.ok(tokens.includes('safe-offset-top-16'))
+    assert.ok(tokens.includes('safe-admin-aside-h'))
+    assert.ok(!tokens.includes('top-16'))
+  })
 })

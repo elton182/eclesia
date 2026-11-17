@@ -92,7 +92,7 @@ const logout = async () => {
 </script>
 
 <template>
-  <header class="top-navbar h-16 border-b flex items-center justify-between px-4 md:px-6">
+  <header class="top-navbar h-16 safe-header-16 border-b flex items-center justify-between px-4 md:px-6">
     <div class="flex items-center gap-3 min-w-0">
       <button
         type="button"

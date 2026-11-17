@@ -27,6 +27,11 @@ import UserMenuAppActions from '@/components/base/UserMenuAppActions.vue'
 import ViewAsLiderBanner from '@/components/ViewAsLiderBanner.vue'
 import LiderBottomNav from '@/components/ecc/LiderBottomNav.vue'
 import { asideNavClasses } from '@/utils/mobileNav'
+import {
+  SAFE_AREA_CLASSES,
+  moduleAsideSafePadClass,
+  moduleHeaderSafeClass,
+} from '@/utils/safeArea'
 import fallbackLogo from '@/assets/logo-icon.png'
 
 library.add(faBars)
@@ -321,9 +326,12 @@ function onNav(item) {
 const userMenuOpen = ref(false)
 const mobileNavOpen = ref(false)
 
-const sidebarClass = computed(() =>
-  asideNavClasses({ open: mobileNavOpen.value || false }) + ' px-3.5 py-5',
+const sidebarClass = computed(
+  () =>
+    `${asideNavClasses({ open: mobileNavOpen.value || false })} ${moduleAsideSafePadClass(viewAsLider.value)}`,
 )
+
+const headerSafeClass = computed(() => moduleHeaderSafeClass(viewAsLider.value))
 
 function closeMobileNav() {
   mobileNavOpen.value = false
@@ -386,11 +394,11 @@ onUnmounted(() => {
 
 <template>
   <div
-    class="min-h-screen flex flex-col"
+    :class="['flex flex-col', SAFE_AREA_CLASSES.minHeightApp]"
     style="background: var(--color-bg)"
     data-testid="module-layout"
   >
-    <ViewAsLiderBanner v-if="viewAsLider" />
+    <ViewAsLiderBanner v-if="viewAsLider" :class="SAFE_AREA_CLASSES.padTop" />
     <div
       v-if="mobileNavOpen && !liderShell"
       class="fixed inset-0 z-40 md:hidden"
@@ -515,7 +523,8 @@ onUnmounted(() => {
         v-if="moduleKey !== 'site' || !liderShell"
         class="h-14 shrink-0 flex items-center justify-between px-4 md:px-6 gap-3"
         style="background: var(--color-surface); border-bottom: 1px solid var(--color-line)"
-        :class="moduleKey === 'site' ? 'md:hidden' : ''"
+        :class="[headerSafeClass, moduleKey === 'site' ? 'md:hidden' : '']"
+        data-testid="module-header"
       >
         <div
           class="flex items-center gap-2.5 min-w-0 text-[13px]"
@@ -609,7 +618,7 @@ onUnmounted(() => {
 
       <main
         class="flex-1 min-w-0 w-full"
-        :class="liderShell ? 'pb-[72px] md:pb-0' : ''"
+        :class="liderShell ? `${SAFE_AREA_CLASSES.liderMainPadBottom} md:pb-0` : ''"
       >
         <router-view @mural-seen="refreshMuralBadges" @recados-seen="refreshMuralBadges" />
       </main>

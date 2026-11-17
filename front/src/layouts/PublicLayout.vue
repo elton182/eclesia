@@ -23,10 +23,10 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="min-h-screen flex flex-col" style="background: var(--color-bg)">
+  <div class="min-h-app flex flex-col" style="background: var(--color-bg)">
     <header
       :class="[
-        'sticky top-0 z-50 transition-all duration-300 border-b',
+        'sticky top-0 z-50 transition-all duration-300 border-b safe-pt',
         isScrolled
           ? 'bg-white/90 backdrop-blur border-[var(--color-line)]'
           : 'bg-transparent border-transparent',
