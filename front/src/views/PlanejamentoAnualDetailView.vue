@@ -1061,9 +1061,10 @@ onMounted(load)
                       .map((c) => c.titulo || 'outro evento')
                       .slice(0, 2)
                       .join(', ')
-                  }}<template v-if="ev.conflitos.length > 2">
-                    +{{ ev.conflitos.length - 2 }}</template
-                  >
+                  }}
+                  <template v-if="ev.conflitos.length > 2">
+                    +{{ ev.conflitos.length - 2 }}
+                  </template>
                 </template>
               </div>
             </button>
