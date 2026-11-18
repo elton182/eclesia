@@ -21,7 +21,7 @@ Hoje `POST /ecc/casais/merge` unifica dois casais de imediato: une equipes, pree
 - `POST /ecc/casais/merge/preview` com `{ keep_id, absorb_id }`.
 - Escopo: casais da igreja atual; ambos devem existir e ser distintos.
 - Diffs: mesmos campos comparáveis da importação, **exceto** `equipe` (equipes sempre em união no pivot).
-- Sugestão inicial de `apply_fields`: mantido vazio e absorvido preenchido → sugerir aplicar; ambos preenchidos e diferentes → não sugerir.
+- Sugestão inicial de `apply_fields`: mantido vazio e absorvido preenchido → sugerir aplicar; ambos preenchidos e diferentes → ver SPEC-037 (mais completo).
 
 ## Commit
 

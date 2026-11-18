@@ -1517,11 +1517,62 @@ class EccCasalService
                 'field' => $field,
                 'keep' => $keepVal,
                 'absorb' => $absorbVal,
-                'suggest_apply' => $this->isComparableEmpty($keepVal) && ! $this->isComparableEmpty($absorbVal),
+                'suggest_apply' => $this->shouldSuggestApplyAbsorb($field, $keepVal, $absorbVal),
             ];
         }
 
         return $diffs;
+    }
+
+    /**
+     * SPEC-037: sugerir absorb se preenche lacuna ou é mais completo que o keep.
+     * Empate (ou keep mais completo) → não sugerir.
+     */
+    private function shouldSuggestApplyAbsorb(string $field, mixed $keepVal, mixed $absorbVal): bool
+    {
+        if ($this->isComparableEmpty($absorbVal)) {
+            return false;
+        }
+        if ($this->isComparableEmpty($keepVal)) {
+            return true;
+        }
+
+        return $this->comparableCompletenessScore($field, $absorbVal)
+            > $this->comparableCompletenessScore($field, $keepVal);
+    }
+
+    /**
+     * Score de “mais informação” para um valor comparável (SPEC-037).
+     */
+    private function comparableCompletenessScore(string $field, mixed $value): int
+    {
+        if ($this->isComparableEmpty($value)) {
+            return 0;
+        }
+
+        if (in_array($field, ['etapas', 'atividades', 'preferencias'], true)) {
+            return is_array($value) ? count($value) : 0;
+        }
+
+        if (in_array($field, ['telefone', 'telefone_conjuge', 'cep'], true)) {
+            $digits = preg_replace('/\D+/', '', (string) $value) ?? '';
+
+            return strlen($digits);
+        }
+
+        if (is_bool($value)) {
+            return strlen($value ? '1' : '0');
+        }
+
+        if (is_int($value) || is_float($value)) {
+            return strlen((string) $value);
+        }
+
+        if (is_array($value)) {
+            return count($value);
+        }
+
+        return mb_strlen(trim((string) $value));
     }
 
     private function fillEmptyFromAbsorb(Casal $keep, Casal $absorb): void

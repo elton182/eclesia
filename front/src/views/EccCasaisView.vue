@@ -1211,7 +1211,7 @@ onUnmounted(() => {
         <div>
           <h3 class="font-serif text-xl" style="color: #2A1418">Revisar unificação</h3>
           <p class="mt-1 text-[13.5px]" style="color: rgba(42, 20, 24, 0.62)">
-            {{ mergeReviewSummaryText }}. Marque os campos do absorvido que devem sobrescrever o mantido.
+            {{ mergeReviewSummaryText }}. Pré-marcamos o valor mais completo de cada campo; ajuste se precisar.
           </p>
         </div>
         <div class="flex flex-col gap-2 sm:flex-row">

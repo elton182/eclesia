@@ -2991,8 +2991,11 @@ paths:
       summary: Pré-visualizar unificação de dois casais
       description: >
         Compara keep e absorb campo a campo (como a revisão de import),
-        sugere apply_fields e lista a união de equipes. Não grava. SPEC-036.
-        Requer ecc.casais.manage.
+        sugere apply_fields e lista a união de equipes. Não grava.
+        SPEC-036 / SPEC-037: suggest_apply é true quando o absorb preenche
+        lacuna do keep ou quando o valor do absorb é mais completo
+        (mais caracteres, mais dígitos em telefone/CEP, mais itens em listas);
+        empate fica com o keep. Requer ecc.casais.manage.
       security:
         - bearerAuth: []
           tenantHeader: []
@@ -3027,8 +3030,19 @@ paths:
                     type: array
                     items:
                       type: object
+                      required: [field, keep, absorb, suggest_apply]
+                      properties:
+                        field: { type: string }
+                        keep: {}
+                        absorb: {}
+                        suggest_apply:
+                          type: boolean
+                          description: >
+                            True se o valor do absorb deve ser pré-selecionado
+                            (lacuna no keep ou absorb mais completo — SPEC-037).
                   suggested_apply_fields:
                     type: array
+                    description: Campos com suggest_apply true (pré-seleção na revisão).
                     items:
                       type: string
         '403':
