@@ -17,6 +17,9 @@ import {
   intervaloEventoMs,
   anotarConflitosEventos,
   contarEventosComConflito,
+  eventoTemConflito,
+  filterEventosComConflito,
+  sortEventosPorDataInicio,
   canCriarEventoPlanejamento,
   canEditarEventoPlanejamento,
   canEditarEventoPlanejamentoPublico,
@@ -147,6 +150,20 @@ describe('planejamento', () => {
     assert.equal(anotados.find((e) => e.id === 'c').tem_conflito, false)
     assert.equal(contarEventosComConflito(anotados), 2)
     assert.match(anotados.find((e) => e.id === 'a').conflitos[0].titulo, /Ensaio/)
+    assert.equal(eventoTemConflito(anotados.find((e) => e.id === 'a')), true)
+    assert.equal(eventoTemConflito(anotados.find((e) => e.id === 'c')), false)
+    assert.deepEqual(
+      filterEventosComConflito(anotados).map((e) => e.id).sort(),
+      ['a', 'b'],
+    )
+    assert.deepEqual(
+      sortEventosPorDataInicio([
+        { id: 'z', data_inicio: '2026-05-02', hora_inicio: '08:00' },
+        { id: 'a', data_inicio: '2026-05-01', hora_inicio: '20:00' },
+        { id: 'b', data_inicio: '2026-05-01', hora_inicio: '09:00' },
+      ]).map((e) => e.id),
+      ['b', 'a', 'z'],
+    )
   })
 
   it('canCriarEventoPlanejamento por papel e status', () => {

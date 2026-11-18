@@ -36,7 +36,8 @@ import {
   canAlterarStatusSolicitacao,
   canCriarEventoPlanejamento,
   canEditarEventoPlanejamento,
-  contarEventosComConflito,
+  eventoTemConflito as eventoTemConflitoUtil,
+  filterEventosComConflito,
   filterEventosPorMes,
   filterEventosPorPastoraisVisiveis,
   filterEventosPorSemana,
@@ -46,6 +47,7 @@ import {
   labelStatusPlanejamento,
   labelStatusSolicitacao,
   mapaCoresPastorais,
+  sortEventosPorDataInicio,
   GRADE_SEMANA_HORA_FIM,
   GRADE_SEMANA_HORA_INICIO,
   horasGradeSemana,
@@ -106,6 +108,7 @@ const semanaInicio = ref(
 const pastoraisVisiveis = ref(new Set())
 const pastoraisFiltroInicializado = ref(false)
 const filtroStatus = ref('')
+const filtroSoConflitos = ref(false)
 const diaSelecionado = ref('')
 const showDayModal = ref(false)
 const editingEvento = ref(null)
@@ -204,24 +207,43 @@ const pastoraisPainel = computed(() => {
 
 const coresPastorais = computed(() => mapaCoresPastorais(pastoraisPainel.value))
 
+/**
+ * Filtros de pastoral/status/espaço (sem recorte de mês/semana).
+ * @param {Array} list
+ */
+function aplicarFiltrosEscopo(list) {
+  let out = list || []
+  if (canVerGlobal.value || pastoraisPainel.value.length) {
+    out = filterEventosPorPastoraisVisiveis(out, pastoraisVisiveis.value)
+  }
+  if (filtroStatus.value) {
+    out = out.filter((e) => e.status_solicitacao === filtroStatus.value)
+  }
+  if (filtroEspaco.value) {
+    out = out.filter((e) => (e.recursos || []).some((r) => r.recurso_id === filtroEspaco.value))
+  }
+  if (!canVerGlobal.value && myPastoralIds.value.length) {
+    out = out.filter((e) => myPastoralIds.value.includes(e.pastoral_id))
+  }
+  return out
+}
+
+const eventosNoEscopo = computed(() => aplicarFiltrosEscopo(eventos.value))
+
+const eventosComConflitoLista = computed(() =>
+  sortEventosPorDataInicio(filterEventosComConflito(eventosNoEscopo.value)),
+)
+
+const conflitosEscopoCount = computed(() => eventosComConflitoLista.value.length)
+
 const eventosFiltrados = computed(() => {
   let list =
     visaoCalendario.value === 'semana'
       ? filterEventosPorSemana(eventos.value, semanaInicio.value)
       : filterEventosPorMes(eventos.value, mesView.value)
-  if (canVerGlobal.value || pastoraisPainel.value.length) {
-    list = filterEventosPorPastoraisVisiveis(list, pastoraisVisiveis.value)
-  }
-  if (filtroStatus.value) {
-    list = list.filter((e) => e.status_solicitacao === filtroStatus.value)
-  }
-  if (filtroEspaco.value) {
-    list = list.filter((e) =>
-      (e.recursos || []).some((r) => r.recurso_id === filtroEspaco.value),
-    )
-  }
-  if (!canVerGlobal.value && myPastoralIds.value.length) {
-    list = list.filter((e) => myPastoralIds.value.includes(e.pastoral_id))
+  list = aplicarFiltrosEscopo(list)
+  if (filtroSoConflitos.value) {
+    list = filterEventosComConflito(list)
   }
   return list
 })
@@ -245,8 +267,6 @@ const periodoTitulo = computed(() => {
   const fim = addDiasIso(semanaInicio.value, 6)
   return `${labelDiaCurto(semanaInicio.value)} – ${labelDiaCurto(fim)} · ${anual.value?.ano || ''}`
 })
-
-const conflitosVisiveisCount = computed(() => contarEventosComConflito(eventosFiltrados.value))
 
 const maxChipsPorDia = computed(() => (visaoCalendario.value === 'semana' ? 8 : 2))
 
@@ -273,7 +293,29 @@ const statusSolicitacaoOptions = computed(() =>
 )
 
 function eventoTemConflito(ev) {
-  return ev?.tem_conflito === true || (Array.isArray(ev?.conflitos) && ev.conflitos.length > 0)
+  return eventoTemConflitoUtil(ev)
+}
+
+function ativarFiltroConflitos() {
+  filtroSoConflitos.value = true
+}
+
+function limparFiltroConflitos() {
+  filtroSoConflitos.value = false
+}
+
+/**
+ * Navega para o mês/semana do evento em conflito e abre o dia.
+ * @param {{ data_inicio?: string }|null|undefined} ev
+ */
+function irParaEventoConflito(ev) {
+  const iso = String(ev?.data_inicio || '').slice(0, 10)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return
+  const mes = Number(iso.slice(5, 7))
+  if (mes >= 1 && mes <= 12) mesView.value = mes
+  semanaInicio.value = inicioSemanaDomingo(iso)
+  filtroSoConflitos.value = true
+  selectDay(iso)
 }
 
 function podeEditar(ev) {
@@ -955,15 +997,86 @@ onMounted(load)
       </div>
 
       <div
-        v-if="conflitosVisiveisCount > 0"
-        class="rounded-xl px-4 py-3 text-[13.5px] flex flex-wrap items-center gap-2"
+        v-if="conflitosEscopoCount > 0 || filtroSoConflitos"
+        class="rounded-xl px-4 py-3 text-[13.5px] flex flex-col gap-3"
         style="background: var(--color-accent-soft); color: var(--color-accent-dark); border: 1px solid var(--color-line)"
         data-testid="planejamento-conflitos-resumo"
       >
-        <span class="font-medium">{{ conflitosVisiveisCount }} evento(s) com conflito de local/horário</span>
-        <span class="text-[12px]" style="color: var(--color-muted)">
-          Destacados na grade — a gravação não é bloqueada por este tipo de conflito.
-        </span>
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="font-medium">
+            {{
+              conflitosEscopoCount > 0
+                ? `${conflitosEscopoCount} evento(s) com conflito de local/horário`
+                : 'Nenhum conflito no filtro atual'
+            }}
+          </span>
+          <span class="text-[12px]" style="color: var(--color-muted)">
+            Destacados na grade — a gravação não é bloqueada por este tipo de conflito.
+          </span>
+          <button
+            v-if="!filtroSoConflitos && conflitosEscopoCount > 0"
+            type="button"
+            class="btn btn-ghost !py-1 !px-2.5 text-xs ml-auto"
+            data-testid="planejamento-ver-conflitos"
+            @click="ativarFiltroConflitos"
+          >
+            Ver conflitos
+          </button>
+          <button
+            v-else-if="filtroSoConflitos"
+            type="button"
+            class="btn btn-ghost !py-1 !px-2.5 text-xs ml-auto"
+            data-testid="planejamento-limpar-filtro-conflitos"
+            @click="limparFiltroConflitos"
+          >
+            Mostrar todos
+          </button>
+        </div>
+        <ul
+          v-if="filtroSoConflitos && eventosComConflitoLista.length"
+          class="list-none p-0 m-0 space-y-1.5"
+          data-testid="planejamento-lista-conflitos"
+        >
+          <li v-for="ev in eventosComConflitoLista" :key="ev.id">
+            <button
+              type="button"
+              class="w-full text-left rounded-md px-2.5 py-2 border-0 cursor-pointer"
+              style="background: var(--color-surface); color: var(--color-ink)"
+              :data-testid="`planejamento-conflito-item-${ev.id}`"
+              @click="irParaEventoConflito(ev)"
+            >
+              <div class="font-medium text-[13px]">
+                {{ isoToBr((ev.data_inicio || '').slice(0, 10)) }}
+                <span v-if="ev.hora_inicio" style="color: var(--color-muted)">
+                  · {{ formatHoraCalendario(ev.hora_inicio) || ev.hora_inicio }}
+                </span>
+                — {{ ev.titulo || 'Sem título' }}
+              </div>
+              <div class="text-[12px] mt-0.5" style="color: var(--color-muted)">
+                {{ pastoralNome(ev.pastoral_id) || ev.pastoral?.nome || ev.pastoral_nome || 'Pastoral' }}
+                <template v-if="ev.conflitos?.length">
+                  · conflita com
+                  {{
+                    ev.conflitos
+                      .map((c) => c.titulo || 'outro evento')
+                      .slice(0, 2)
+                      .join(', ')
+                  }}<template v-if="ev.conflitos.length > 2">
+                    +{{ ev.conflitos.length - 2 }}</template
+                  >
+                </template>
+              </div>
+            </button>
+          </li>
+        </ul>
+        <p
+          v-else-if="filtroSoConflitos && !eventosComConflitoLista.length"
+          class="text-[12.5px] m-0"
+          style="color: var(--color-muted)"
+          data-testid="planejamento-lista-conflitos-vazia"
+        >
+          Nenhum conflito com os filtros de pastoral/status/espaço atuais.
+        </p>
       </div>
 
       <div class="card p-4 md:p-5 flex flex-wrap gap-3 items-end">
@@ -1029,6 +1142,17 @@ onMounted(load)
             <option v-for="r in espacosCatalogo" :key="r.id" :value="r.id">{{ r.nome }}</option>
           </select>
         </div>
+        <label
+          class="flex items-center gap-2 text-[13px] cursor-pointer pb-2"
+          style="color: var(--color-ink)"
+          data-testid="planejamento-filtro-so-conflitos"
+        >
+          <input v-model="filtroSoConflitos" type="checkbox" class="shrink-0" />
+          Só conflitos
+          <span v-if="conflitosEscopoCount" class="text-[12px]" style="color: var(--color-muted)">
+            ({{ conflitosEscopoCount }})
+          </span>
+        </label>
         <button
           v-if="podeCriar"
           type="button"

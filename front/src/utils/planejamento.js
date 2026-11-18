@@ -301,14 +301,44 @@ export function anotarConflitosEventos(eventos) {
 }
 
 /**
+ * Evento anotado (ou com conflitos[]) tem conflito de local/horário?
+ * @param {{ tem_conflito?: boolean, conflitos?: unknown[] }|null|undefined} ev
+ * @returns {boolean}
+ */
+export function eventoTemConflito(ev) {
+  return ev?.tem_conflito === true || (Array.isArray(ev?.conflitos) && ev.conflitos.length > 0)
+}
+
+/**
+ * Mantém só eventos com conflito de local/horário.
+ * @param {Array<{ tem_conflito?: boolean, conflitos?: unknown[] }>|null|undefined} eventos
+ * @returns {Array}
+ */
+export function filterEventosComConflito(eventos) {
+  return (eventos || []).filter(eventoTemConflito)
+}
+
+/**
+ * Ordena eventos por data_inicio e hora_inicio (asc).
+ * @param {Array<{ data_inicio?: string, hora_inicio?: string }>|null|undefined} eventos
+ * @returns {Array}
+ */
+export function sortEventosPorDataInicio(eventos) {
+  return [...(eventos || [])].sort((a, b) => {
+    const da = String(a?.data_inicio || '').slice(0, 10)
+    const db = String(b?.data_inicio || '').slice(0, 10)
+    if (da !== db) return da.localeCompare(db)
+    return String(a?.hora_inicio || '').localeCompare(String(b?.hora_inicio || ''))
+  })
+}
+
+/**
  * Conta eventos com conflito na lista (já anotada ou com conflitos[]).
  * @param {Array<{ tem_conflito?: boolean, conflitos?: unknown[] }>|null|undefined} eventos
  * @returns {number}
  */
 export function contarEventosComConflito(eventos) {
-  return (eventos || []).filter(
-    (ev) => ev.tem_conflito === true || (Array.isArray(ev.conflitos) && ev.conflitos.length > 0),
-  ).length
+  return filterEventosComConflito(eventos).length
 }
 
 /**
