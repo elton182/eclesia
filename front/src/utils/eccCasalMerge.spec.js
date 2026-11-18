@@ -73,5 +73,6 @@ describe('eccCasalMerge', () => {
     assert.match(view, /openMergeReview/)
     assert.match(view, /apply_fields/)
     assert.match(view, /Trocar mantido/)
+    assert.match(view, /valor mais completo/)
   })
 })

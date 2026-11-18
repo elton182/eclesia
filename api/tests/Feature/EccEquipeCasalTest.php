@@ -512,7 +512,10 @@ class EccEquipeCasalTest extends TestCase
         $this->assertContains('telefone', $fields);
         $this->assertNotContains('equipe', $fields);
         $this->assertContains('telefone', $preview['suggested_apply_fields']);
-        $this->assertNotContains('endereco', $preview['suggested_apply_fields']);
+        // SPEC-037: "Rua Absorb" é mais longo que "Rua Keep" → sugerir absorb.
+        $this->assertContains('endereco', $preview['suggested_apply_fields']);
+        // "Campinas" (8) >= "Jundiaí" (7) → empate/keep mais completo → não sugerir.
+        $this->assertNotContains('cidade', $preview['suggested_apply_fields']);
 
         $merged = $this->tenantJson('POST', '/api/v1/ecc/casais/merge', [
             'keep_id' => $keep['id'],
@@ -526,6 +529,49 @@ class EccEquipeCasalTest extends TestCase
         $this->assertTrue(empty($merged['telefone']));
         $this->assertEqualsCanonicalizing([$eqA['id'], $eqB['id']], $merged['equipe_ids']);
         $this->tenantJson('GET', '/api/v1/ecc/casais/'.$absorb['id'])->assertNotFound();
+    }
+
+    public function test_merge_preview_sugere_valor_mais_completo(): void
+    {
+        $eq = $this->tenantJson('POST', '/api/v1/ecc/equipes', ['nome' => 'Completo'])->assertCreated()->json('data');
+
+        $keep = $this->tenantJson('POST', '/api/v1/ecc/casais', [
+            'nome' => 'Roberto',
+            'nome_conjuge' => 'Helena',
+            'equipe_id' => $eq['id'],
+            'telefone' => '99998888',
+            'cep' => '13000',
+            'observacoes' => 'nota',
+            'endereco' => 'Rua Curta',
+        ])->assertCreated()->json('data');
+
+        $absorb = $this->tenantJson('POST', '/api/v1/ecc/casais', [
+            'nome' => 'Roberto',
+            'nome_conjuge' => 'Helena',
+            'equipe_id' => $eq['id'],
+            'telefone' => '1199998888',
+            'cep' => '13000-000',
+            'observacoes' => 'nota detalhada do casal',
+            'endereco' => 'Rua',
+            'bairro' => 'Centro',
+        ])->assertCreated()->json('data');
+
+        $preview = $this->tenantJson('POST', '/api/v1/ecc/casais/merge/preview', [
+            'keep_id' => $keep['id'],
+            'absorb_id' => $absorb['id'],
+        ])->assertOk()->json();
+
+        $suggested = $preview['suggested_apply_fields'];
+        $this->assertContains('telefone', $suggested);
+        $this->assertContains('cep', $suggested);
+        $this->assertContains('observacoes', $suggested);
+        $this->assertContains('bairro', $suggested);
+        $this->assertNotContains('endereco', $suggested);
+
+        $telefoneDiff = collect($preview['field_diffs'])->firstWhere('field', 'telefone');
+        $this->assertTrue($telefoneDiff['suggest_apply']);
+        $enderecoDiff = collect($preview['field_diffs'])->firstWhere('field', 'endereco');
+        $this->assertFalse($enderecoDiff['suggest_apply']);
     }
 
     public function test_ativo_casal_e_equipe(): void

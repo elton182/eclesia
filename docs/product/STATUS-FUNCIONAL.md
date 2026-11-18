@@ -142,7 +142,7 @@ Entrada típica: card **ECC** no launcher → rotas sob `/ecc/*`.
 | Funcionalidade | Como funciona |
 |----------------|---------------|
 | Equipes de perseverança | CRUD + ativo/inativo; casal pode estar em N equipes |
-| Casais | CRUD em `/ecc/casais`; ficha em `/ecc/casais/:id`; ativo/inativo; unificar duplicatas com revisão de diferenças |
+| Casais | CRUD em `/ecc/casais`; ficha em `/ecc/casais/:id`; ativo/inativo; unificar duplicatas com revisão (sugere valor mais completo por campo) |
 | Import Excel | Carga em lote com revisão seletiva (preview + commit; legado cria sempre) |
 | Swap Ele/Ela | Inverte posições na ficha |
 | Ficha enriquecida | Etapas, preferências, atividades/serviço |
