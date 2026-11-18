@@ -434,6 +434,18 @@ export function filterUsersBySearch(users, query) {
 }
 
 /**
+ * Filtra lista de pastorais por nome (busca no painel do planejamento).
+ * @param {Array<{ nome?: string }>|null|undefined} pastorais
+ * @param {string} query
+ * @returns {Array<{ nome?: string }>}
+ */
+export function filterPastoraisBySearch(pastorais, query) {
+  const q = (query || '').trim().toLocaleLowerCase('pt-BR')
+  if (!q) return [...(pastorais || [])]
+  return (pastorais || []).filter((p) => (p?.nome || '').toLocaleLowerCase('pt-BR').includes(q))
+}
+
+/**
  * Extrai array `data` de respostas Laravel Resource.
  * @param {unknown} body
  * @returns {Array}

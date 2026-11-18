@@ -25,6 +25,7 @@ import {
   labelEventoPlanejamentoPreview,
   formatHoraCurta,
   filterUsersBySearch,
+  filterPastoraisBySearch,
   unwrapList,
   unwrapItem,
   pastoralIdsDoUsuario,
@@ -233,6 +234,24 @@ describe('planejamento', () => {
     assert.deepEqual(unwrapItem({ data: { id: 'a' } }), { id: 'a' })
     assert.deepEqual(pastoralIdsDoUsuario({ pastorais: [{ id: 'p1' }] }), ['p1'])
     assert.deepEqual(pastoralIdsDoUsuario({ pastoral_ids: ['p2'] }), ['p2'])
+  })
+
+  it('filterPastoraisBySearch filtra por nome completo', () => {
+    const pastorais = [
+      { id: '1', nome: 'Pastoral da Catequese Infantil' },
+      { id: '2', nome: 'Liturgia' },
+      { id: '3', nome: 'Pastoral Familiar' },
+    ]
+    assert.equal(filterPastoraisBySearch(pastorais, '').length, 3)
+    assert.equal(filterPastoraisBySearch(pastorais, '  ').length, 3)
+    assert.deepEqual(
+      filterPastoraisBySearch(pastorais, 'catequese').map((p) => p.id),
+      ['1'],
+    )
+    assert.equal(filterPastoraisBySearch(pastorais, 'pastoral').length, 2)
+    assert.equal(filterPastoraisBySearch(pastorais, 'FAMILIAR').length, 1)
+    assert.deepEqual(filterPastoraisBySearch(null, 'x'), [])
+    assert.deepEqual(filterPastoraisBySearch(undefined, ''), [])
   })
 
   it('mapPastoralLinks mantém só links ativos com token', () => {

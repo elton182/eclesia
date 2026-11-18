@@ -40,6 +40,7 @@ import {
   filterEventosPorMes,
   filterEventosPorPastoraisVisiveis,
   filterEventosPorSemana,
+  filterPastoraisBySearch,
   formatConflitosAlert,
   groupEventosByDay,
   labelEventoPlanejamentoPreview,
@@ -127,6 +128,7 @@ const dragEventoId = ref('')
 const dropAlvo = ref('')
 const novaPastoralNome = ref('')
 const salvandoPastoral = ref(false)
+const buscaPastorais = ref('')
 /** @type {import('vue').Ref<''|'agenda'|'links'>} */
 const pdfBusy = ref('')
 let dispTimer = null
@@ -201,6 +203,10 @@ const pastoraisPainel = computed(() => {
   if (canVerGlobal.value) return pastorais.value
   return pastoraisOpcoes.value
 })
+
+const pastoraisPainelFiltradas = computed(() =>
+  filterPastoraisBySearch(pastoraisPainel.value, buscaPastorais.value),
+)
 
 const coresPastorais = computed(() => mapaCoresPastorais(pastoraisPainel.value))
 
@@ -1043,7 +1049,7 @@ onMounted(load)
       <div class="flex flex-col lg:flex-row gap-4 items-start">
         <aside
           v-if="canGerir || pastoraisPainel.length"
-          class="card p-4 w-full lg:w-56 shrink-0"
+          class="card p-4 w-full lg:w-72 shrink-0"
           data-testid="planejamento-filtro-pastorais"
         >
           <div class="flex items-center justify-between gap-2 mb-3">
@@ -1069,28 +1075,54 @@ onMounted(load)
               </button>
             </div>
           </div>
-          <ul v-if="pastoraisPainel.length" class="list-none p-0 m-0 space-y-1.5">
-            <li v-for="p in pastoraisPainel" :key="p.id">
+          <div v-if="pastoraisPainel.length" class="mb-3">
+            <label class="sr-only" for="pl-busca-pastorais">Buscar pastoral</label>
+            <input
+              id="pl-busca-pastorais"
+              v-model="buscaPastorais"
+              type="search"
+              class="input w-full text-[13px]"
+              placeholder="Buscar pastoral…"
+              data-testid="planejamento-busca-pastorais"
+              autocomplete="off"
+            />
+          </div>
+          <ul
+            v-if="pastoraisPainelFiltradas.length"
+            class="list-none p-0 m-0 space-y-1.5"
+            data-testid="planejamento-lista-pastorais"
+          >
+            <li v-for="p in pastoraisPainelFiltradas" :key="p.id">
               <label
-                class="flex items-center gap-2 cursor-pointer rounded-md px-1.5 py-1.5 text-[13px]"
+                class="flex items-start gap-2 cursor-pointer rounded-md px-1.5 py-1.5 text-[13px]"
                 style="color: var(--color-ink)"
                 :data-testid="`planejamento-pastoral-check-${p.id}`"
               >
                 <input
                   type="checkbox"
-                  class="shrink-0"
+                  class="shrink-0 mt-0.5"
                   :checked="pastoraisVisiveis.has(p.id)"
                   @change="onTogglePastoral(p.id)"
                 />
                 <span
-                  class="inline-block w-2.5 h-2.5 rounded-sm shrink-0"
+                  class="inline-block w-2.5 h-2.5 rounded-sm shrink-0 mt-1"
                   :style="{ background: pastoralCor(p.id) }"
                   aria-hidden="true"
                 />
-                <span class="truncate">{{ p.nome }}</span>
+                <span class="min-w-0 flex-1 break-words leading-snug whitespace-normal">{{
+                  p.nome
+                }}</span>
               </label>
             </li>
           </ul>
+          <p
+            v-else-if="pastoraisPainel.length && buscaPastorais.trim()"
+            class="text-[12.5px] mb-3"
+            style="color: var(--color-muted)"
+            data-testid="planejamento-busca-pastorais-vazio"
+          >
+            Nenhuma pastoral encontrada.
+          </p>
           <p v-else class="text-[12.5px] mb-3" style="color: var(--color-muted)">
             Nenhuma pastoral ainda.
           </p>
