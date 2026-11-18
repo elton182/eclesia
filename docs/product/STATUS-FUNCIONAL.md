@@ -240,6 +240,7 @@ Marca do **site** ≠ marca do **app** (ver branding abaixo).
 | Visão gestor (SPEC-022) | Toggle mensal/semanal; tags laterais por pastoral; conflitos destacados na grade |
 | Conflitos de local/horário | Alerta na gravação + destaque na grade (não bloqueia) |
 | PDF | Export do planejamento |
+| Excel | Agenda do mês ou ano (12 abas) — SPEC-036 |
 | Link/token público | Coleta por pastoral: criar, editar e remover propostas |
 
 **Não tem:** ligação automática com o calendário oficial; recorrência (cada data é um evento separado).

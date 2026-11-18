@@ -24,6 +24,7 @@ A tabela `pastorais` já existe para o site público (SPEC-005 / ADR-0003) e evo
    > Emenda (2026-10-14): conflito de **espaços e recursos** do planejamento bloqueia a gravação — ver [SPEC-019](./SPEC-019-planejamento-espacos-recursos.md). O alerta por `calendario_locais` segue não bloqueante.
 6. Sem ligação automática com o calendário oficial (SPEC-012) nesta versão.
 7. Exportação lista/PDF do ano (ou por mês) quando `fechado` (ou em `revisao`).
+   > Emenda (2026-11-16): lista Excel do mês e do ano (12 abas) no front — [SPEC-036](./SPEC-036-planejamento-export-excel.md).
 
 ## Critérios de aceite (testáveis)
 
@@ -62,6 +63,7 @@ A tabela `pastorais` já existe para o site público (SPEC-005 / ADR-0003) e evo
 - [ ] `GET` listagem filtrável: por ano, mês, pastoral_id, status_solicitacao, local_id.
 - [ ] Visão agregada para gestor (todas as pastorais) e filtrada para coordenador (suas pastorais + leitura do global em `coleta`/`revisao`/`fechado` se tiver `planejamento.ver_global` — ver notas).
 - [x] `GET .../anuais/{id}/pdf`: `tipo=agenda` (+ `mes`) imprime a agenda do mês; `tipo=links` imprime tabela Pastoral | QR + URL (cria tokens faltantes).
+- [x] Excel (client-side): mês selecionado e ano com uma aba por mês — [SPEC-036](./SPEC-036-planejamento-export-excel.md).
 
 ### Front
 
