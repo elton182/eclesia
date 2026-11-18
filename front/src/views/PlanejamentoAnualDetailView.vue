@@ -75,6 +75,7 @@ import {
   selecaoTemEspaco,
 } from '@/utils/planejamentoRecursos'
 import { getDisponibilidade, listRecursos } from '@/services/planejamentoRecursos'
+import { buildPlanejamentoAnualWorkbook } from '@/utils/planejamentoExcelExport'
 import PlanejamentoRecursosPicker from '@/components/planejamento/PlanejamentoRecursosPicker.vue'
 import DateInput from '@/components/form/DateInput.vue'
 import SelectSearchable from '@/components/form/SelectSearchable.vue'
@@ -134,6 +135,7 @@ const salvandoPastoral = ref(false)
 const buscaPastorais = ref('')
 /** @type {import('vue').Ref<''|'agenda'|'links'>} */
 const pdfBusy = ref('')
+const excelBusy = ref(false)
 let dispTimer = null
 let dispSeq = 0
 
@@ -817,7 +819,7 @@ async function mudarStatus(status) {
  * @param {'agenda'|'links'} tipo
  */
 async function baixarPdf(tipo) {
-  if (pdfBusy.value || !anual.value) return
+  if (pdfBusy.value || excelBusy.value || !anual.value) return
   pdfBusy.value = tipo
   try {
     const params =
@@ -867,6 +869,33 @@ async function baixarPdf(tipo) {
     innovToast('error', 'PDF', msg)
   } finally {
     pdfBusy.value = ''
+  }
+}
+
+async function baixarExcel() {
+  if (excelBusy.value || pdfBusy.value || !anual.value) return
+  excelBusy.value = true
+  try {
+    const XLSX = await import('xlsx')
+    const buffer = buildPlanejamentoAnualWorkbook(XLSX, {
+      ano: anual.value.ano,
+      eventos: eventos.value,
+      pastorais: pastorais.value,
+    })
+    const blob = new Blob([buffer], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `planejamento-anual-${anual.value.ano}.xlsx`
+    a.click()
+    URL.revokeObjectURL(url)
+    innovToast('success', 'Excel', `Planilha ${anual.value.ano} · 12 abas (meses)`)
+  } catch (e) {
+    innovToast('error', 'Excel', e?.message || 'Falha ao gerar planilha')
+  } finally {
+    excelBusy.value = false
   }
 }
 
@@ -968,16 +997,25 @@ onMounted(load)
               type="button"
               class="btn btn-ghost"
               data-testid="planejamento-pdf-agenda"
-              :disabled="!!pdfBusy || anoStatus === 'rascunho'"
+              :disabled="!!pdfBusy || excelBusy || anoStatus === 'rascunho'"
               @click="baixarPdf('agenda')"
             >
               {{ pdfBusy === 'agenda' ? 'Gerando…' : 'PDF agenda' }}
             </button>
             <button
               type="button"
+              class="btn btn-ghost"
+              data-testid="planejamento-excel"
+              :disabled="!!pdfBusy || excelBusy || anoStatus === 'rascunho'"
+              @click="baixarExcel"
+            >
+              {{ excelBusy ? 'Gerando…' : 'Excel' }}
+            </button>
+            <button
+              type="button"
               class="btn btn-primary"
               data-testid="planejamento-pdf-links"
-              :disabled="!!pdfBusy || anoStatus === 'rascunho'"
+              :disabled="!!pdfBusy || excelBusy || anoStatus === 'rascunho'"
               @click="baixarPdf('links')"
             >
               {{ pdfBusy === 'links' ? 'Gerando…' : 'PDF links' }}
