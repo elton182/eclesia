@@ -29,6 +29,8 @@ import {
   formatHoraCurta,
   filterUsersBySearch,
   filterPastoraisBySearch,
+  navegarMesPlanejamento,
+  pickAnualParaPastoral,
   unwrapList,
   unwrapItem,
   pastoralIdsDoUsuario,
@@ -269,6 +271,24 @@ describe('planejamento', () => {
     assert.equal(filterPastoraisBySearch(pastorais, 'FAMILIAR').length, 1)
     assert.deepEqual(filterPastoraisBySearch(null, 'x'), [])
     assert.deepEqual(filterPastoraisBySearch(undefined, ''), [])
+  })
+
+  it('navegarMesPlanejamento limita ao ano (1–12)', () => {
+    assert.equal(navegarMesPlanejamento(3, 1), 4)
+    assert.equal(navegarMesPlanejamento(1, -1), 1)
+    assert.equal(navegarMesPlanejamento(12, 1), 12)
+    assert.equal(navegarMesPlanejamento(6, -2), 4)
+  })
+
+  it('pickAnualParaPastoral prefere ano corrente senão o mais recente', () => {
+    assert.equal(pickAnualParaPastoral([]), null)
+    const anuais = [
+      { id: 'a', ano: 2024 },
+      { id: 'b', ano: 2026 },
+      { id: 'c', ano: 2025 },
+    ]
+    assert.equal(pickAnualParaPastoral(anuais, 2026)?.id, 'b')
+    assert.equal(pickAnualParaPastoral(anuais, 2030)?.id, 'b')
   })
 
   it('mapPastoralLinks mantém só links ativos com token', () => {

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\MergePastoralRequest;
 use App\Http\Requests\StorePastoralDomainRequest;
 use App\Http\Requests\StorePastoralMembroRequest;
 use App\Http\Requests\UpdatePastoralDomainRequest;
@@ -61,6 +62,17 @@ class PastoraisController extends Controller
         $this->pastorais->delete($this->pastorais->find($id));
 
         return response()->noContent();
+    }
+
+    public function merge(MergePastoralRequest $request): PastoralResource
+    {
+        abort_unless($this->access->canManage(), 403);
+
+        $data = $request->validated();
+
+        return new PastoralResource(
+            $this->pastorais->merge($data['keep_id'], $data['absorb_id'])
+        );
     }
 
     public function indexMembros(string $id): AnonymousResourceCollection

@@ -62,6 +62,7 @@ import {
   styleStatusSolicitacao,
   togglePastoralVisivel,
   unwrapList,
+  navegarMesPlanejamento,
 } from '@/utils/planejamento'
 import {
   buildRecursosPayload,
@@ -109,6 +110,8 @@ const semanaInicio = ref(
 /** @type {import('vue').Ref<Set<string>>} */
 const pastoraisVisiveis = ref(new Set())
 const pastoraisFiltroInicializado = ref(false)
+/** pastoral_id já aplicado via query (evita reaplicar em reloads silent) */
+const pastoralQueryAplicada = ref('')
 const filtroStatus = ref('')
 const filtroSoConflitos = ref(false)
 const diaSelecionado = ref('')
@@ -383,6 +386,7 @@ function syncPastoraisVisiveis(list) {
     pastoraisVisiveis.value = new Set(ids)
     pastoraisIdsConhecidos.value = new Set(ids)
     pastoraisFiltroInicializado.value = true
+    aplicarFiltroPastoralQuery()
     return
   }
   const prev = pastoraisVisiveis.value
@@ -394,7 +398,29 @@ function syncPastoraisVisiveis(list) {
   }
   pastoraisVisiveis.value = next
   pastoraisIdsConhecidos.value = new Set(ids)
+  aplicarFiltroPastoralQuery()
 }
+
+/** Aplica `?pastoral=` deixando só essa pastoral visível. */
+function aplicarFiltroPastoralQuery() {
+  const pid = String(route.query.pastoral || '').trim()
+  if (!pid) {
+    pastoralQueryAplicada.value = ''
+    return
+  }
+  if (pastoralQueryAplicada.value === pid) return
+  if (!(pastorais.value || []).some((p) => p.id === pid)) return
+  pastoraisVisiveis.value = new Set([pid])
+  pastoralQueryAplicada.value = pid
+}
+
+watch(
+  () => route.query.pastoral,
+  () => {
+    pastoralQueryAplicada.value = ''
+    aplicarFiltroPastoralQuery()
+  },
+)
 
 function marcarTodasPastorais() {
   pastoraisVisiveis.value = new Set(pastoraisPainel.value.map((p) => p.id).filter(Boolean))
@@ -425,6 +451,10 @@ function navegarSemana(delta) {
     const m = Number(mid.slice(5, 7))
     if (m >= 1 && m <= 12) mesView.value = m
   }
+}
+
+function navegarMes(delta) {
+  mesView.value = navegarMesPlanejamento(mesView.value, delta)
 }
 
 watch(mesView, (mes) => {
@@ -1125,13 +1155,40 @@ onMounted(load)
       </div>
 
       <div class="card p-4 md:p-5 flex flex-wrap gap-3 items-end">
-        <div>
-          <label class="fld" for="pl-mes">Mês</label>
-          <select id="pl-mes" v-model.number="mesView" class="input min-w-[10rem]" data-testid="planejamento-mes">
-            <option v-for="(nome, i) in MES_NOMES.slice(1)" :key="i + 1" :value="i + 1">
-              {{ nome }}
-            </option>
-          </select>
+        <div class="flex items-end gap-1">
+          <button
+            type="button"
+            class="btn btn-ghost !px-2 text-xs mb-0.5"
+            data-testid="planejamento-mes-prev"
+            :disabled="mesView <= 1"
+            aria-label="Mês anterior"
+            @click="navegarMes(-1)"
+          >
+            ←
+          </button>
+          <div>
+            <label class="fld" for="pl-mes">Mês</label>
+            <select
+              id="pl-mes"
+              v-model.number="mesView"
+              class="input min-w-[10rem]"
+              data-testid="planejamento-mes"
+            >
+              <option v-for="(nome, i) in MES_NOMES.slice(1)" :key="i + 1" :value="i + 1">
+                {{ nome }}
+              </option>
+            </select>
+          </div>
+          <button
+            type="button"
+            class="btn btn-ghost !px-2 text-xs mb-0.5"
+            data-testid="planejamento-mes-next"
+            :disabled="mesView >= 12"
+            aria-label="Próximo mês"
+            @click="navegarMes(1)"
+          >
+            →
+          </button>
         </div>
         <div>
           <span class="fld">Visão</span>
@@ -1340,13 +1397,31 @@ onMounted(load)
                   →
                 </button>
               </template>
-              <h2
-                v-else
-                class="font-serif text-[18px] font-medium m-0"
-                style="color: var(--color-ink)"
-              >
-                {{ mesTitulo }}
-              </h2>
+              <template v-else>
+                <button
+                  type="button"
+                  class="btn btn-ghost !px-2 text-xs"
+                  data-testid="planejamento-mes-prev-titulo"
+                  :disabled="mesView <= 1"
+                  aria-label="Mês anterior"
+                  @click="navegarMes(-1)"
+                >
+                  ←
+                </button>
+                <h2 class="font-serif text-[18px] font-medium m-0" style="color: var(--color-ink)">
+                  {{ mesTitulo }}
+                </h2>
+                <button
+                  type="button"
+                  class="btn btn-ghost !px-2 text-xs"
+                  data-testid="planejamento-mes-next-titulo"
+                  :disabled="mesView >= 12"
+                  aria-label="Próximo mês"
+                  @click="navegarMes(1)"
+                >
+                  →
+                </button>
+              </template>
             </div>
             <p class="text-[12px]" style="color: var(--color-muted)">
               Clique em um dia para ver eventos e propor<template v-if="podeArrastar">

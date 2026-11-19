@@ -6077,6 +6077,37 @@ paths:
         '401': {description: Não autenticado}
         '403': {description: Sem permissão}
         '422': {description: Validação}
+  /pastorais/merge:
+    post:
+      summary: Unificar duas pastorais
+      description: >
+        Mantém keep_id, absorve absorb_id (eventos e membros passam para a
+        mantida; tokens conflitantes do mesmo anual são removidos; a absorvida
+        é excluída). SPEC-038. Requer pastorais.manage.
+      security: [{bearerAuth: [], tenantHeader: [], igrejaHeader: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [keep_id, absorb_id]
+              properties:
+                keep_id: {type: string, description: ULID da pastoral mantida}
+                absorb_id: {type: string, description: ULID da pastoral absorvida}
+      responses:
+        '200':
+          description: Pastoral mantida após unificação
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Pastoral'
+        '401': {description: Não autenticado}
+        '403': {description: Sem permissão}
+        '422': {description: Validação}
   /pastorais/{id}:
     get:
       summary: Detalhe da pastoral

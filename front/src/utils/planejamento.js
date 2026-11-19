@@ -476,6 +476,35 @@ export function filterPastoraisBySearch(pastorais, query) {
 }
 
 /**
+ * Navega mês no planejamento anual (1–12), sem mudar de ano.
+ * @param {number} mes mês atual (1–12)
+ * @param {number} delta -1 ou +1
+ * @returns {number} mês resultante (clamp)
+ */
+export function navegarMesPlanejamento(mes, delta) {
+  const m = Number(mes)
+  const d = Number(delta) || 0
+  if (!Number.isFinite(m)) return 1
+  return Math.min(12, Math.max(1, Math.trunc(m) + d))
+}
+
+/**
+ * Escolhe o planejamento anual para abrir a partir do cadastro de pastorais.
+ * Prefere o ano corrente; senão o de maior `ano`.
+ * @param {Array<{ id?: string, ano?: number }>|null|undefined} anuais
+ * @param {number} [anoPreferido]
+ * @returns {{ id: string, ano: number }|null}
+ */
+export function pickAnualParaPastoral(anuais, anoPreferido = new Date().getFullYear()) {
+  const list = [...(anuais || [])].filter((a) => a?.id)
+  if (!list.length) return null
+  const prefer = Number(anoPreferido)
+  const match = list.find((a) => Number(a.ano) === prefer)
+  if (match) return match
+  return list.slice().sort((a, b) => Number(b.ano) - Number(a.ano))[0] || null
+}
+
+/**
  * Extrai array `data` de respostas Laravel Resource.
  * @param {unknown} body
  * @returns {Array}

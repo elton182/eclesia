@@ -233,11 +233,12 @@ Marca do **site** ≠ marca do **app** (ver branding abaixo).
 
 | Funcionalidade | Como funciona |
 |----------------|---------------|
-| Pastorais | `/pastorais` — CRUD + membros (coordenador/membro) |
+| Pastorais | `/pastorais` — CRUD + membros; busca; unificar duplicatas (SPEC-038) |
 | Detalhe da pastoral | `/pastorais/:id` |
+| Atalho calendário | Clique na pastoral abre o planejamento filtrado (`?pastoral=`) |
 | Anos de planejamento | `/planejamento` — status `rascunho → coleta → revisao → fechado` |
 | Eventos por pastoral | Propostas no detalhe do ano `/planejamento/:id` |
-| Visão gestor (SPEC-022) | Toggle mensal/semanal; tags laterais por pastoral; conflitos destacados na grade |
+| Visão gestor (SPEC-022) | Toggle mensal/semanal; navegação mês ant/prox; tags laterais; conflitos |
 | Conflitos de local/horário | Alerta na gravação + destaque na grade (não bloqueia) |
 | PDF | Export do planejamento |
 | Link/token público | Coleta por pastoral: criar, editar e remover propostas |

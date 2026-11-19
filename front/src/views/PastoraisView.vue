@@ -7,11 +7,21 @@ import {
   createPastoral,
   deletePastoral,
   listPastorais,
+  mergePastorais,
   updatePastoral,
 } from '@/services/pastorais'
+import { listAnuais } from '@/services/planejamento'
 import { useAuthStore } from '@/stores/auth'
 import { useAuthAdminStore } from '@/stores/authAdmin'
 import { userHasPermission } from '@/utils/userRoles'
+import {
+  filterPastoraisBySearch,
+  pickAnualParaPastoral,
+} from '@/utils/planejamento'
+import {
+  resolveMergePair,
+  toggleMergeSelection,
+} from '@/utils/eccCasalMerge'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -23,6 +33,10 @@ const busyId = ref('')
 const pastorais = ref([])
 const showForm = ref(false)
 const editingId = ref(null)
+const busca = ref('')
+const mergeMode = ref(false)
+const mergeSelected = ref(/** @type {Set<string>} */ (new Set()))
+const merging = ref(false)
 const form = ref({
   nome: '',
   ativa: true,
@@ -38,6 +52,12 @@ const canManage = computed(
     userHasPermission(auth.user, 'pastorais.manage', { isSuperAdmin: isPlatformAdmin.value }) ||
     isPlatformAdmin.value,
 )
+
+const pastoraisFiltradas = computed(() =>
+  filterPastoraisBySearch(pastorais.value, busca.value),
+)
+
+const mergePair = computed(() => resolveMergePair(pastorais.value, mergeSelected.value))
 
 function resetForm() {
   editingId.value = null
@@ -56,7 +76,8 @@ function openCreate() {
   showForm.value = true
 }
 
-function openEdit(p) {
+function openEdit(p, e) {
+  e?.stopPropagation?.()
   editingId.value = p.id
   form.value = {
     nome: p.nome || '',
@@ -67,6 +88,67 @@ function openEdit(p) {
     publicado_no_site: !!p.publicado_no_site,
   }
   showForm.value = true
+}
+
+function toggleMergeMode() {
+  mergeMode.value = !mergeMode.value
+  mergeSelected.value = new Set()
+}
+
+function onMergeCheck(pastoralId, checked) {
+  mergeSelected.value = toggleMergeSelection(mergeSelected.value, pastoralId, checked, 2)
+}
+
+async function confirmarUnificar() {
+  const { keep, absorb } = mergePair.value
+  if (!keep || !absorb) {
+    innovToast('error', 'Unificar', 'Selecione exatamente duas pastorais.')
+    return
+  }
+  const keepFirst = await innovConfirm({
+    title: 'Unificar pastorais',
+    message:
+      `Manter “${keep.nome}” e absorver “${absorb.nome}”? ` +
+      '(A primeira selecionada é a mantida. Cancele e selecione na outra ordem se preferir.) ' +
+      'Eventos e membros da absorvida passam para a mantida; a absorvida será excluída.',
+    confirmText: `Manter “${keep.nome}”`,
+  })
+  if (!keepFirst) return
+  merging.value = true
+  try {
+    await mergePastorais({ keep_id: keep.id, absorb_id: absorb.id })
+    innovToast('success', 'Unificar', 'Pastorais unificadas.')
+    mergeMode.value = false
+    mergeSelected.value = new Set()
+    await load()
+  } catch (e) {
+    innovToast('error', 'Unificar', e.response?.data?.message || 'Falha ao unificar')
+  } finally {
+    merging.value = false
+  }
+}
+
+async function abrirCalendario(p) {
+  try {
+    const anuais = await listAnuais()
+    const alvo = pickAnualParaPastoral(anuais)
+    if (!alvo?.id) {
+      innovToast(
+        'warning',
+        'Planejamento',
+        'Nenhum ano de planejamento aberto. Crie um em Planejamento anual.',
+      )
+      return
+    }
+    router.push({ path: `/planejamento/${alvo.id}`, query: { pastoral: p.id } })
+  } catch (e) {
+    innovToast('error', 'Planejamento', e.response?.data?.message || 'Falha ao abrir calendário')
+  }
+}
+
+function irParaMembros(p, e) {
+  e?.stopPropagation?.()
+  router.push(`/pastorais/${p.id}`)
 }
 
 async function load() {
@@ -157,18 +239,40 @@ onMounted(load)
           Cadastro de pastorais
         </h1>
         <p class="text-[14px] mt-1 max-w-xl" style="color: var(--color-muted)">
-          Pastorais e movimentos da igreja, com coordenadores e membros.
+          Pastorais e movimentos da igreja, com coordenadores e membros. Clique para ver o calendário
+          da pastoral.
         </p>
       </div>
-      <button
-        v-if="canManage"
-        type="button"
-        class="btn btn-primary"
-        data-testid="pastorais-nova"
-        @click="openCreate"
-      >
-        Nova pastoral
-      </button>
+      <div class="flex flex-wrap gap-2">
+        <button
+          v-if="canManage"
+          type="button"
+          class="btn btn-ghost"
+          data-testid="pastorais-unificar-toggle"
+          @click="toggleMergeMode"
+        >
+          {{ mergeMode ? 'Cancelar unificação' : 'Unificar pastorais' }}
+        </button>
+        <button
+          v-if="canManage && mergeMode"
+          type="button"
+          class="btn btn-accent"
+          data-testid="pastorais-unificar-confirmar"
+          :disabled="mergeSelected.size !== 2 || merging"
+          @click="confirmarUnificar"
+        >
+          {{ merging ? 'Unificando…' : `Unificar (${mergeSelected.size}/2)` }}
+        </button>
+        <button
+          v-if="canManage && !mergeMode"
+          type="button"
+          class="btn btn-primary"
+          data-testid="pastorais-nova"
+          @click="openCreate"
+        >
+          Nova pastoral
+        </button>
+      </div>
     </header>
 
     <section
@@ -233,13 +337,7 @@ onMounted(load)
           </div>
         </details>
         <div class="flex justify-end gap-2 pt-1">
-          <button
-            type="button"
-            class="btn btn-ghost"
-            @click="showForm = false"
-          >
-            Cancelar
-          </button>
+          <button type="button" class="btn btn-ghost" @click="showForm = false">Cancelar</button>
           <button
             type="submit"
             class="btn btn-primary"
@@ -252,29 +350,54 @@ onMounted(load)
       </form>
     </section>
 
+    <div v-if="!loading && pastorais.length" class="mb-4 max-w-md">
+      <label class="fld" for="pastorais-busca">Buscar</label>
+      <input
+        id="pastorais-busca"
+        v-model="busca"
+        type="search"
+        class="input w-full"
+        placeholder="Buscar pastoral…"
+        data-testid="pastorais-busca"
+        autocomplete="off"
+      />
+    </div>
+
     <p v-if="loading" class="text-[14px]" style="color: var(--color-muted)">Carregando…</p>
 
     <ul
-      v-else-if="pastorais.length"
+      v-else-if="pastoraisFiltradas.length"
       class="flex flex-col gap-3 list-none p-0 m-0"
       data-testid="pastorais-lista-itens"
     >
-      <li v-for="p in pastorais" :key="p.id" class="card px-5 py-4">
+      <li v-for="p in pastoraisFiltradas" :key="p.id" class="card px-5 py-4">
         <div class="flex flex-wrap items-center justify-between gap-3">
-          <button
-            type="button"
-            class="min-w-0 flex-1 text-left border-0 bg-transparent cursor-pointer p-0"
-            data-testid="pastorais-item"
-            @click="router.push(`/pastorais/${p.id}`)"
-          >
-            <div class="font-serif text-[17px] font-medium" style="color: var(--color-ink)">
-              {{ p.nome }}
-            </div>
-            <div class="text-[13px] mt-0.5" style="color: var(--color-muted)">
-              Ordem {{ p.ordem ?? 0 }}
-              <span v-if="p.membros_count != null"> · {{ p.membros_count }} membro(s)</span>
-            </div>
-          </button>
+          <div class="flex items-start gap-3 min-w-0 flex-1">
+            <input
+              v-if="mergeMode && canManage"
+              type="checkbox"
+              class="shrink-0 mt-1.5"
+              :checked="mergeSelected.has(String(p.id))"
+              data-testid="pastorais-merge-check"
+              @click.stop
+              @change="onMergeCheck(p.id, $event.target.checked)"
+            />
+            <button
+              type="button"
+              class="min-w-0 flex-1 text-left border-0 bg-transparent cursor-pointer p-0"
+              data-testid="pastorais-item"
+              @click="abrirCalendario(p)"
+            >
+              <div class="font-serif text-[17px] font-medium" style="color: var(--color-ink)">
+                {{ p.nome }}
+              </div>
+              <div class="text-[13px] mt-0.5" style="color: var(--color-muted)">
+                Ordem {{ p.ordem ?? 0 }}
+                <span v-if="p.membros_count != null"> · {{ p.membros_count }} membro(s)</span>
+                <span> · ver calendário</span>
+              </div>
+            </button>
+          </div>
           <div class="flex flex-wrap items-center gap-2 shrink-0">
             <span
               class="text-[12px] font-medium px-2.5 py-1 rounded-full"
@@ -286,12 +409,20 @@ onMounted(load)
             >
               {{ p.ativa !== false ? 'Ativa' : 'Inativa' }}
             </span>
-            <template v-if="canManage">
+            <template v-if="canManage && !mergeMode">
+              <button
+                type="button"
+                class="btn btn-ghost !py-1.5 !px-3 text-xs"
+                data-testid="pastorais-membros"
+                @click="irParaMembros(p, $event)"
+              >
+                Membros
+              </button>
               <button
                 type="button"
                 class="btn btn-ghost !py-1.5 !px-3 text-xs"
                 data-testid="pastorais-editar"
-                @click="openEdit(p)"
+                @click="openEdit(p, $event)"
               >
                 Editar
               </button>
@@ -312,7 +443,19 @@ onMounted(load)
     </ul>
 
     <div
-      v-else
+      v-else-if="!loading && pastorais.length && busca.trim()"
+      class="rounded-xl px-6 py-10 text-center"
+      style="background: var(--color-surface); border: 1px dashed var(--color-line)"
+      data-testid="pastorais-busca-vazio"
+    >
+      <p class="font-serif text-[17px]" style="color: var(--color-ink)">Nenhuma pastoral encontrada</p>
+      <p class="text-[13.5px] mt-2" style="color: var(--color-muted)">
+        Tente outro termo de busca.
+      </p>
+    </div>
+
+    <div
+      v-else-if="!loading"
       class="rounded-xl px-6 py-10 text-center"
       style="background: var(--color-surface); border: 1px dashed var(--color-line)"
       data-testid="pastorais-vazio"
