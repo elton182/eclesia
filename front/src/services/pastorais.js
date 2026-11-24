@@ -30,6 +30,15 @@ export async function deletePastoral(id) {
   await api.delete(`/pastorais/${id}`)
 }
 
+/**
+ * Unifica duas pastorais (SPEC-038). Mantém keepId, absorve absorbId.
+ * @param {{ keep_id: string, absorb_id: string }} payload
+ */
+export async function mergePastorais(payload) {
+  const { data } = await api.post('/pastorais/merge', payload)
+  return unwrapItem(data)
+}
+
 export async function listMembros(pastoralId) {
   const { data } = await api.get(`/pastorais/${pastoralId}/membros`)
   return unwrapList(data)

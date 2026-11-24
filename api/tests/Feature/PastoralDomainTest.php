@@ -237,4 +237,144 @@ class PastoralDomainTest extends TestCase
             'web/me deve incluir pastorais vinculadas ao usuário'
         );
     }
+
+    public function test_merge_unifica_eventos_e_membros(): void
+    {
+        Sanctum::actingAs($this->admin);
+
+        $keep = $this->tenantJson('POST', '/api/v1/pastorais', [
+            'nome' => 'Família',
+            'descricao_publica' => null,
+        ])->assertCreated()->json('data');
+
+        $absorb = $this->tenantJson('POST', '/api/v1/pastorais', [
+            'nome' => 'Pastoral Familiar',
+            'descricao_publica' => 'Grupo duplicado',
+        ])->assertCreated()->json('data');
+
+        tenancy()->initialize($this->tenant);
+        $userKeep = User::query()->create([
+            'name' => 'Coord Keep',
+            'email' => 'coord-keep-merge@test.local',
+            'password' => 'password',
+            'is_active' => true,
+        ]);
+        $userBoth = User::query()->create([
+            'name' => 'Membro Both',
+            'email' => 'membro-both-merge@test.local',
+            'password' => 'password',
+            'is_active' => true,
+        ]);
+        $userAbsorb = User::query()->create([
+            'name' => 'Coord Absorb',
+            'email' => 'coord-absorb-merge@test.local',
+            'password' => 'password',
+            'is_active' => true,
+        ]);
+        $userKeepUlid = $userKeep->ulid;
+        $userBothUlid = $userBoth->ulid;
+        $userAbsorbUlid = $userAbsorb->ulid;
+        tenancy()->end();
+
+        Sanctum::actingAs($this->admin);
+
+        $this->tenantJson('POST', '/api/v1/pastorais/'.$keep['id'].'/membros', [
+            'user_id' => $userKeepUlid,
+            'papel' => 'coordenador',
+        ])->assertCreated();
+        $this->tenantJson('POST', '/api/v1/pastorais/'.$keep['id'].'/membros', [
+            'user_id' => $userBothUlid,
+            'papel' => 'membro',
+        ])->assertCreated();
+        $this->tenantJson('POST', '/api/v1/pastorais/'.$absorb['id'].'/membros', [
+            'user_id' => $userBothUlid,
+            'papel' => 'coordenador',
+        ])->assertCreated();
+        $this->tenantJson('POST', '/api/v1/pastorais/'.$absorb['id'].'/membros', [
+            'user_id' => $userAbsorbUlid,
+            'papel' => 'membro',
+        ])->assertCreated();
+
+        $anual = $this->tenantJson('POST', '/api/v1/planejamento/anuais', [
+            'ano' => 2027,
+        ])->assertCreated()->json('data');
+
+        $this->tenantJson('POST', '/api/v1/planejamento/anuais/'.$anual['id'].'/status', [
+            'status' => 'coleta',
+        ])->assertOk();
+
+        $this->tenantJson('POST', '/api/v1/planejamento/anuais/'.$anual['id'].'/eventos', [
+            'pastoral_id' => $absorb['id'],
+            'titulo' => 'Encontro familiar',
+            'data_inicio' => '2027-03-10',
+            'local_texto' => 'Salão',
+        ])->assertCreated();
+
+        $this->tenantJson('POST', '/api/v1/planejamento/anuais/'.$anual['id'].'/pastorais/'.$absorb['id'].'/token')
+            ->assertCreated();
+
+        $this->tenantJson('POST', '/api/v1/pastorais/merge', [
+            'keep_id' => $keep['id'],
+            'absorb_id' => $absorb['id'],
+        ])->assertOk()
+            ->assertJsonPath('data.id', $keep['id'])
+            ->assertJsonPath('data.nome', 'Família')
+            ->assertJsonPath('data.descricao_publica', 'Grupo duplicado');
+
+        $this->tenantJson('GET', '/api/v1/pastorais/'.$absorb['id'])->assertNotFound();
+
+        $membros = collect(
+            $this->tenantJson('GET', '/api/v1/pastorais/'.$keep['id'].'/membros')
+                ->assertOk()
+                ->json('data')
+        )->keyBy('user_id');
+
+        $this->assertCount(3, $membros);
+        $this->assertSame('coordenador', $membros[$userKeepUlid]['papel']);
+        $this->assertSame('coordenador', $membros[$userBothUlid]['papel']);
+        $this->assertSame('membro', $membros[$userAbsorbUlid]['papel']);
+
+        $eventos = collect(
+            $this->tenantJson('GET', '/api/v1/planejamento/anuais/'.$anual['id'].'/eventos')
+                ->assertOk()
+                ->json('data')
+        );
+        $this->assertTrue(
+            $eventos->contains(fn ($e) => ($e['titulo'] ?? null) === 'Encontro familiar'
+                && ($e['pastoral_id'] ?? null) === $keep['id']),
+            'evento da pastoral absorvida deve apontar para a mantida'
+        );
+
+        $tokens = collect(
+            $this->tenantJson('GET', '/api/v1/planejamento/anuais/'.$anual['id'].'/pastorais/tokens')
+                ->assertOk()
+                ->json('data')
+        )->keyBy('pastoral_id');
+        $this->assertArrayHasKey($keep['id'], $tokens->all());
+        $this->assertArrayNotHasKey($absorb['id'], $tokens->all());
+    }
+
+    public function test_merge_mesmo_id_422_e_sem_permissao_403(): void
+    {
+        Sanctum::actingAs($this->admin);
+        $a = $this->tenantJson('POST', '/api/v1/pastorais', [
+            'nome' => 'A',
+        ])->assertCreated()->json('data');
+        $b = $this->tenantJson('POST', '/api/v1/pastorais', [
+            'nome' => 'B',
+        ])->assertCreated()->json('data');
+
+        $this->tenantJson('POST', '/api/v1/pastorais/merge', [
+            'keep_id' => $a['id'],
+            'absorb_id' => $a['id'],
+        ])->assertStatus(422);
+
+        $coord = $this->actingAsRole('coordenador-pastoral', 'coord-merge-forbid@test.local');
+        Sanctum::actingAs($coord);
+
+        $this->tenantJson('POST', '/api/v1/pastorais/merge', [
+            'keep_id' => $a['id'],
+            'absorb_id' => $b['id'],
+        ])->assertForbidden();
+    }
 }

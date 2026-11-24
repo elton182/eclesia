@@ -312,6 +312,7 @@ Route::middleware([
 
     Route::get('pastorais', [PastoraisController::class, 'index']);
     Route::post('pastorais', [PastoraisController::class, 'store']);
+    Route::post('pastorais/merge', [PastoraisController::class, 'merge']);
     Route::get('pastorais/{id}', [PastoraisController::class, 'show']);
     Route::patch('pastorais/{id}', [PastoraisController::class, 'update']);
     Route::delete('pastorais/{id}', [PastoraisController::class, 'destroy']);

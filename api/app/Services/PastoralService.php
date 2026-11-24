@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\Pastoral;
+use App\Models\PlanejamentoEvento;
+use App\Models\PlanejamentoPastoralToken;
 use App\Models\User;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class PastoralService
@@ -96,5 +99,104 @@ class PastoralService
     {
         $user = User::query()->where('ulid', $userUlid)->firstOrFail();
         $pastoral->membros()->detach($user->id);
+    }
+
+    /**
+     * Unifica duas pastorais (SPEC-038): mantém keep, absorve absorb.
+     */
+    public function merge(string $keepId, string $absorbId): Pastoral
+    {
+        if ($keepId === $absorbId) {
+            throw ValidationException::withMessages([
+                'absorb_id' => ['Selecione duas pastorais diferentes para unificar.'],
+            ]);
+        }
+
+        return DB::transaction(function () use ($keepId, $absorbId) {
+            $keep = $this->find($keepId);
+            $absorb = $this->find($absorbId);
+
+            $this->mergeMembros($keep, $absorb);
+            $this->reatribuirEventos($keep, $absorb);
+            $this->reatribuirTokens($keep, $absorb);
+            $this->preencherLacunas($keep, $absorb);
+
+            $absorb->membros()->detach();
+            $absorb->delete();
+
+            return $this->find((string) $keep->id);
+        });
+    }
+
+    private function mergeMembros(Pastoral $keep, Pastoral $absorb): void
+    {
+        $keepByUser = $keep->membros()
+            ->get()
+            ->keyBy(fn (User $u) => (int) $u->id);
+
+        foreach ($absorb->membros()->get() as $user) {
+            $papelAbsorb = (string) ($user->pivot->papel ?? Pastoral::PAPEL_MEMBRO);
+            $existente = $keepByUser->get((int) $user->id);
+
+            if ($existente === null) {
+                $keep->membros()->attach($user->id, ['papel' => $papelAbsorb]);
+                continue;
+            }
+
+            $papelKeep = (string) ($existente->pivot->papel ?? Pastoral::PAPEL_MEMBRO);
+            if (
+                $papelKeep !== Pastoral::PAPEL_COORDENADOR
+                && $papelAbsorb === Pastoral::PAPEL_COORDENADOR
+            ) {
+                $keep->membros()->updateExistingPivot($user->id, [
+                    'papel' => Pastoral::PAPEL_COORDENADOR,
+                ]);
+            }
+        }
+    }
+
+    private function reatribuirEventos(Pastoral $keep, Pastoral $absorb): void
+    {
+        PlanejamentoEvento::query()
+            ->where('pastoral_id', $absorb->id)
+            ->update(['pastoral_id' => $keep->id]);
+    }
+
+    private function reatribuirTokens(Pastoral $keep, Pastoral $absorb): void
+    {
+        $tokensAbsorb = PlanejamentoPastoralToken::query()
+            ->where('pastoral_id', $absorb->id)
+            ->get();
+
+        foreach ($tokensAbsorb as $token) {
+            $conflito = PlanejamentoPastoralToken::query()
+                ->where('planejamento_anual_id', $token->planejamento_anual_id)
+                ->where('pastoral_id', $keep->id)
+                ->exists();
+
+            if ($conflito) {
+                $token->delete();
+                continue;
+            }
+
+            $token->pastoral_id = $keep->id;
+            $token->save();
+        }
+    }
+
+    private function preencherLacunas(Pastoral $keep, Pastoral $absorb): void
+    {
+        $dirty = false;
+        foreach (['descricao_publica', 'contato_publico'] as $campo) {
+            $atual = $keep->{$campo};
+            $candidato = $absorb->{$campo};
+            if (($atual === null || $atual === '') && $candidato !== null && $candidato !== '') {
+                $keep->{$campo} = $candidato;
+                $dirty = true;
+            }
+        }
+        if ($dirty) {
+            $keep->save();
+        }
     }
 }
