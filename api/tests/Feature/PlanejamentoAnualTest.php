@@ -816,4 +816,150 @@ class PlanejamentoAnualTest extends TestCase
         $this->assertCount(1, $listaA);
         $this->assertSame('Só da A', $listaA[0]['titulo']);
     }
+
+    public function test_create_autenticado_repetir_semanal_expande_ate_fim_do_ano(): void
+    {
+        $base = $this->seedBase();
+        $anualId = $base['anual']['id'];
+
+        Sanctum::actingAs($this->admin);
+        $this->tenantJson('POST', '/api/v1/planejamento/anuais/'.$anualId.'/status', [
+            'status' => 'coleta',
+        ])->assertOk();
+
+        // 2026-11-02 é segunda → até 2026-12-28 = 9 ocorrências
+        $resp = $this->tenantJson('POST', '/api/v1/planejamento/anuais/'.$anualId.'/eventos', [
+            'pastoral_id' => $base['pastoral']['id'],
+            'titulo' => 'Reunião semanal',
+            'data_inicio' => '2026-11-02',
+            'hora_inicio' => '19:00',
+            'hora_fim' => '20:00',
+            'local_texto' => 'Salão',
+            'repetir' => 'semanal',
+        ])->assertCreated();
+
+        $this->assertSame(9, $resp->json('criados'));
+        $data = $resp->json('data');
+        $this->assertIsArray($data);
+        $this->assertCount(9, $data);
+        $this->assertSame('2026-11-02', $data[0]['data_inicio']);
+        $this->assertSame('2026-12-28', $data[8]['data_inicio']);
+
+        $lista = $this->tenantJson('GET', '/api/v1/planejamento/anuais/'.$anualId.'/eventos')
+            ->assertOk()
+            ->json('data');
+        $this->assertCount(9, $lista);
+    }
+
+    public function test_create_autenticado_repetir_mensal_preserva_duracao(): void
+    {
+        $base = $this->seedBase();
+        $anualId = $base['anual']['id'];
+
+        Sanctum::actingAs($this->admin);
+        $this->tenantJson('POST', '/api/v1/planejamento/anuais/'.$anualId.'/status', [
+            'status' => 'coleta',
+        ])->assertOk();
+
+        $resp = $this->tenantJson('POST', '/api/v1/planejamento/anuais/'.$anualId.'/eventos', [
+            'pastoral_id' => $base['pastoral']['id'],
+            'titulo' => 'Retiro mensal',
+            'data_inicio' => '2026-10-15',
+            'data_fim' => '2026-10-17',
+            'local_texto' => 'Casa de retiro',
+            'repetir' => 'mensal',
+        ])->assertCreated();
+
+        $this->assertSame(3, $resp->json('criados'));
+        $data = $resp->json('data');
+        $this->assertSame([
+            ['inicio' => '2026-10-15', 'fim' => '2026-10-17'],
+            ['inicio' => '2026-11-15', 'fim' => '2026-11-17'],
+            ['inicio' => '2026-12-15', 'fim' => '2026-12-17'],
+        ], array_map(fn ($e) => [
+            'inicio' => $e['data_inicio'],
+            'fim' => $e['data_fim'],
+        ], $data));
+    }
+
+    public function test_create_sem_repetir_mantem_shape_objeto(): void
+    {
+        $base = $this->seedBase();
+        $anualId = $base['anual']['id'];
+
+        Sanctum::actingAs($this->admin);
+        $this->tenantJson('POST', '/api/v1/planejamento/anuais/'.$anualId.'/status', [
+            'status' => 'coleta',
+        ])->assertOk();
+
+        $resp = $this->tenantJson('POST', '/api/v1/planejamento/anuais/'.$anualId.'/eventos', [
+            'pastoral_id' => $base['pastoral']['id'],
+            'titulo' => 'Único',
+            'data_inicio' => '2026-05-01',
+            'local_texto' => 'Salão',
+        ])->assertCreated();
+
+        $this->assertIsArray($resp->json('data'));
+        $this->assertArrayHasKey('id', $resp->json('data'));
+        $this->assertArrayNotHasKey('criados', $resp->json());
+        $this->assertSame('Único', $resp->json('data.titulo'));
+    }
+
+    public function test_repetir_invalido_422(): void
+    {
+        $base = $this->seedBase();
+        $anualId = $base['anual']['id'];
+
+        Sanctum::actingAs($this->admin);
+        $this->tenantJson('POST', '/api/v1/planejamento/anuais/'.$anualId.'/status', [
+            'status' => 'coleta',
+        ])->assertOk();
+
+        $this->tenantJson('POST', '/api/v1/planejamento/anuais/'.$anualId.'/eventos', [
+            'pastoral_id' => $base['pastoral']['id'],
+            'titulo' => 'X',
+            'data_inicio' => '2026-05-01',
+            'local_texto' => 'Salão',
+            'repetir' => 'diario',
+        ])->assertStatus(422)->assertJsonValidationErrors('repetir');
+    }
+
+    public function test_link_publico_repetir_mensal(): void
+    {
+        $base = $this->seedBase();
+        $anualId = $base['anual']['id'];
+        $pastoralId = $base['pastoral']['id'];
+
+        Sanctum::actingAs($this->admin);
+        $this->tenantJson('POST', '/api/v1/planejamento/anuais/'.$anualId.'/status', [
+            'status' => 'coleta',
+        ])->assertOk();
+
+        $plain = $this->tenantJson(
+            'POST',
+            '/api/v1/planejamento/anuais/'.$anualId.'/pastorais/'.$pastoralId.'/token'
+        )->assertCreated()->json('token');
+
+        Auth::forgetGuards();
+        $this->app['auth']->forgetGuards();
+
+        $resp = $this->withHeader('X-Tenant', 'demo-planejamento')
+            ->postJson('/api/v1/public/planejamento/'.$plain.'/eventos', [
+                'titulo' => 'Via link mensal',
+                'data_inicio' => '2026-11-10',
+                'local_texto' => 'Salão',
+                'repetir' => 'mensal',
+            ])
+            ->assertCreated();
+
+        $this->assertSame(2, $resp->json('criados'));
+        $this->assertCount(2, $resp->json('data'));
+        $this->assertSame('proposta', $resp->json('data.0.status_solicitacao'));
+
+        $lista = $this->withHeader('X-Tenant', 'demo-planejamento')
+            ->getJson('/api/v1/public/planejamento/'.$plain.'/eventos')
+            ->assertOk()
+            ->json('data');
+        $this->assertCount(2, $lista);
+    }
 }

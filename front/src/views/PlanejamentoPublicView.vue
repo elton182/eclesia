@@ -4,6 +4,8 @@ import { useRoute } from 'vue-router'
 import { useTenantStore } from '@/stores/tenant'
 import { MES_NOMES, formatHoraCalendario, gradeMesCalendario } from '@/utils/calendario'
 import {
+  REPETIR_OPCOES,
+  applyRepetirToPayload,
   buildPublicEventoPayload,
   buildPublicEventosParams,
   canEditarEventoPlanejamentoPublico,
@@ -16,6 +18,7 @@ import {
   podeCarregarEventosPublicos,
   resolvePublicTenantSlug,
   styleStatusSolicitacao,
+  textoAjudaRepetir,
 } from '@/utils/planejamento'
 import { innovToast } from '@/plugins/toast'
 import { innovConfirm } from '@/plugins/dialog'
@@ -67,8 +70,17 @@ const emptyForm = () => ({
   hora_fim: '',
   local_texto: '',
   observacoes: '',
+  repetir: '',
 })
 const form = ref(emptyForm())
+const ajudaRepetir = computed(() => {
+  if (editingEvento.value) return ''
+  return textoAjudaRepetir(
+    form.value.repetir,
+    brToIso(form.value.data_inicio),
+    meta.value?.ano,
+  )
+})
 const selecaoRecursos = ref(emptySelecaoRecursos())
 const disponibilidade = ref([])
 const dispLoading = ref(false)
@@ -181,6 +193,7 @@ function openEdit(ev) {
     hora_fim: formatHoraCalendario(ev.hora_fim) || '',
     local_texto: ev.local_texto || '',
     observacoes: ev.observacoes || '',
+    repetir: '',
   }
   selecaoRecursos.value = selecaoFromEvento(ev)
   capacidadeErro.value = ''
@@ -288,7 +301,7 @@ async function load() {
 
 function buildPayload() {
   const dataInicio = brToIso(form.value.data_inicio)
-  return buildPublicEventoPayload(
+  const base = buildPublicEventoPayload(
     {
       titulo: form.value.titulo.trim(),
       data_inicio: dataInicio,
@@ -301,6 +314,8 @@ function buildPayload() {
     meta.value,
     pastoralNomeConfirmado.value,
   )
+  if (editingEvento.value) return base
+  return applyRepetirToPayload(base, form.value.repetir)
 }
 
 async function salvar() {
@@ -324,8 +339,13 @@ async function salvar() {
       await updateEventoPublico(token.value, editingEvento.value.id, payload, headers.value)
       innovToast('success', 'Planejamento', 'Proposta atualizada')
     } else {
-      await createEventoPublico(token.value, payload, headers.value)
-      innovToast('success', 'Planejamento', 'Proposta enviada')
+      const result = await createEventoPublico(token.value, payload, headers.value)
+      const n = result.criados
+      innovToast(
+        'success',
+        'Planejamento',
+        n && n > 1 ? `${n} propostas enviadas` : 'Proposta enviada',
+      )
     }
     const dia = brToIso(form.value.data_inicio) || diaSelecionado.value
     await carregarEventos()
@@ -750,6 +770,31 @@ onMounted(load)
                 />
               </div>
             </div>
+          </div>
+          <div v-if="!editingEvento">
+            <label class="fld" for="pub-repetir">Repetir</label>
+            <select
+              id="pub-repetir"
+              v-model="form.repetir"
+              class="input"
+              data-testid="planejamento-publico-repetir"
+            >
+              <option
+                v-for="opt in REPETIR_OPCOES"
+                :key="opt.value || 'none'"
+                :value="opt.value"
+              >
+                {{ opt.label }}
+              </option>
+            </select>
+            <p
+              v-if="ajudaRepetir"
+              class="mt-1 text-[12px]"
+              style="color: var(--color-muted)"
+              data-testid="planejamento-publico-repetir-ajuda"
+            >
+              {{ ajudaRepetir }}
+            </p>
           </div>
           <PlanejamentoRecursosPicker
             v-if="temEspacos || disponibilidade.length || dispLoading"

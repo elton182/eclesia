@@ -185,7 +185,13 @@ class PlanejamentoService
 
     /**
      * @param  array<string, mixed>  $data
-     * @return array{evento: PlanejamentoEvento, conflitos: list<array<string, mixed>>}
+     * @return array{
+     *   evento: PlanejamentoEvento,
+     *   eventos: list<PlanejamentoEvento>,
+     *   conflitos: list<array<string, mixed>>,
+     *   criados: int,
+     *   expandido: bool
+     * }
      */
     public function createEvento(PlanejamentoAnual $anual, array $data, bool $publico = false): array
     {
@@ -194,60 +200,104 @@ class PlanejamentoService
         $this->assertLocalOuTexto($data, $this->recursos->temEspaco($pedido));
         $localIds = $this->resolveLocalIds($data['local_ids'] ?? []);
 
+        $modoRepetir = isset($data['repetir']) && is_string($data['repetir']) && $data['repetir'] !== ''
+            ? $data['repetir']
+            : null;
+        unset($data['repetir'], $data['pastoral_nome']);
+
+        $ocorrencias = PlanejamentoRecorrencia::expandir(
+            (string) $data['data_inicio'],
+            isset($data['data_fim']) && is_string($data['data_fim']) ? $data['data_fim'] : null,
+            $modoRepetir,
+            (int) $anual->ano,
+        );
+
         $isGestor = $this->access->canGerir();
         $status = $isGestor && ! empty($data['status_solicitacao'])
             ? $data['status_solicitacao']
             : PlanejamentoEvento::STATUS_PROPOSTA;
 
-        $evento = DB::transaction(function () use ($anual, $data, $pedido, $localIds, $isGestor, $status, $publico) {
-            if ($status !== PlanejamentoEvento::STATUS_RECUSADO) {
-                $this->recursos->assertCapacidade(
-                    $anual->id,
-                    PlanejamentoIntervalo::deDados(
-                        (string) $data['data_inicio'],
-                        $data['data_fim'] ?? null,
-                        $data['hora_inicio'] ?? null,
-                        $data['hora_fim'] ?? null,
-                    ),
-                    $pedido,
-                    null,
-                    $publico,
-                );
+        $eventos = DB::transaction(function () use (
+            $anual,
+            $data,
+            $pedido,
+            $localIds,
+            $isGestor,
+            $status,
+            $publico,
+            $ocorrencias,
+        ) {
+            $criados = [];
+            foreach ($ocorrencias as $oc) {
+                $dataOc = [
+                    ...$data,
+                    'data_inicio' => $oc['data_inicio'],
+                    'data_fim' => $oc['data_fim'],
+                ];
+
+                if ($status !== PlanejamentoEvento::STATUS_RECUSADO) {
+                    $this->recursos->assertCapacidade(
+                        $anual->id,
+                        PlanejamentoIntervalo::deDados(
+                            (string) $dataOc['data_inicio'],
+                            $dataOc['data_fim'] ?? null,
+                            $dataOc['hora_inicio'] ?? null,
+                            $dataOc['hora_fim'] ?? null,
+                        ),
+                        $pedido,
+                        null,
+                        $publico,
+                    );
+                }
+
+                $evento = PlanejamentoEvento::query()->create([
+                    'planejamento_anual_id' => $anual->id,
+                    'pastoral_id' => $dataOc['pastoral_id'],
+                    'titulo' => $dataOc['titulo'],
+                    'data_inicio' => $dataOc['data_inicio'],
+                    'data_fim' => $dataOc['data_fim'] ?? null,
+                    'hora_inicio' => $dataOc['hora_inicio'] ?? null,
+                    'hora_fim' => $dataOc['hora_fim'] ?? null,
+                    'participantes_media' => $dataOc['participantes_media'] ?? null,
+                    'observacoes' => $dataOc['observacoes'] ?? null,
+                    'local_texto' => $dataOc['local_texto'] ?? null,
+                    'status_solicitacao' => $status,
+                    'motivo_ajuste' => $isGestor ? ($dataOc['motivo_ajuste'] ?? null) : null,
+                ]);
+
+                if ($localIds !== []) {
+                    $evento->locais()->sync($localIds);
+                }
+                $evento->recursos()->sync($this->pivotRecursos($pedido));
+                $criados[] = $evento;
             }
 
-            $evento = PlanejamentoEvento::query()->create([
-                'planejamento_anual_id' => $anual->id,
-                'pastoral_id' => $data['pastoral_id'],
-                'titulo' => $data['titulo'],
-                'data_inicio' => $data['data_inicio'],
-                'data_fim' => $data['data_fim'] ?? null,
-                'hora_inicio' => $data['hora_inicio'] ?? null,
-                'hora_fim' => $data['hora_fim'] ?? null,
-                'participantes_media' => $data['participantes_media'] ?? null,
-                'observacoes' => $data['observacoes'] ?? null,
-                'local_texto' => $data['local_texto'] ?? null,
-                'status_solicitacao' => $status,
-                'motivo_ajuste' => $isGestor ? ($data['motivo_ajuste'] ?? null) : null,
-            ]);
-
-            if ($localIds !== []) {
-                $evento->locais()->sync($localIds);
-            }
-            $evento->recursos()->sync($this->pivotRecursos($pedido));
-
-            return $evento;
+            return $criados;
         });
 
-        $evento->load(['locais', 'recursos', 'pastoral', 'planejamentoAnual']);
-        $conflitos = $this->detectarConflitos($evento);
+        $conflitos = [];
+        $vistos = [];
+        foreach ($eventos as $evento) {
+            $evento->load(['locais', 'recursos', 'pastoral', 'planejamentoAnual']);
+            foreach ($this->detectarConflitos($evento) as $c) {
+                $key = ($c['id'] ?? '').'|'.($evento->id);
+                if (isset($vistos[$key])) {
+                    continue;
+                }
+                $vistos[$key] = true;
+                $conflitos[] = $c;
+            }
+        }
 
-        return ['evento' => $evento, 'conflitos' => $conflitos];
+        return [
+            'evento' => $eventos[0],
+            'eventos' => $eventos,
+            'conflitos' => $conflitos,
+            'criados' => count($eventos),
+            'expandido' => $modoRepetir !== null,
+        ];
     }
 
-    /**
-     * @param  array<string, mixed>  $data
-     * @return array{evento: PlanejamentoEvento, conflitos: list<array<string, mixed>>}
-     */
     /**
      * @param  array<string, mixed>  $data
      * @return array{evento: PlanejamentoEvento, conflitos: list<array<string, mixed>>}
@@ -789,7 +839,14 @@ class PlanejamentoService
 
     /**
      * @param  array<string, mixed>  $data
-     * @return array{evento: PlanejamentoEvento, conflitos: list<array<string, mixed>>, pastoral_criada: bool}
+     * @return array{
+     *   evento: PlanejamentoEvento,
+     *   eventos: list<PlanejamentoEvento>,
+     *   conflitos: list<array<string, mixed>>,
+     *   criados: int,
+     *   expandido: bool,
+     *   pastoral_criada: bool
+     * }
      */
     public function createEventoPublico(PlanejamentoPublicLink $link, array $data): array
     {

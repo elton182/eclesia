@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Http\Requests;
 
+use App\Services\PlanejamentoRecorrencia;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StorePlanejamentoEventoPublicoRequest extends FormRequest
 {
@@ -29,6 +31,7 @@ class StorePlanejamentoEventoPublicoRequest extends FormRequest
             'recursos' => ['sometimes', 'array', 'max:30'],
             'recursos.*.recurso_id' => ['required', 'string', 'distinct', 'exists:planejamento_recursos,id'],
             'recursos.*.quantidade' => ['nullable', 'integer', 'min:1', 'max:9999'],
+            'repetir' => ['sometimes', 'nullable', 'string', Rule::in(PlanejamentoRecorrencia::MODOS)],
         ];
     }
 }

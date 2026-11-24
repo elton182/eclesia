@@ -114,10 +114,7 @@ class PlanejamentoController extends Controller
 
         $result = $this->planejamento->createEvento($anual, $data);
 
-        return (new PlanejamentoEventoResource($result['evento']))
-            ->withConflitos($result['conflitos'])
-            ->response()
-            ->setStatusCode(201);
+        return $this->respostaEventosCriados($result);
     }
 
     public function showEvento(string $eventoId): PlanejamentoEventoResource
@@ -280,11 +277,9 @@ class PlanejamentoController extends Controller
         $link = $this->planejamento->findPublicLink($token);
         $result = $this->planejamento->createEventoPublico($link, $request->validated());
 
-        return (new PlanejamentoEventoResource($result['evento']))
-            ->withConflitos($result['conflitos'])
-            ->additional(['pastoral_criada' => $result['pastoral_criada']])
-            ->response()
-            ->setStatusCode(201);
+        return $this->respostaEventosCriados($result, [
+            'pastoral_criada' => $result['pastoral_criada'],
+        ]);
     }
 
     public function updateEventoPublico(
@@ -319,5 +314,38 @@ class PlanejamentoController extends Controller
         return response()->json([
             'data' => $this->planejamento->disponibilidadePublica($link, $request->validated()),
         ]);
+    }
+
+    /**
+     * @param  array{
+     *   evento: \App\Models\PlanejamentoEvento,
+     *   eventos: list<\App\Models\PlanejamentoEvento>,
+     *   conflitos: list<array<string, mixed>>,
+     *   criados: int,
+     *   expandido: bool
+     * }  $result
+     * @param  array<string, mixed>  $extra
+     */
+    private function respostaEventosCriados(array $result, array $extra = []): JsonResponse
+    {
+        if ($result['expandido']) {
+            $collection = PlanejamentoEventoResource::collection($result['eventos']);
+
+            return response()->json([
+                'data' => $collection->resolve(),
+                'criados' => $result['criados'],
+                'conflitos' => $result['conflitos'],
+                ...$extra,
+            ], 201);
+        }
+
+        $resource = (new PlanejamentoEventoResource($result['evento']))
+            ->withConflitos($result['conflitos']);
+
+        if ($extra !== []) {
+            $resource->additional($extra);
+        }
+
+        return $resource->response()->setStatusCode(201);
     }
 }
