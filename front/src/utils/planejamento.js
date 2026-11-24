@@ -664,6 +664,112 @@ export function buildPublicEventoPayload(payload, meta, pastoralNome) {
   return body
 }
 
+/** Opções de repetição na criação (SPEC-038). */
+export const REPETIR_OPCOES = Object.freeze([
+  { value: '', label: 'Não repetir' },
+  { value: 'semanal', label: 'Toda semana' },
+  { value: 'mensal', label: 'Todos os meses do ano' },
+])
+
+const DIAS_SEMANA_PT = Object.freeze([
+  'domingo',
+  'segunda',
+  'terça',
+  'quarta',
+  'quinta',
+  'sexta',
+  'sábado',
+])
+
+/**
+ * @param {string|null|undefined} iso YYYY-MM-DD
+ * @returns {Date|null}
+ */
+function parseYmdLocal(iso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || '').slice(0, 10))
+  if (!m) return null
+  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
+}
+
+/**
+ * @param {string|null|undefined} iso
+ * @returns {string}
+ */
+export function labelDiaSemanaIso(iso) {
+  const d = parseYmdLocal(iso)
+  if (!d) return ''
+  return DIAS_SEMANA_PT[d.getDay()] || ''
+}
+
+/**
+ * @param {string|null|undefined} modo
+ * @param {string|null|undefined} dataInicioIso
+ * @param {number|null|undefined} ano
+ * @returns {number}
+ */
+export function contarOcorrenciasRepetir(modo, dataInicioIso, ano) {
+  if (modo !== 'semanal' && modo !== 'mensal') return 1
+  const start = parseYmdLocal(dataInicioIso)
+  const year = Number(ano)
+  if (!start || !Number.isFinite(year)) return 1
+
+  if (modo === 'semanal') {
+    let n = 0
+    const d = new Date(start.getFullYear(), start.getMonth(), start.getDate())
+    const limite = new Date(year, 11, 31)
+    while (d <= limite && d.getFullYear() === year) {
+      n += 1
+      d.setDate(d.getDate() + 7)
+    }
+    return n || 1
+  }
+
+  const diaAlvo = start.getDate()
+  let n = 0
+  for (let m = start.getMonth(); m <= 11; m += 1) {
+    const ultimo = new Date(year, m + 1, 0).getDate()
+    const d = new Date(year, m, Math.min(diaAlvo, ultimo))
+    if (d >= start && d.getFullYear() === year) n += 1
+  }
+  return n || 1
+}
+
+/**
+ * Texto auxiliar sob o select de repetir.
+ * @param {string|null|undefined} modo
+ * @param {string|null|undefined} dataInicioIso
+ * @param {number|null|undefined} ano
+ * @returns {string}
+ */
+export function textoAjudaRepetir(modo, dataInicioIso, ano) {
+  if (modo !== 'semanal' && modo !== 'mensal') return ''
+  const year = Number(ano) || new Date().getFullYear()
+  const n = contarOcorrenciasRepetir(modo, dataInicioIso, year)
+  if (modo === 'semanal') {
+    const dia = labelDiaSemanaIso(dataInicioIso) || 'mesmo dia da semana'
+    return `Cria ${n} ocorrência${n === 1 ? '' : 's'}: toda ${dia} até dez/${year}.`
+  }
+  const day = String(dataInicioIso || '').slice(8, 10)
+  const diaLabel = day ? `dia ${Number(day)}` : 'mesmo dia'
+  return `Cria ${n} ocorrência${n === 1 ? '' : 's'}: ${diaLabel} de cada mês até dez/${year}.`
+}
+
+/**
+ * Injeta ou remove `repetir` no payload de create.
+ * @param {Record<string, unknown>} payload
+ * @param {string|null|undefined} repetir
+ * @returns {Record<string, unknown>}
+ */
+export function applyRepetirToPayload(payload, repetir) {
+  const body = { ...(payload || {}) }
+  if (repetir === 'semanal' || repetir === 'mensal') {
+    body.repetir = repetir
+  } else {
+    delete body.repetir
+  }
+  return body
+}
+
 /**
  * Extrai token em claro do GET/POST token-generico.
  * @param {Record<string, unknown>|null|undefined} data

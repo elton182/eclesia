@@ -49,9 +49,25 @@ export async function listEventos(anualId, params = {}) {
 
 /**
  * Resposta pode incluir `conflitos[]` no root ou em data.
- * @returns {{ evento: Record<string, unknown>|null, conflitos: Array }}
+ * Com `repetir` (SPEC-038): `data` é array + `criados`.
+ * @returns {{
+ *   evento: Record<string, unknown>|null,
+ *   eventos: Array<Record<string, unknown>>,
+ *   conflitos: Array,
+ *   criados: number|null
+ * }}
  */
 function withConflitos(body) {
+  if (Array.isArray(body?.data)) {
+    const eventos = body.data
+    return {
+      evento: eventos[0] || null,
+      eventos,
+      conflitos: Array.isArray(body.conflitos) ? body.conflitos : [],
+      criados: typeof body.criados === 'number' ? body.criados : eventos.length,
+    }
+  }
+
   const item = unwrapItem(body)
   const conflitos =
     (item && Array.isArray(item.conflitos) && item.conflitos) ||
@@ -59,9 +75,14 @@ function withConflitos(body) {
     []
   if (item && 'conflitos' in item) {
     const { conflitos: _c, ...rest } = item
-    return { evento: rest, conflitos }
+    return { evento: rest, eventos: rest ? [rest] : [], conflitos, criados: null }
   }
-  return { evento: item, conflitos }
+  return {
+    evento: item,
+    eventos: item ? [item] : [],
+    conflitos,
+    criados: null,
+  }
 }
 
 export async function createEvento(anualId, payload) {

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Requests;
 
 use App\Models\PlanejamentoEvento;
+use App\Services\PlanejamentoRecorrencia;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -37,6 +38,7 @@ class StorePlanejamentoEventoRequest extends FormRequest
             'recursos.*.quantidade' => ['nullable', 'integer', 'min:1', 'max:9999'],
             'status_solicitacao' => ['sometimes', 'string', Rule::in(PlanejamentoEvento::STATUS_SOLICITACAO)],
             'motivo_ajuste' => ['nullable', 'string'],
+            'repetir' => ['sometimes', 'nullable', 'string', Rule::in(PlanejamentoRecorrencia::MODOS)],
         ];
     }
 }

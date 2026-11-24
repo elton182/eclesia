@@ -494,4 +494,33 @@ class PlanejamentoRecursosTest extends TestCase
         $this->tenantJson('GET', '/api/v1/planejamento/anuais/'.$base['anualId'].'/disponibilidade?data_inicio=2026-03-10')
             ->assertOk();
     }
+
+    public function test_repetir_falha_capacidade_nao_grava_nenhum(): void
+    {
+        $base = $this->seedAno();
+        $sala = $this->criarRecurso(['nome' => 'Sala 1', 'tipo' => 'espaco']);
+
+        // 2026-03-09 e 2026-03-23 são segundas; bloqueia a 3ª ocorrência da série.
+        $this->criarEvento($base['anualId'], $base['pastoralA'], [['recurso_id' => $sala['id']]], [
+            'titulo' => 'Bloqueio',
+            'data_inicio' => '2026-03-23',
+            'hora_inicio' => '19:00',
+            'hora_fim' => '21:00',
+        ])->assertCreated();
+
+        Sanctum::actingAs($this->admin);
+        $this->criarEvento($base['anualId'], $base['pastoralB'], [['recurso_id' => $sala['id']]], [
+            'titulo' => 'Série',
+            'data_inicio' => '2026-03-09',
+            'hora_inicio' => '19:00',
+            'hora_fim' => '21:00',
+            'repetir' => 'semanal',
+        ])->assertStatus(422)->assertJsonValidationErrors('recursos');
+
+        $depois = $this->tenantJson('GET', '/api/v1/planejamento/anuais/'.$base['anualId'].'/eventos')
+            ->assertOk()
+            ->json('data');
+        $this->assertCount(1, $depois);
+        $this->assertSame('Bloqueio', $depois[0]['titulo']);
+    }
 }

@@ -62,6 +62,9 @@ import {
   styleStatusSolicitacao,
   togglePastoralVisivel,
   unwrapList,
+  REPETIR_OPCOES,
+  applyRepetirToPayload,
+  textoAjudaRepetir,
 } from '@/utils/planejamento'
 import {
   buildRecursosPayload,
@@ -156,9 +159,18 @@ const emptyForm = () => ({
   local_texto: '',
   status_solicitacao: 'proposta',
   motivo_ajuste: '',
+  repetir: '',
 })
 
 const form = ref(emptyForm())
+const ajudaRepetir = computed(() => {
+  if (editingEvento.value) return ''
+  return textoAjudaRepetir(
+    form.value.repetir,
+    brToIso(form.value.data_inicio),
+    anual.value?.ano,
+  )
+})
 
 const isPlatformAdmin = computed(() => authAdmin.isAuthenticated && !auth.isAuthenticated)
 const canGerir = computed(
@@ -465,6 +477,7 @@ function openEdit(ev) {
     local_texto: ev.local_texto || '',
     status_solicitacao: ev.status_solicitacao || 'proposta',
     motivo_ajuste: ev.motivo_ajuste || '',
+    repetir: '',
   }
   selecaoRecursos.value = selecaoFromEvento(ev)
   capacidadeErro.value = ''
@@ -636,7 +649,7 @@ function buildPayload() {
   const f = form.value
   const dataInicio = brToIso(f.data_inicio)
   const dataFim = brToIso(f.data_fim)
-  const payload = {
+  let payload = {
     pastoral_id: f.pastoral_id,
     titulo: f.titulo.trim(),
     data_inicio: dataInicio,
@@ -655,6 +668,9 @@ function buildPayload() {
   if (canGerir.value && editingEvento.value) {
     payload.status_solicitacao = f.status_solicitacao
     payload.motivo_ajuste = f.motivo_ajuste || null
+  }
+  if (!editingEvento.value) {
+    payload = applyRepetirToPayload(payload, f.repetir)
   }
   return payload
 }
@@ -733,11 +749,18 @@ async function salvarEvento() {
     let result
     if (editingEvento.value) {
       result = await updateEvento(editingEvento.value.id, payload)
+      showConflitos(result.conflitos)
+      innovToast('success', 'Evento', 'Atualizado')
     } else {
       result = await createEvento(anual.value.id, payload)
+      showConflitos(result.conflitos)
+      const n = result.criados
+      innovToast(
+        'success',
+        'Evento',
+        n && n > 1 ? `${n} eventos criados` : 'Proposto',
+      )
     }
-    showConflitos(result.conflitos)
-    innovToast('success', 'Evento', editingEvento.value ? 'Atualizado' : 'Proposto')
     closeForm()
     showDayModal.value = false
     await load({ silent: true })
@@ -1880,6 +1903,31 @@ onMounted(load)
                 required
               />
               <DateInput v-model="form.data_fim" name="ev-fim" label="Data fim" />
+              <div v-if="!editingEvento" class="sm:col-span-2">
+                <label class="fld" for="ev-repetir">Repetir</label>
+                <select
+                  id="ev-repetir"
+                  v-model="form.repetir"
+                  class="input"
+                  data-testid="planejamento-evento-repetir"
+                >
+                  <option
+                    v-for="opt in REPETIR_OPCOES"
+                    :key="opt.value || 'none'"
+                    :value="opt.value"
+                  >
+                    {{ opt.label }}
+                  </option>
+                </select>
+                <p
+                  v-if="ajudaRepetir"
+                  class="mt-1 text-[12px]"
+                  style="color: var(--color-muted)"
+                  data-testid="planejamento-evento-repetir-ajuda"
+                >
+                  {{ ajudaRepetir }}
+                </p>
+              </div>
               <div>
                 <label class="fld" for="ev-hi">Hora início</label>
                 <input

@@ -45,6 +45,10 @@ import {
   plainTokenFromAnualToken,
   buildPlanejamentoPublicUrl,
   resolvePublicTenantSlug,
+  applyRepetirToPayload,
+  contarOcorrenciasRepetir,
+  labelDiaSemanaIso,
+  textoAjudaRepetir,
 } from './planejamento.js'
 
 describe('planejamento', () => {
@@ -347,5 +351,20 @@ describe('planejamento', () => {
     )
     assert.equal(resolvePublicTenantSlug({ params: {}, query: { tenant: 'b' } }), 'b')
     assert.equal(resolvePublicTenantSlug({ params: {}, query: {} }, 'fallback'), 'fallback')
+  })
+
+  it('aplica e conta repetição (SPEC-038)', () => {
+    assert.deepEqual(applyRepetirToPayload({ titulo: 'T' }, ''), { titulo: 'T' })
+    assert.deepEqual(applyRepetirToPayload({ titulo: 'T' }, 'semanal'), {
+      titulo: 'T',
+      repetir: 'semanal',
+    })
+    assert.equal(labelDiaSemanaIso('2026-11-02'), 'segunda')
+    assert.equal(contarOcorrenciasRepetir('semanal', '2026-11-02', 2026), 9)
+    assert.equal(contarOcorrenciasRepetir('mensal', '2026-10-15', 2026), 3)
+    assert.equal(contarOcorrenciasRepetir('', '2026-10-15', 2026), 1)
+    assert.match(textoAjudaRepetir('semanal', '2026-11-02', 2026), /toda segunda/)
+    assert.match(textoAjudaRepetir('mensal', '2026-10-15', 2026), /dia 15/)
+    assert.equal(textoAjudaRepetir('', '2026-10-15', 2026), '')
   })
 })

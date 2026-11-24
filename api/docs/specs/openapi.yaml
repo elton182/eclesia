@@ -6389,16 +6389,34 @@ paths:
                   enum: [proposta, confirmado, ajuste_solicitado, reagendado, recusado, cotidiano]
                   description: Somente gestor (planejamento.gerir) pode definir; coordenador cria como proposta
                 motivo_ajuste: {type: string, nullable: true}
+                repetir:
+                  type: string
+                  enum: [semanal, mensal]
+                  description: |
+                    SPEC-038. Expande em N eventos até 31/12 do ano (semanal = mesmo weekday; mensal = mesmo dia do mês).
+                    Omitido = uma ocorrência. Resposta com array + criados quando presente.
       responses:
         '201':
-          description: Created (pode incluir conflitos[])
+          description: |
+            Created (pode incluir conflitos[]). Sem `repetir`: `data` é um objeto.
+            Com `repetir`: `data` é array de PlanejamentoEvento + `criados`.
           content:
             application/json:
               schema:
                 type: object
                 properties:
                   data:
-                    $ref: '#/components/schemas/PlanejamentoEvento'
+                    oneOf:
+                      - $ref: '#/components/schemas/PlanejamentoEvento'
+                      - type: array
+                        items:
+                          $ref: '#/components/schemas/PlanejamentoEvento'
+                  criados:
+                    type: integer
+                    description: Presente quando `repetir` foi enviado (SPEC-038)
+                  conflitos:
+                    type: array
+                    items: {type: object}
         '401': {description: Não autenticado}
         '403': {description: Sem permissão / fora do escopo}
         '422':
@@ -6837,16 +6855,30 @@ paths:
                   type: array
                   items:
                     $ref: '#/components/schemas/PlanejamentoRecursoInput'
+                repetir:
+                  type: string
+                  enum: [semanal, mensal]
+                  description: |
+                    SPEC-038. Expande em N propostas até 31/12 do ano.
+                    Omitido = uma ocorrência. Com `repetir`, `data` é array + `criados`.
       responses:
         '201':
-          description: Created
+          description: |
+            Created. Sem `repetir`: `data` objeto. Com `repetir`: `data` array + `criados` (SPEC-038).
           content:
             application/json:
               schema:
                 type: object
                 properties:
                   data:
-                    type: object
+                    oneOf:
+                      - $ref: '#/components/schemas/PlanejamentoEvento'
+                      - type: array
+                        items:
+                          $ref: '#/components/schemas/PlanejamentoEvento'
+                  criados:
+                    type: integer
+                    description: Presente quando `repetir` foi enviado
                   pastoral_criada:
                     type: boolean
                     description: True se a pastoral foi criada neste POST (só modo genérico).
