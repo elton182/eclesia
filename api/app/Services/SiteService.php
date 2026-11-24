@@ -15,8 +15,8 @@ use App\Models\SiteMedia;
 use App\Models\SitePage;
 use App\Models\SiteSetting;
 use App\Models\User;
+use App\Support\UntaggedCache;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -28,8 +28,9 @@ class SiteService
 
     public function forgetPublicSeoCache(): void
     {
-        $current = (int) Cache::get(self::SEO_CACHE_VERSION_KEY, 0);
-        Cache::forever(self::SEO_CACHE_VERSION_KEY, $current + 1);
+        $cache = UntaggedCache::store();
+        $current = (int) $cache->get(self::SEO_CACHE_VERSION_KEY, 0);
+        $cache->forever(self::SEO_CACHE_VERSION_KEY, $current + 1);
     }
 
     public function settings(): SiteSetting
