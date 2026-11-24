@@ -29,7 +29,11 @@ return [
      */
     'bootstrappers' => [
         Stancl\Tenancy\Bootstrappers\DatabaseTenancyBootstrapper::class,
-        Stancl\Tenancy\Bootstrappers\CacheTenancyBootstrapper::class,
+        // CacheTenancyBootstrapper aplica Cache::tags() em toda chamada.
+        // Incompatível com CACHE_STORE=database|file (padrão do projeto) — só redis/memcached
+        // suportam tags. Isolamento: tabela cache no DB do tenant + UntaggedCache no app.
+        // Se migrar para Redis compartilhado, habilite RedisTenancyBootstrapper abaixo.
+        // Stancl\Tenancy\Bootstrappers\CacheTenancyBootstrapper::class,
         Stancl\Tenancy\Bootstrappers\FilesystemTenancyBootstrapper::class,
         Stancl\Tenancy\Bootstrappers\QueueTenancyBootstrapper::class,
         // Stancl\Tenancy\Bootstrappers\RedisTenancyBootstrapper::class, // Note: phpredis is needed

@@ -7,8 +7,8 @@ namespace App\Services;
 use App\Models\SiteBlock;
 use App\Models\SitePage;
 use App\Models\SiteSetting;
+use App\Support\UntaggedCache;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 
 class SitePublicHtmlRenderer
@@ -96,10 +96,11 @@ class SitePublicHtmlRenderer
     {
         $settings = $this->site->assertPublished();
 
-        $version = (int) Cache::get(SiteService::SEO_CACHE_VERSION_KEY, 0);
+        $cache = UntaggedCache::store();
+        $version = (int) $cache->get(SiteService::SEO_CACHE_VERSION_KEY, 0);
         $cacheKey = 'site_access_manifest:'.$tenantSlug.':'.$version;
 
-        return Cache::remember($cacheKey, self::CACHE_TTL_SECONDS, function () use ($tenantSlug, $settings) {
+        return $cache->remember($cacheKey, self::CACHE_TTL_SECONDS, function () use ($tenantSlug, $settings) {
             $front = rtrim((string) config('app.frontend_url'), '/');
             $name = $this->brandTitle($settings);
             $short = $this->shortAppName($name);
@@ -161,10 +162,11 @@ class SitePublicHtmlRenderer
     {
         $this->site->assertPublished();
 
-        $version = (int) Cache::get(SiteService::SEO_CACHE_VERSION_KEY, 0);
+        $cache = UntaggedCache::store();
+        $version = (int) $cache->get(SiteService::SEO_CACHE_VERSION_KEY, 0);
         $cacheKey = 'site_sitemap:'.$version;
 
-        return Cache::remember($cacheKey, self::CACHE_TTL_SECONDS, function () use ($tenantSlug) {
+        return $cache->remember($cacheKey, self::CACHE_TTL_SECONDS, function () use ($tenantSlug) {
             $base = rtrim((string) config('app.frontend_url'), '/');
             $pages = SitePage::query()
                 ->where('status', SitePage::STATUS_PUBLICADO)
@@ -196,10 +198,11 @@ class SitePublicHtmlRenderer
      */
     private function rememberHtml(string $pageKey, callable $builder): string
     {
-        $version = (int) Cache::get(SiteService::SEO_CACHE_VERSION_KEY, 0);
+        $cache = UntaggedCache::store();
+        $version = (int) $cache->get(SiteService::SEO_CACHE_VERSION_KEY, 0);
         $cacheKey = 'site_html:'.$pageKey.':'.$version;
 
-        return Cache::remember($cacheKey, self::CACHE_TTL_SECONDS, $builder);
+        return $cache->remember($cacheKey, self::CACHE_TTL_SECONDS, $builder);
     }
 
     private function buildDocument(
